@@ -6,7 +6,7 @@ A simple MITM forward proxy written in Go.
 
 ## Requirements
 
-- Go 1.23 or newer (older versions will most likely work but are untested)
+- Go 1.24.4 or newer (older versions will most likely work but are untested)
 - OpenSSL (for generating CA cert/key)
 
 ## Quick Start
