@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -25,8 +26,8 @@ type MitmProxy struct {
 func NewMitmProxy(caCertFile, caKeyFile string) (*MitmProxy, error) {
 	caCert, caKey, err := loadX509KeyPair(caCertFile, caKeyFile)
 	if err != nil {
-		log.Fatalf("Failed to load CA certificate and key: %v", err)
-		return nil, err
+		err_msg := fmt.Sprintf("Failed to load CA certificate and key: %v", err)
+		return nil, errors.New(err_msg)
 	}
 	log.Printf("Loaded CA certificate: %v (IsCA=%v)\n", caCert, caCert.IsCA)
 
@@ -38,20 +39,27 @@ func NewMitmProxy(caCertFile, caKeyFile string) (*MitmProxy, error) {
 
 func (p *MitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method == http.MethodConnect {
-		p.handleCONNECT(w, proxyReq)
+		if err := p.handleCONNECT(w, proxyReq); err != nil {
+			log.Printf("Error handling CONNECT request: %v", err)
+			return
+		}
 	} else {
-		p.handleHTTP(w, proxyReq)
+		if err := p.handleHTTP(w, proxyReq); err != nil {
+			log.Printf("Error handling HTTP request: %v", err)
+			return
+		}
 	}
 }
 
-func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) {
+func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	// remove proxy headers
 	proxyReq.RequestURI = ""
 	transport := http.DefaultTransport
 	resp, err := transport.RoundTrip(proxyReq)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
+		err_msg := fmt.Sprintf("error forwarding request to target %v: %v", proxyReq.Host, err)
+		http.Error(w, err_msg, http.StatusBadGateway)
+		return errors.New(err_msg)
 	}
 	defer resp.Body.Close()
 
@@ -64,44 +72,49 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
+
+	return nil
 }
 
-func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) {
+func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		http.Error(w, "Hijacking not supported for target remote", http.StatusInternalServerError)
-		return
+		err_msg := fmt.Sprintf("hijacking not supported for target host '%v'. Hijacking only works with servers that support HTTP 1.x", proxyReq.Host)
+		http.Error(w, err_msg, http.StatusInternalServerError)
+		return errors.New(err_msg)
 	}
 
 	clientConn, _, err := hj.Hijack()
 	if err != nil {
-		log.Printf("Hijack failed: %v", err)
-		http.Error(w, "Hijack failed", http.StatusInternalServerError)
-		return
+		err_msg := fmt.Sprintf("hijack failed: %v", err)
+		http.Error(w, err_msg, http.StatusInternalServerError)
+		return errors.New(err_msg)
 	}
 
 	host, _, err := net.SplitHostPort(proxyReq.Host)
 	if err != nil {
-		log.Printf("Invalid host:port format %v: %v", proxyReq.Host, err)
-		http.Error(w, "Invalid host:port format", http.StatusBadRequest)
-		return
+		err_msg := fmt.Sprintf("invalid host:port format %v: %v", proxyReq.Host, err)
+		http.Error(w, err_msg, http.StatusBadRequest)
+		return errors.New(err_msg)
 	}
 
 	// Create a fake TLS certificate for the target host, signed by our CA.
 	pemCert, pemKey := createCert([]string{host}, p.caCert, p.caKey, 240)
 	tlsCert, err := tls.X509KeyPair(pemCert, pemKey)
 	if err != nil {
-		log.Fatal(err)
+		err_msg := fmt.Sprintf("failed to create TLS certificate for %v: %v", host, err)
+		return errors.New(err_msg)
 	}
 
 	// Send an HTTP OK response back to the client; this initiates the CONNECT
 	// tunnel. From this point on the client will assume it's connected directly
 	// to the target.
 	if _, err := clientConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
-		log.Fatal("Error writing HTTP OK to client:", err)
+		err_msg := fmt.Sprintf("failed to write HTTP OK response to client: %v", err)
+		return errors.New(err_msg)
 	}
 
 	// Configure a new TLS server, pointing it at the client connection, using
@@ -115,6 +128,8 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 	tlsConn := tls.Server(clientConn, tlsConfig)
 	defer tlsConn.Close()
 	proxyRequestLoop(tlsConn, proxyReq)
+
+	return nil
 }
 
 func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
@@ -133,7 +148,7 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
 
 		// We can dump the request; log it, modify it...
 		if b, err := httputil.DumpRequest(req, false); err == nil {
-			log.Printf("Incoming request:\n%s\n", string(b))
+			log.Printf("incoming request:\n%s\n", string(b))
 		}
 
 		// Take the request and changes its destination to be forwarded to the target server.
@@ -143,14 +158,14 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
 		// Send the request to the target server and log the response.
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Fatalf("Error sending request to '%v': %v", proxyReq.Host, err)
+			log.Fatalf("error sending request to '%v': %v", proxyReq.Host, err)
 		}
 		defer resp.Body.Close()
-		log.Printf("Sent request to target %v, got response status: %s", proxyReq.Host, resp.Status)
+		log.Printf("sent request to target %v, got response status: %s", proxyReq.Host, resp.Status)
 
 		// Send the target server's response back to the client.
 		if err := resp.Write(tlsConn); err != nil {
-			log.Printf("Error writing response back to client (%v): %v\n", proxyReq.RemoteAddr, err)
+			log.Printf("error writing response back to client (%v): %v\n", proxyReq.RemoteAddr, err)
 		}
 	}
 }
@@ -158,7 +173,7 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
 func changeRequestToTarget(req *http.Request, targetHost string) {
 	targetUrl, err := addrToUrl(targetHost)
 	if err != nil {
-		log.Fatalf("Invalid target host '%s': %v", targetHost, err)
+		log.Fatalf("invalid target host '%s': %v", targetHost, err)
 	}
 
 	targetUrl.Path = req.URL.Path

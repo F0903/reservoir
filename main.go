@@ -16,7 +16,6 @@ func main() {
 	proxy, err := proxy.NewMitmProxy(*caCertFile, *caKeyFile)
 	if err != nil {
 		log.Fatalf("Failed to create proxy: %v", err)
-		return
 	}
 
 	log.Println("Starting proxy server on", *address)
