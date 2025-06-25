@@ -127,6 +127,7 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 	if _, err := clientConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
 		return fmt.Errorf("failed to write HTTP OK response to client: %v", err)
 	}
+	log.Print("Sent HTTP 200 OK response to client, established CONNECT tunnel")
 
 	// Configure a new TLS server, pointing it at the client connection, using
 	// our certificate. This server will now pretend being the target.
@@ -136,6 +137,7 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 		Certificates:     []tls.Certificate{tlsCert},
 	}
 
+	log.Print("Starting TLS server for CONNECT tunnel")
 	tlsConn := tls.Server(clientConn, tlsConfig)
 	proxyRequestLoop(tlsConn, proxyReq)
 	tlsConn.Close()
@@ -148,6 +150,7 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) error {
 	// use http package functions with this connection.
 	connReader := bufio.NewReader(tlsConn)
 
+	log.Print("Entering request loop for CONNECT tunnel")
 	for {
 		// Read next HTTP request from client.
 		req, err := http.ReadRequest(connReader)
