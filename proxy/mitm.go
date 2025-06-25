@@ -11,8 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
-	"strings"
 )
 
 type MitmProxy struct {
@@ -55,6 +53,9 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) er
 	// remove proxy headers
 	proxyReq.RequestURI = ""
 	transport := http.DefaultTransport
+
+	// Remove hop-by-hop headers that should not be forwarded to the target server.
+	removeHopByHopHeaders(proxyReq.Header)
 	resp, err := transport.RoundTrip(proxyReq)
 	if err != nil {
 		err_msg := fmt.Sprintf("error forwarding request to target %v: %v", proxyReq.Host, err)
@@ -63,13 +64,15 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) er
 	}
 	defer resp.Body.Close()
 
-	// copy headers
+	// Copy headers
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
 		}
 	}
 
+	// Remove any hop-by-hop headers that should not be forwarded to the client.
+	removeHopByHopHeaders(w.Header())
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 
@@ -87,6 +90,7 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 		return errors.New(err_msg)
 	}
 
+	// Hijack the connection to get the underlying net.Conn.
 	clientConn, _, err := hj.Hijack()
 	if err != nil {
 		err_msg := fmt.Sprintf("hijack failed: %v", err)
@@ -126,13 +130,13 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 	}
 
 	tlsConn := tls.Server(clientConn, tlsConfig)
-	defer tlsConn.Close()
 	proxyRequestLoop(tlsConn, proxyReq)
+	tlsConn.Close()
 
 	return nil
 }
 
-func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
+func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) error {
 	// Create a buffered reader for the client connection; this is required to
 	// use http package functions with this connection.
 	connReader := bufio.NewReader(tlsConn)
@@ -143,7 +147,7 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
 		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("error reading request from client (%v): %w", proxyReq.RemoteAddr, err)
 		}
 
 		// We can dump the request; log it, modify it...
@@ -155,41 +159,25 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) {
 		// The target server is specified in the original CONNECT request, which is proxyReq.
 		changeRequestToTarget(req, proxyReq.Host)
 
+		// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
+		removeHopByHopHeaders(req.Header)
+
 		// Send the request to the target server and log the response.
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			log.Fatalf("error sending request to '%v': %v", proxyReq.Host, err)
+			return fmt.Errorf("error sending request to target (%v): %w", proxyReq.Host, err)
 		}
-		defer resp.Body.Close()
 		log.Printf("sent request to target %v, got response status: %s", proxyReq.Host, resp.Status)
+
+		// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
+		removeHopByHopHeaders(resp.Header)
 
 		// Send the target server's response back to the client.
 		if err := resp.Write(tlsConn); err != nil {
 			log.Printf("error writing response back to client (%v): %v\n", proxyReq.RemoteAddr, err)
 		}
-	}
-}
-
-func changeRequestToTarget(req *http.Request, targetHost string) {
-	targetUrl, err := addrToUrl(targetHost)
-	if err != nil {
-		log.Fatalf("invalid target host '%s': %v", targetHost, err)
+		resp.Body.Close() // Don't defer this, as it will only close the body when the function returns, not after each iteration.
 	}
 
-	targetUrl.Path = req.URL.Path
-	targetUrl.RawQuery = req.URL.RawQuery
-	req.URL = targetUrl
-	// Make sure this is unset for sending the request through a client
-	req.RequestURI = ""
-}
-
-func addrToUrl(addr string) (*url.URL, error) {
-	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		addr = "https://" + addr
-	}
-	u, err := url.Parse(addr)
-	if err != nil {
-		return nil, err
-	}
-	return u, nil
+	return nil
 }
