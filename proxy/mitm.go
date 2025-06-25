@@ -49,6 +49,8 @@ func (p *MitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 }
 
 func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
+	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
+
 	// remove proxy headers
 	proxyReq.RequestURI = ""
 	transport := http.DefaultTransport
