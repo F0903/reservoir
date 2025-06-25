@@ -24,8 +24,7 @@ type MitmProxy struct {
 func NewMitmProxy(caCertFile, caKeyFile string) (*MitmProxy, error) {
 	caCert, caKey, err := loadX509KeyPair(caCertFile, caKeyFile)
 	if err != nil {
-		err_msg := fmt.Sprintf("Failed to load CA certificate and key: %v", err)
-		return nil, errors.New(err_msg)
+		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
 	}
 	log.Printf("Loaded CA certificate: %v (IsCA=%v)\n", caCert, caCert.IsCA)
 
@@ -58,9 +57,9 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) er
 	removeHopByHopHeaders(proxyReq.Header)
 	resp, err := transport.RoundTrip(proxyReq)
 	if err != nil {
-		err_msg := fmt.Sprintf("error forwarding request to target %v: %v", proxyReq.Host, err)
-		http.Error(w, err_msg, http.StatusBadGateway)
-		return errors.New(err_msg)
+		err := fmt.Errorf("error forwarding request to target %v: %v", proxyReq.Host, err)
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -85,40 +84,46 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		err_msg := fmt.Sprintf("hijacking not supported for target host '%v'. Hijacking only works with servers that support HTTP 1.x", proxyReq.Host)
-		http.Error(w, err_msg, http.StatusInternalServerError)
-		return errors.New(err_msg)
+		err := fmt.Errorf("hijacking not supported for target host '%v'. Hijacking only works with servers that support HTTP 1.x", proxyReq.Host)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
 	}
 
 	// Hijack the connection to get the underlying net.Conn.
 	clientConn, _, err := hj.Hijack()
 	if err != nil {
-		err_msg := fmt.Sprintf("hijack failed: %v", err)
-		http.Error(w, err_msg, http.StatusInternalServerError)
-		return errors.New(err_msg)
+		err := fmt.Errorf("hijack failed: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
 	}
 
 	host, _, err := net.SplitHostPort(proxyReq.Host)
 	if err != nil {
-		err_msg := fmt.Sprintf("invalid host:port format %v: %v", proxyReq.Host, err)
-		http.Error(w, err_msg, http.StatusBadRequest)
-		return errors.New(err_msg)
+		err := fmt.Errorf("invalid host:port format %v: %v", proxyReq.Host, err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return err
 	}
 
 	// Create a fake TLS certificate for the target host, signed by our CA.
-	pemCert, pemKey := createCert([]string{host}, p.caCert, p.caKey, 240)
+	pemCert, pemKey, err := createCert([]string{host}, p.caCert, p.caKey, 240)
+	if err != nil {
+		err := fmt.Errorf("failed to create TLS certificate for %v: %v", host, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
+	}
+
 	tlsCert, err := tls.X509KeyPair(pemCert, pemKey)
 	if err != nil {
-		err_msg := fmt.Sprintf("failed to create TLS certificate for %v: %v", host, err)
-		return errors.New(err_msg)
+		err := fmt.Errorf("failed to create X509 key pair for cert %v: %v", tlsCert, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
 	}
 
 	// Send an HTTP OK response back to the client; this initiates the CONNECT
 	// tunnel. From this point on the client will assume it's connected directly
 	// to the target.
 	if _, err := clientConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
-		err_msg := fmt.Sprintf("failed to write HTTP OK response to client: %v", err)
-		return errors.New(err_msg)
+		return fmt.Errorf("failed to write HTTP OK response to client: %v", err)
 	}
 
 	// Configure a new TLS server, pointing it at the client connection, using

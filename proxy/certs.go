@@ -8,7 +8,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
+	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"time"
@@ -18,16 +19,17 @@ import (
 // signed by the parent/parentKey certificate. hoursValid is the duration of
 // the new certificate's validity.
 // https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go
-func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.PrivateKey, hoursValid int) (cert []byte, priv []byte) {
+func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.PrivateKey, hoursValid int) (cert []byte, priv []byte, err error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
 	if err != nil {
-		log.Fatalf("Failed to generate private key: %v", err)
+		return nil, nil, fmt.Errorf("failed to generate private key: %v", err)
 	}
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("Failed to generate serial number: %v", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %v", err)
 	}
 
 	template := x509.Certificate{
@@ -46,23 +48,23 @@ func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.Pr
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, parent, &privateKey.PublicKey, parentKey)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %v", err)
+		return nil, nil, fmt.Errorf("failed to create certificate: %v", err)
 	}
 	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if pemCert == nil {
-		log.Fatal("failed to encode certificate to PEM")
+		return nil, nil, errors.New("failed to encode certificate to PEM")
 	}
 
 	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		log.Fatalf("Unable to marshal private key: %v", err)
+		return nil, nil, fmt.Errorf("unable to marshal private key: %v", err)
 	}
 	pemKey := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
-	if pemCert == nil {
-		log.Fatal("failed to encode key to PEM")
+	if pemKey == nil {
+		return nil, nil, errors.New("failed to encode key to PEM")
 	}
 
-	return pemCert, pemKey
+	return pemCert, pemKey, nil
 }
 
 // loadX509KeyPair loads a certificate/key pair from files, and unmarshals them
@@ -73,23 +75,23 @@ func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.Pr
 func loadX509KeyPair(certFile, keyFile string) (cert *x509.Certificate, key any, err error) {
 	cf, err := os.ReadFile(certFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to read certificate file %s: %v", certFile, err)
 	}
 
 	kf, err := os.ReadFile(keyFile)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to read key file %s: %v", keyFile, err)
 	}
 	certBlock, _ := pem.Decode(cf)
 	cert, err = x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to parse certificate: %v", err)
 	}
 
 	keyBlock, _ := pem.Decode(kf)
 	key, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to parse private key: %v", err)
 	}
 
 	return cert, key, nil
