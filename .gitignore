@@ -6,3 +6,6 @@ mitm_proxy*
 
 # Dependency directories (vendor/)
 vendor/
+
+# Certs and keys
+ssl/
