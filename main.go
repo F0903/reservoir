@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+	"mitm_proxy/proxy"
 	"net/http"
-	"tunnel_http_proxy/proxy"
 )
 
 func main() {
