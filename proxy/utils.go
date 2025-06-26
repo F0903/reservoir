@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 )
 
@@ -46,9 +47,21 @@ func addrToUrl(addr string) (*url.URL, error) {
 
 func writeRawHTTPResonse(w io.Writer, status int, text string) {
 	fmt.Fprintf(w, "HTTP/1.1 %d %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
-		http.StatusInternalServerError,
-		http.StatusText(http.StatusInternalServerError),
+		status,
+		http.StatusText(status),
 		len(text),
 		text,
 	)
+}
+
+func buildCacheKeyFromRequest(r *http.Request) string {
+	// Use scheme, host, path, query, and method
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+
+	normHost := strings.ToLower(r.Host)
+	normPath := path.Clean(r.URL.Path)
+	return fmt.Sprintf("%s|%s|%s|%s|%s", scheme, normHost, r.Method, normPath, r.URL.RawQuery)
 }

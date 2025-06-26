@@ -69,35 +69,37 @@ func (p *CachingMitmProxy) parseExpiresOrDefault(header http.Header) time.Time {
 
 // Checks if the request is already cached. If it is, it returns the cached entry.
 // If the entry is expired, it removes it from the cache and returns nil.
-func (p *CachingMitmProxy) getCached(proxyReq *http.Request) (*cache.Entry[cachedRequestInfo], error) {
-	if cached, err := p.cache.Get(proxyReq.Host); err == nil {
-		log.Printf("Cache hit for %v", proxyReq.Host)
+func (p *CachingMitmProxy) getCached(key string) (*cache.Entry[cachedRequestInfo], error) {
+	if cached, err := p.cache.Get(key); err == nil {
+		log.Printf("Cache hit for %v", key)
 
 		if cached.Metadata.Expires.Before(cached.Metadata.TimeWritten) {
-			log.Printf("Cache entry for %v is expired, removing from cache", proxyReq.Host)
-			p.cache.Delete(proxyReq.Host)
+			log.Printf("Cache entry for %v is expired, removing from cache", key)
+			p.cache.Delete(key)
 		} else {
-			log.Printf("Cache entry for %v is valid, serving from cache", proxyReq.Host)
+			log.Printf("Cache entry for %v is valid, serving from cache", key)
 			return cached, nil
 		}
 
 	} else if !errors.Is(err, cache.ErrorCacheMiss) {
-		return nil, fmt.Errorf("error retrieving from cache for %v: %w", proxyReq.Host, err)
+		return nil, fmt.Errorf("error retrieving from cache for %v: %w", key, err)
 	}
 
-	log.Printf("Cache miss for %v", proxyReq.Host)
+	log.Printf("Cache miss for %v", key)
 	return nil, nil
 }
 
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
-	if cached, err := p.getCached(proxyReq); cached != nil && err == nil {
-		log.Printf("Serving cached response for %v", proxyReq.Host)
-		w.Write(cached.Data)
+	key := buildCacheKeyFromRequest(proxyReq)
+
+	if cached, err := p.getCached(key); cached != nil && err == nil {
+		log.Printf("Serving cached response for %v", key)
+		io.Copy(w, cached.Data)
 		return err
 	} else if err != nil {
-		err := fmt.Errorf("error getting cache for %v: %v", proxyReq.Host, err)
+		err := fmt.Errorf("error getting cache for %v: %v", key, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
@@ -130,7 +132,8 @@ func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Requ
 
 	expiresTime := p.parseExpiresOrDefault(resp.Header)
 	etag := resp.Header.Get("ETag")
-	p.cache.Cache(proxyReq.Host, resp.Body, expiresTime, cachedRequestInfo{
+
+	p.cache.Cache(key, resp.Body, expiresTime, cachedRequestInfo{
 		ETag: etag,
 	}) // Cache the response for 1 hour
 
@@ -142,6 +145,8 @@ func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Requ
 
 func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
+
+	key := buildCacheKeyFromRequest(proxyReq)
 
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)
@@ -217,13 +222,14 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 
 		log.Printf("Received request from client (%v): %s %s", proxyReq.RemoteAddr, req.Method, req.URL)
 
-		if cached, err := p.getCached(req); cached != nil && err == nil {
+		if cached, err := p.getCached(key); cached != nil && err == nil {
 			log.Printf("Serving cached response for %v", req.Host)
-			clientConn.Write(cached.Data)
+			io.Copy(tlsConn, cached.Data)
+			cached.Data.Close() // Close the cached response body
 			return err
 		} else if err != nil {
 			err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
-			writeRawHTTPResonse(clientConn, http.StatusInternalServerError, err.Error())
+			writeRawHTTPResonse(tlsConn, http.StatusInternalServerError, err.Error())
 			return err
 		}
 
@@ -246,7 +252,7 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 
 		expiresTime := p.parseExpiresOrDefault(resp.Header)
 		etag := resp.Header.Get("ETag")
-		p.cache.Cache(req.Host, resp.Body, expiresTime, cachedRequestInfo{
+		p.cache.Cache(key, resp.Body, expiresTime, cachedRequestInfo{
 			ETag: etag,
 		})
 

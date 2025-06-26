@@ -58,7 +58,7 @@ func (c *FileCache[ObjectData]) Get(input string) (*Entry[ObjectData], error) {
 		return nil, ErrorCacheMiss
 	}
 
-	data, err := os.ReadFile(fileName)
+	dataStream, err := os.Open(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached data file '%s': %v", fileName, err)
 	}
@@ -75,7 +75,7 @@ func (c *FileCache[ObjectData]) Get(input string) (*Entry[ObjectData], error) {
 	}
 
 	return &Entry[ObjectData]{
-		Data:     data,
+		Data:     dataStream,
 		Metadata: meta,
 	}, nil
 }

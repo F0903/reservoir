@@ -11,7 +11,7 @@ var (
 )
 
 type Entry[ObjectData any] struct {
-	Data     []byte
+	Data     io.ReadCloser
 	Metadata EntryMetadata[ObjectData]
 }
 
