@@ -28,7 +28,7 @@ type CachingMitmProxy struct {
 // createMitmProxy creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*CachingMitmProxy, error) {
+func NewCachingMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*CachingMitmProxy, error) {
 	caCert, caKey, err := loadX509KeyPair(caCertFile, caKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)

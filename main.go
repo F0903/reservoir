@@ -14,7 +14,7 @@ func main() {
 	cacheDir := flag.String("cache-dir", "cache/", "Path to cache directory")
 	flag.Parse()
 
-	proxy, err := proxy.NewMitmProxy(*caCertFile, *caKeyFile, *cacheDir)
+	proxy, err := proxy.NewCachingMitmProxy(*caCertFile, *caKeyFile, *cacheDir)
 	if err != nil {
 		log.Fatalf("Failed to create proxy: %v", err)
 	}
