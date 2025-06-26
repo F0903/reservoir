@@ -1,4 +1,6 @@
-# MITM Forward Proxy
+# apt-cacher-go
+
+WIP
 
 A simple MITM forward proxy written in Go.
 
@@ -23,17 +25,16 @@ openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -out ca-cert.pe
 - **Windows:** Double-click `ca-cert.pem` and install it to "Trusted Root Certification Authorities".
 - **macOS:** Use Keychain Access to import and trust the certificate.
 - **Linux:** Add to `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
-- **Browsers:** You may need to import the CA in your browser's settings for HTTPS interception.
 
 ### Run the Proxy
 
 ```sh
-go run main.go -address 127.0.0.1:9999 -ca-cert ca-cert.pem -ca-key ca-key.pem
+go run main.go --listen 127.0.0.1:9999 --ca-cert ca-cert.pem --ca-key ca-key.pem
 ```
 
 Available arguments:
 
-- **address** - The address and port that the proxy will listen on.
+- **listen** - The address and port that the proxy will listen on.
 - **ca-cert** - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** - The path to the PEM key of the CA the proxy will use to sign.
 

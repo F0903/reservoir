@@ -1,5 +1,5 @@
 # Binaries
-mitm_proxy*
+apt_cacher_go*
 
 # Output of the go coverage tool
 *.coverprofile

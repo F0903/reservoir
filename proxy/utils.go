@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -41,4 +42,13 @@ func addrToUrl(addr string) (*url.URL, error) {
 		return nil, err
 	}
 	return u, nil
+}
+
+func writeRawHTTPResonse(w io.Writer, status int, text string) {
+	fmt.Fprintf(w, "HTTP/1.1 %d %s\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
+		http.StatusInternalServerError,
+		http.StatusText(http.StatusInternalServerError),
+		len(text),
+		text,
+	)
 }

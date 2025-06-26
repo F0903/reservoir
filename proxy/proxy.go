@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"apt_cacher_go/cache"
 	"bufio"
 	"crypto/tls"
 	"crypto/x509"
@@ -10,31 +11,39 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
+	"time"
 )
 
-type MitmProxy struct {
-	caCert *x509.Certificate
-	caKey  any
+type cachedRequestInfo struct {
+	ETag string
+}
+
+type CachingMitmProxy struct {
+	caCert         *x509.Certificate
+	caKey          any
+	cache          cache.Cache[cachedRequestInfo]
+	defaultExpires time.Duration
 }
 
 // createMitmProxy creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewMitmProxy(caCertFile, caKeyFile string) (*MitmProxy, error) {
+func NewMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*CachingMitmProxy, error) {
 	caCert, caKey, err := loadX509KeyPair(caCertFile, caKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
 	}
 	log.Printf("Loaded CA certificate: %v (IsCA=%v)\n", caCert, caCert.IsCA)
 
-	return &MitmProxy{
-		caCert: caCert,
-		caKey:  caKey,
+	return &CachingMitmProxy{
+		caCert:         caCert,
+		caKey:          caKey,
+		cache:          cache.NewFileCache[cachedRequestInfo](cacheDir),
+		defaultExpires: 1 * time.Hour,
 	}, nil
 }
 
-func (p *MitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
+func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method == http.MethodConnect {
 		if err := p.handleCONNECT(w, proxyReq); err != nil {
 			log.Printf("Error handling CONNECT request: %v", err)
@@ -48,8 +57,50 @@ func (p *MitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 	}
 }
 
-func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
+func (p *CachingMitmProxy) parseExpiresOrDefault(header http.Header) time.Time {
+	expires := header.Get("Expires")
+	expiresTime, err := time.Parse(time.RFC1123, expires)
+	if err != nil {
+		log.Printf("Failed to parse Expires header: %v, using default expiration time", err)
+		expiresTime = time.Now().Add(p.defaultExpires)
+	}
+	return expiresTime
+}
+
+// Checks if the request is already cached. If it is, it returns the cached entry.
+// If the entry is expired, it removes it from the cache and returns nil.
+func (p *CachingMitmProxy) getCached(proxyReq *http.Request) (*cache.Entry[cachedRequestInfo], error) {
+	if cached, err := p.cache.Get(proxyReq.Host); err == nil {
+		log.Printf("Cache hit for %v", proxyReq.Host)
+
+		if cached.Metadata.Expires.Before(cached.Metadata.TimeWritten) {
+			log.Printf("Cache entry for %v is expired, removing from cache", proxyReq.Host)
+			p.cache.Delete(proxyReq.Host)
+		} else {
+			log.Printf("Cache entry for %v is valid, serving from cache", proxyReq.Host)
+			return cached, nil
+		}
+
+	} else if !errors.Is(err, cache.ErrorCacheMiss) {
+		return nil, fmt.Errorf("error retrieving from cache for %v: %w", proxyReq.Host, err)
+	}
+
+	log.Printf("Cache miss for %v", proxyReq.Host)
+	return nil, nil
+}
+
+func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
+
+	if cached, err := p.getCached(proxyReq); cached != nil && err == nil {
+		log.Printf("Serving cached response for %v", proxyReq.Host)
+		w.Write(cached.Data)
+		return err
+	} else if err != nil {
+		err := fmt.Errorf("error getting cache for %v: %v", proxyReq.Host, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return err
+	}
 
 	// remove proxy headers
 	proxyReq.RequestURI = ""
@@ -57,6 +108,7 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) er
 
 	// Remove hop-by-hop headers that should not be forwarded to the target server.
 	removeHopByHopHeaders(proxyReq.Header)
+	log.Printf("Forwarding request to target %v", proxyReq.Host)
 	resp, err := transport.RoundTrip(proxyReq)
 	if err != nil {
 		err := fmt.Errorf("error forwarding request to target %v: %v", proxyReq.Host, err)
@@ -65,22 +117,30 @@ func (p *MitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) er
 	}
 	defer resp.Body.Close()
 
+	log.Printf("Received response from target %v, status: %s", proxyReq.Host, resp.Status)
+
 	// Copy headers
 	for k, vv := range resp.Header {
 		for _, v := range vv {
 			w.Header().Add(k, v)
 		}
 	}
-
 	// Remove any hop-by-hop headers that should not be forwarded to the client.
 	removeHopByHopHeaders(w.Header())
+
+	expiresTime := p.parseExpiresOrDefault(resp.Header)
+	etag := resp.Header.Get("ETag")
+	p.cache.Cache(proxyReq.Host, resp.Body, expiresTime, cachedRequestInfo{
+		ETag: etag,
+	}) // Cache the response for 1 hour
+
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
 
 	return nil
 }
 
-func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
+func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
@@ -139,13 +199,8 @@ func (p *MitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request)
 
 	log.Print("Starting TLS server for CONNECT tunnel")
 	tlsConn := tls.Server(clientConn, tlsConfig)
-	proxyRequestLoop(tlsConn, proxyReq)
-	tlsConn.Close()
+	defer tlsConn.Close()
 
-	return nil
-}
-
-func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) error {
 	// Create a buffered reader for the client connection; this is required to
 	// use http package functions with this connection.
 	connReader := bufio.NewReader(tlsConn)
@@ -160,9 +215,16 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) error {
 			return fmt.Errorf("error reading request from client (%v): %w", proxyReq.RemoteAddr, err)
 		}
 
-		// We can dump the request; log it, modify it...
-		if b, err := httputil.DumpRequest(req, false); err == nil {
-			log.Printf("incoming request:\n%s\n", string(b))
+		log.Printf("Received request from client (%v): %s %s", proxyReq.RemoteAddr, req.Method, req.URL)
+
+		if cached, err := p.getCached(req); cached != nil && err == nil {
+			log.Printf("Serving cached response for %v", req.Host)
+			clientConn.Write(cached.Data)
+			return err
+		} else if err != nil {
+			err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
+			writeRawHTTPResonse(clientConn, http.StatusInternalServerError, err.Error())
+			return err
 		}
 
 		// Take the request and changes its destination to be forwarded to the target server.
@@ -181,6 +243,12 @@ func proxyRequestLoop(tlsConn *tls.Conn, proxyReq *http.Request) error {
 
 		// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
 		removeHopByHopHeaders(resp.Header)
+
+		expiresTime := p.parseExpiresOrDefault(resp.Header)
+		etag := resp.Header.Get("ETag")
+		p.cache.Cache(req.Host, resp.Body, expiresTime, cachedRequestInfo{
+			ETag: etag,
+		})
 
 		// Send the target server's response back to the client.
 		if err := resp.Write(tlsConn); err != nil {

@@ -1,19 +1,20 @@
 package main
 
 import (
+	"apt_cacher_go/proxy"
 	"flag"
 	"log"
-	"mitm_proxy/proxy"
 	"net/http"
 )
 
 func main() {
-	address := flag.String("address", "127.0.0.1:9999", "Address to listen on")
+	address := flag.String("listen", "127.0.0.1:9999", "Address and port to listen on")
 	caCertFile := flag.String("ca-cert", "cert.pem", "Path to CA certificate file")
 	caKeyFile := flag.String("ca-key", "key.pem", "Path to CA private key file")
+	cacheDir := flag.String("cache-dir", "cache/", "Path to cache directory")
 	flag.Parse()
 
-	proxy, err := proxy.NewMitmProxy(*caCertFile, *caKeyFile)
+	proxy, err := proxy.NewMitmProxy(*caCertFile, *caKeyFile, *cacheDir)
 	if err != nil {
 		log.Fatalf("Failed to create proxy: %v", err)
 	}
