@@ -1,11 +1,5 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
+# Binaries
+mitm_proxy*
 
 # Output of the go coverage tool
 *.coverprofile
