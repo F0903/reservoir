@@ -89,58 +89,58 @@ func (p *CachingMitmProxy) getCached(key string) (*cache.Entry[cachedRequestInfo
 	return nil, nil
 }
 
+func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, cacheKey string) error {
+	log.Printf("Received HTTP request from client (%v): %s %s", req.RemoteAddr, req.Method, req.URL)
+
+	if cached, err := p.getCached(cacheKey); cached != nil && err == nil {
+		log.Printf("Serving cached response for %v", req.Host)
+		io.Copy(w, cached.Data)
+		cached.Data.Close() // Close the cached response body
+		return err
+	} else if err != nil {
+		err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
+		writeRawHTTPResonse(w, http.StatusInternalServerError, err.Error())
+		return err
+	}
+
+	log.Printf("Request not cached, forwarding to target %v", req.Host)
+
+	// Take the request and changes its destination to be forwarded to the target server.
+	// The target server is specified in the original CONNECT request, which is proxyReq.
+	changeRequestToTarget(req, req.Host)
+
+	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
+	removeHopByHopHeaders(req.Header)
+
+	// Send the request to the target server and log the response.
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending request to target (%v): %w", req.Host, err)
+	}
+	defer resp.Body.Close()
+	log.Printf("sent request to target %v, got response status: %s", req.Host, resp.Status)
+
+	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
+	removeHopByHopHeaders(resp.Header)
+
+	expiresTime := p.parseExpiresOrDefault(resp.Header)
+	etag := resp.Header.Get("ETag")
+	p.cache.Cache(cacheKey, resp.Body, expiresTime, cachedRequestInfo{
+		ETag: etag,
+	})
+
+	// Send the target server's response back to the client.
+	if err := resp.Write(w); err != nil {
+		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
+	}
+	return nil
+}
+
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
 	key := buildCacheKeyFromRequest(proxyReq)
-
-	if cached, err := p.getCached(key); cached != nil && err == nil {
-		log.Printf("Serving cached response for %v", key)
-		io.Copy(w, cached.Data)
-		return err
-	} else if err != nil {
-		err := fmt.Errorf("error getting cache for %v: %v", key, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return err
-	}
-
-	// remove proxy headers
-	proxyReq.RequestURI = ""
-	transport := http.DefaultTransport
-
-	// Remove hop-by-hop headers that should not be forwarded to the target server.
-	removeHopByHopHeaders(proxyReq.Header)
-	log.Printf("Forwarding request to target %v", proxyReq.Host)
-	resp, err := transport.RoundTrip(proxyReq)
-	if err != nil {
-		err := fmt.Errorf("error forwarding request to target %v: %v", proxyReq.Host, err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return err
-	}
-	defer resp.Body.Close()
-
-	log.Printf("Received response from target %v, status: %s", proxyReq.Host, resp.Status)
-
-	// Copy headers
-	for k, vv := range resp.Header {
-		for _, v := range vv {
-			w.Header().Add(k, v)
-		}
-	}
-	// Remove any hop-by-hop headers that should not be forwarded to the client.
-	removeHopByHopHeaders(w.Header())
-
-	expiresTime := p.parseExpiresOrDefault(resp.Header)
-	etag := resp.Header.Get("ETag")
-
-	p.cache.Cache(key, resp.Body, expiresTime, cachedRequestInfo{
-		ETag: etag,
-	}) // Cache the response for 1 hour
-
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
-
-	return nil
+	return p.processHTTPRequest(w, proxyReq, key)
 }
 
 func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
@@ -197,9 +197,8 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 	// Configure a new TLS server, pointing it at the client connection, using
 	// our certificate. This server will now pretend being the target.
 	tlsConfig := &tls.Config{
-		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
-		MinVersion:       tls.VersionTLS12,
-		Certificates:     []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS12,
+		Certificates: []tls.Certificate{tlsCert},
 	}
 
 	log.Print("Starting TLS server for CONNECT tunnel")
@@ -220,47 +219,7 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 			return fmt.Errorf("error reading request from client (%v): %w", proxyReq.RemoteAddr, err)
 		}
 
-		log.Printf("Received request from client (%v): %s %s", proxyReq.RemoteAddr, req.Method, req.URL)
-
-		if cached, err := p.getCached(key); cached != nil && err == nil {
-			log.Printf("Serving cached response for %v", req.Host)
-			io.Copy(tlsConn, cached.Data)
-			cached.Data.Close() // Close the cached response body
-			return err
-		} else if err != nil {
-			err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
-			writeRawHTTPResonse(tlsConn, http.StatusInternalServerError, err.Error())
-			return err
-		}
-
-		// Take the request and changes its destination to be forwarded to the target server.
-		// The target server is specified in the original CONNECT request, which is proxyReq.
-		changeRequestToTarget(req, proxyReq.Host)
-
-		// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
-		removeHopByHopHeaders(req.Header)
-
-		// Send the request to the target server and log the response.
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("error sending request to target (%v): %w", proxyReq.Host, err)
-		}
-		log.Printf("sent request to target %v, got response status: %s", proxyReq.Host, resp.Status)
-
-		// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
-		removeHopByHopHeaders(resp.Header)
-
-		expiresTime := p.parseExpiresOrDefault(resp.Header)
-		etag := resp.Header.Get("ETag")
-		p.cache.Cache(key, resp.Body, expiresTime, cachedRequestInfo{
-			ETag: etag,
-		})
-
-		// Send the target server's response back to the client.
-		if err := resp.Write(tlsConn); err != nil {
-			log.Printf("error writing response back to client (%v): %v\n", proxyReq.RemoteAddr, err)
-		}
-		resp.Body.Close() // Don't defer this, as it will only close the body when the function returns, not after each iteration.
+		p.processHTTPRequest(tlsConn, req, key)
 	}
 
 	return nil
