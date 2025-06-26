@@ -11,11 +11,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
 type cachedRequestInfo struct {
-	ETag string
+	ETag         string
+	LastModified time.Time
 }
 
 type CachingMitmProxy struct {
@@ -57,14 +60,61 @@ func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Reque
 	}
 }
 
-func (p *CachingMitmProxy) parseExpiresOrDefault(header http.Header) time.Time {
-	expires := header.Get("Expires")
-	expiresTime, err := time.Parse(time.RFC1123, expires)
-	if err != nil {
-		log.Printf("Failed to parse Expires header: %v, using default expiration time", err)
-		expiresTime = time.Now().Add(p.defaultExpires)
+type cacheControl struct {
+	noCache        bool
+	mustRevalidate bool
+	maxAge         time.Duration
+}
+
+func (p *CachingMitmProxy) parseCacheControl(header http.Header) (*cacheControl, error) {
+	ccHeader := header.Get("Cache-Control")
+	if ccHeader == "" {
+		return nil, nil // No Cache-Control header, nothing to parse
 	}
-	return expiresTime
+
+	cc := &cacheControl{}
+	// Parse the Cache-Control header for max-age directive
+	for _, directive := range strings.Split(ccHeader, ",") {
+		directive = strings.TrimSpace(directive)
+		if directive == "no-cache" || directive == "no-store" {
+			cc.noCache = true
+		} else if directive == "must-revalidate" || directive == "proxy-revalidate" {
+			// must-revalidate is used to indicate that the cache must revalidate
+			// the response with the origin server before serving it to the client.
+			// This is useful for ensuring that the client always gets the most up-to-date response.
+			// proxy-revalidate is similar, but specifically for proxies. (we interpret it the same way)
+			cc.mustRevalidate = true
+		} else if strings.HasPrefix(directive, "max-age=") {
+			// max-age directive specifies the maximum amount of time a response is considered fresh in seconds.
+			maxAgeStr := strings.TrimPrefix(directive, "max-age=")
+			maxAge, err := strconv.ParseInt(maxAgeStr, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse max-age: %v", err)
+			}
+			cc.maxAge = time.Duration(maxAge) * time.Second
+		}
+	}
+
+	return cc, nil
+}
+
+func (p *CachingMitmProxy) getCacheExpirationTime(header http.Header) time.Time {
+	// For now we only use max-age from Cache-Control
+	cc, err := p.parseCacheControl(header)
+	if err == nil {
+		return time.Now().Add(cc.maxAge)
+	}
+	log.Printf("Error parsing Cache-Control header: %v", err)
+
+	expires, err := http.ParseTime(header.Get("Expires"))
+	if err == nil {
+		return expires
+	}
+	log.Printf("Error parsing Expires header: %v", err)
+
+	defaultExpires := time.Now().Add(p.defaultExpires)
+	log.Printf("Using default expiration time of %v", defaultExpires)
+	return defaultExpires
 }
 
 // Checks if the request is already cached. If it is, it returns the cached entry.
@@ -123,10 +173,17 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
 	removeHopByHopHeaders(resp.Header)
 
-	expiresTime := p.parseExpiresOrDefault(resp.Header)
+	lastModified := time.Now()
+	// Parse the Last-Modified header to a time.Time value.
+	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
+		lastModified = t
+	}
+	expiresTime := p.getCacheExpirationTime(resp.Header)
 	etag := resp.Header.Get("ETag")
+
 	p.cache.Cache(cacheKey, resp.Body, expiresTime, cachedRequestInfo{
-		ETag: etag,
+		ETag:         etag,
+		LastModified: lastModified,
 	})
 
 	// Send the target server's response back to the client.
