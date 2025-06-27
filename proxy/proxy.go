@@ -53,7 +53,7 @@ func NewCachingMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*Cachin
 		caCert:         caCert,
 		caKey:          caKey,
 		cache:          cache.NewFileCache[cachedRequestInfo](cacheDir),
-		defaultExpires: 1 * time.Hour,
+		defaultExpires: 1 * time.Hour, // Default expiration time for cached responses
 	}, nil
 }
 
@@ -133,7 +133,7 @@ func (p *CachingMitmProxy) parseRequestCacheStatus(header http.Header) requestCa
 
 // Checks if the request is already cached. If it is, it returns the cached entry.
 // If the entry is expired, it removes it from the cache and returns nil.
-func (p *CachingMitmProxy) getCached(key string) (*cache.Entry[cachedRequestInfo], error) {
+func (p *CachingMitmProxy) getCached(key *cache.CacheKey) (*cache.Entry[cachedRequestInfo], error) {
 	if cached, err := p.cache.Get(key); err == nil {
 		log.Printf("Cache hit for %v", key)
 
@@ -153,26 +153,42 @@ func (p *CachingMitmProxy) getCached(key string) (*cache.Entry[cachedRequestInfo
 	return nil, nil
 }
 
-func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, cacheKey string) error {
+func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, cacheKey *cache.CacheKey) error {
 	log.Printf("Received HTTP request from client (%v): %s %s", req.RemoteAddr, req.Method, req.URL)
 
-	if cached, err := p.getCached(cacheKey); cached != nil && err == nil {
-		log.Printf("Serving cached response for %v", req.Host)
-		io.Copy(w, cached.Data)
-		cached.Data.Close() // Close the cached response body
-		return err
-	} else if err != nil {
+	cached, err := p.getCached(cacheKey)
+	if err != nil {
 		err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
 		writeRawHTTPResonse(w, http.StatusInternalServerError, err.Error())
 		return err
 	}
 
-	log.Printf("Request not cached, forwarding to target %v", req.Host)
+	if cached != nil {
+		defer cached.Data.Close() // Close the cached data stream when we return
+
+		// If the cached response is still valid, serve it directly.
+		if time.Now().Before(cached.Metadata.Expires) {
+			log.Printf("Serving cached response for %v", req.Host)
+			io.Copy(w, cached.Data)
+		}
+		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
+
+		// Cache is stale: set conditional headers
+		if cached.Metadata.Object.ETag != "" {
+			req.Header.Set("If-None-Match", cached.Metadata.Object.ETag)
+		}
+		if !cached.Metadata.Object.LastModified.IsZero() {
+			req.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.UTC().Format(http.TimeFormat))
+		}
+	}
 
 	// Take the request and changes its destination to be forwarded to the target server.
 	// The target server is specified in the original CONNECT request, which is proxyReq.
 	changeRequestToTarget(req, req.Host)
+	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
+	removeHopByHopHeaders(req.Header)
 
+	log.Printf("Making request to %v", req.Host)
 	// Send the request to the target server and log the response.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -180,6 +196,17 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 	}
 	defer resp.Body.Close()
 	log.Printf("sent request to target %v, got response status: %s", req.Host, resp.Status)
+
+	// If 304 Not Modified, serve cached response
+	if resp.StatusCode == http.StatusNotModified && cached != nil {
+		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.Host)
+		io.Copy(w, cached.Data)
+		p.cache.UpdateMetadata(cacheKey, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
+			// Update the metadata to reflect that the cached response is still valid.
+			meta.Expires = time.Now().Add(p.defaultExpires)
+		})
+		return nil
+	}
 
 	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
 	removeHopByHopHeaders(resp.Header)
@@ -191,15 +218,23 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 	etag := resp.Header.Get("ETag")
 	requestCacheStatus := p.parseRequestCacheStatus(resp.Header)
 
+	var data io.Reader = resp.Body
+
 	if !requestCacheStatus.noCache {
-		p.cache.Cache(cacheKey, resp.Body, requestCacheStatus.expires, cachedRequestInfo{
+		entry, err := p.cache.Cache(cacheKey, resp.Body, requestCacheStatus.expires, cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
 		})
+		if err != nil {
+			return fmt.Errorf("error caching response for %v: %v", req.Host, err)
+		}
+		defer entry.Data.Close() // Ensure we close the cached data stream
+
+		data = entry.Data
 	}
 
 	// Send the target server's response back to the client.
-	if err := resp.Write(w); err != nil {
+	if _, err := io.Copy(w, data); err != nil {
 		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
 	}
 	return nil
@@ -208,17 +243,15 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
-	key := buildCacheKeyFromRequest(proxyReq)
+	key := cache.MakeFromRequest(proxyReq)
 
-	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
-	removeHopByHopHeaders(proxyReq.Header)
 	return p.processHTTPRequest(w, proxyReq, key)
 }
 
 func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
-	key := buildCacheKeyFromRequest(proxyReq)
+	key := cache.MakeFromRequest(proxyReq)
 
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)
