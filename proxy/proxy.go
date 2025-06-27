@@ -154,28 +154,13 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey) (*cache.Entry[cachedRe
 	return nil, nil
 }
 
-func makeHTTPResponseWithStream(status int, stream io.ReadCloser, header http.Header) *http.Response {
-	return &http.Response{
-		StatusCode: status,
-		Proto:      "HTTP/1.1",
-		ProtoMajor: 1,
-		ProtoMinor: 1,
-		Header:     header,
-		Body:       stream,
-	}
-}
-
-func makeHTTPResponseWithString(status int, text string, header http.Header) *http.Response {
-	return makeHTTPResponseWithStream(status, io.NopCloser(strings.NewReader(text)), header)
-}
-
 func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, key *cache.CacheKey) error {
 	log.Printf("Received HTTP request from client (%v): %s %s", req.RemoteAddr, req.Method, req.URL)
 
 	cached, err := p.getCached(key)
 	if err != nil {
 		err := fmt.Errorf("error getting cache for %v: %v", req.Host, err)
-		makeHTTPResponseWithString(http.StatusInternalServerError, "Error retrieving cached response: "+err.Error(), make(http.Header)).Write(w)
+		makeHTTPErrorResponse(err).Write(w)
 		return err
 	}
 
@@ -245,7 +230,7 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ke
 		})
 		if err != nil {
 			log.Printf("error caching response for %v: %v", req.URL, err)
-			makeHTTPResponseWithString(http.StatusInternalServerError, "Error caching response: "+err.Error(), make(http.Header)).Write(w)
+			makeHTTPErrorResponse(err).Write(w)
 			return fmt.Errorf("error caching response for %v: %v", req.URL, err)
 		}
 		defer entry.Data.Close() // Ensure we close the cached data stream
