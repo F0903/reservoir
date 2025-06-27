@@ -17,7 +17,8 @@
         "ssl/ca.crt",
         "--ca-key",
         "ssl/ca.key"
-      ]
+      ],
+      "console": "integratedTerminal"
     }
   ]
 }
