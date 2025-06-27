@@ -1,17 +1,19 @@
 # apt-cacher-go
 
-WIP
+A simple caching MITM forward proxy written in Go.
 
-A simple MITM forward proxy written in Go.
+Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
 
-[Based on the one written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
+The prime usage of this is as a central cache proxy for apt.
+
+[Based on the MITM forward proxy written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
 
 ## Requirements
 
 - Go 1.24.4 or newer (older versions will most likely work but are untested)
 - OpenSSL (for generating CA cert/key)
 
-## Quick Start
+## Usage Guide
 
 ### Generate a CA Certificate and Key (PEM format)
 
@@ -22,17 +24,35 @@ openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -out ca-cert.pe
 
 ### Trust the CA Certificate
 
+- **Linux:** Add to `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
 - **Windows:** Double-click `ca-cert.pem` and install it to "Trusted Root Certification Authorities".
 - **macOS:** Use Keychain Access to import and trust the certificate.
-- **Linux:** Add to `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
 
-### Run the Proxy
+### Running the Proxy
+
+You can run the proxy either directly with `go run` or build it into an executable first.
+
+#### Directly
 
 ```sh
 go run main.go --listen 127.0.0.1:9999 --ca-cert ca-cert.pem --ca-key ca-key.pem
 ```
 
-Available arguments:
+#### Executable
+
+First you have to build the executable by running the following command in the project directory:
+
+```sh
+go build
+```
+
+Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can setup a systemd service for it.
+
+## Proxy Configuration
+
+Configuration currently takes place via command-line arguments.
+
+The arguments currently available are the following:
 
 - **listen** - The address and port that the proxy will listen on.
 - **ca-cert** - The path to the PEM cert of the CA the proxy will use to sign.
