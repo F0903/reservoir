@@ -19,7 +19,7 @@ The prime usage of this is as a central cache proxy for apt.
 
 ```sh
 openssl genrsa -out ca.key 2048
-openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=apt-cacher-go"
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "//CN=apt-cacher-go"
 ```
 
 ### Trust the CA Certificate
