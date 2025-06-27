@@ -47,7 +47,7 @@ func NewCachingMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*Cachin
 	if err != nil {
 		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
 	}
-	log.Printf("Loaded CA certificate: %v (IsCA=%v)\n", caCert, caCert.IsCA)
+	log.Printf("Loaded CA certificate: '%v' (IsCA=%v)\n", caCert.Subject.CommonName, caCert.IsCA)
 
 	return &CachingMitmProxy{
 		caCert:         caCert,
@@ -79,7 +79,7 @@ func (p *CachingMitmProxy) parseCacheControl(header http.Header) (*cacheControl,
 
 	cc := &cacheControl{}
 	// Parse the Cache-Control header for max-age directive
-	for _, directive := range strings.Split(ccHeader, ",") {
+	for directive := range strings.SplitSeq(ccHeader, ",") {
 		directive = strings.TrimSpace(directive)
 		if directive == "no-cache" || directive == "no-store" {
 			cc.noCache = true

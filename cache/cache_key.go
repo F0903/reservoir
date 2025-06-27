@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"path"
@@ -11,13 +12,19 @@ import (
 
 type CacheKey struct {
 	hashBytes []byte
+	hashHex   string
+}
+
+func NewCacheKey(bytes []byte) *CacheKey {
+	hashBytes := blake2b.Sum256(bytes)
+	return &CacheKey{
+		hashBytes: hashBytes[:],
+		hashHex:   hex.EncodeToString(hashBytes[:]),
+	}
 }
 
 func FromString(input string) *CacheKey {
-	sum := blake2b.Sum256([]byte(input))
-	return &CacheKey{
-		hashBytes: sum[:],
-	}
+	return NewCacheKey([]byte(input))
 }
 
 func MakeFromRequest(r *http.Request) *CacheKey {
@@ -33,10 +40,10 @@ func MakeFromRequest(r *http.Request) *CacheKey {
 	return FromString(stringKey)
 }
 
-func (ck *CacheKey) Hash() []byte {
+func (ck *CacheKey) Bytes() []byte {
 	return ck.hashBytes
 }
 
-func (ck *CacheKey) HashString() string {
-	return string(ck.Hash())
+func (ck *CacheKey) Hex() string {
+	return ck.hashHex
 }

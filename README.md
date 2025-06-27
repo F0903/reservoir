@@ -10,7 +10,7 @@ The prime usage of this is as a central cache proxy for apt.
 
 ## Requirements
 
-- Go 1.24.4 or newer (older versions will most likely work but are untested)
+- Go 1.24 or newer
 - OpenSSL (for generating CA cert/key)
 
 ## Usage Guide
@@ -35,7 +35,7 @@ You can run the proxy either directly with `go run` or build it into an executab
 #### Directly
 
 ```sh
-go run main.go --listen 127.0.0.1:9999 --ca-cert ca-cert.pem --ca-key ca-key.pem
+go run main.go --listen 127.0.0.1:9999 --ca-cert ca.crt --ca-key ca.key
 ```
 
 #### Executable
@@ -54,9 +54,10 @@ Configuration currently takes place via command-line arguments.
 
 The arguments currently available are the following:
 
-- **listen** - The address and port that the proxy will listen on.
-- **ca-cert** - The path to the PEM cert of the CA the proxy will use to sign.
-- **ca-key** - The path to the PEM key of the CA the proxy will use to sign.
+- **listen** (localhost:9999) - The address and port that the proxy will listen on.
+- **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
+- **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
+- **cache-dir** (var/cache) - The path where the cache should be stored.
 
 ## Example: Using curl with the Proxy
 

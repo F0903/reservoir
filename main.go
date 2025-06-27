@@ -9,9 +9,9 @@ import (
 
 func main() {
 	address := flag.String("listen", "127.0.0.1:9999", "Address and port to listen on")
-	caCertFile := flag.String("ca-cert", "cert.pem", "Path to CA certificate file")
-	caKeyFile := flag.String("ca-key", "key.pem", "Path to CA private key file")
-	cacheDir := flag.String("cache-dir", "cache/", "Path to cache directory")
+	caCertFile := flag.String("ca-cert", "ssl/ca.crt", "Path to CA certificate file")
+	caKeyFile := flag.String("ca-key", "ssl/ca.key", "Path to CA private key file")
+	cacheDir := flag.String("cache-dir", "run/cache/", "Path to cache directory")
 	flag.Parse()
 
 	proxy, err := proxy.NewCachingMitmProxy(*caCertFile, *caKeyFile, *cacheDir)

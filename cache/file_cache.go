@@ -44,11 +44,11 @@ func (c *FileCache[ObjectData]) getLock(fileName string) *sync.RWMutex {
 }
 
 func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
-	lock := c.getLock(key.HashString())
+	lock := c.getLock(key.Hex())
 	lock.RLock()
 	defer lock.RUnlock()
 
-	fileName := filepath.Join(c.rootDir, key.HashString())
+	fileName := filepath.Join(c.rootDir, key.Hex())
 	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
 		return nil, ErrorCacheMiss
 	}
@@ -77,11 +77,11 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 }
 
 func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
-	lock := c.getLock(key.HashString())
+	lock := c.getLock(key.Hex())
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir, key.HashString())
+	fileName := filepath.Join(c.rootDir, key.Hex())
 	file, err := os.Create(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cache file '%s': %v", fileName, err)
@@ -120,11 +120,11 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 }
 
 func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
-	lock := c.getLock(key.HashString())
+	lock := c.getLock(key.Hex())
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir, key.HashString())
+	fileName := filepath.Join(c.rootDir, key.Hex())
 	if err := os.Remove(fileName); err != nil {
 		os.Remove(getMetaPath(fileName)) // Ensure no orphaned metadata file exists
 		return fmt.Errorf("failed to delete cache file '%s': %v", fileName, err)
@@ -139,11 +139,11 @@ func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
 }
 
 func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
-	lock := c.getLock(key.HashString())
+	lock := c.getLock(key.Hex())
 	lock.Lock()
 	defer lock.Unlock()
 
-	metaPath := getMetaPath(filepath.Join(c.rootDir, key.HashString()))
+	metaPath := getMetaPath(filepath.Join(c.rootDir, key.Hex()))
 	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
 	if err != nil {
 		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
