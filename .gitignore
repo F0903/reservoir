@@ -1,6 +1,9 @@
 # Binaries
 apt_cacher_go*
 
+# Debugging files
+__debug*
+
 # Output of the go coverage tool
 *.coverprofile
 
