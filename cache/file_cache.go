@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,8 +18,19 @@ type FileCache[ObjectData any] struct {
 	mu      sync.Mutex // protects locks map
 }
 
+func AssertRootDir(rootDir string) {
+	if _, err := os.Stat(rootDir); !errors.Is(err, os.ErrNotExist) {
+		return // Directory already exists, no need to create it
+	}
+
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		log.Panicf("failed to create cache directory '%s': %v", rootDir, err)
+	}
+}
+
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
+	AssertRootDir(rootDir)
 	return &FileCache[ObjectData]{
 		rootDir: rootDir,
 		locks:   make(map[string]*sync.RWMutex),

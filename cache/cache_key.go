@@ -47,3 +47,7 @@ func (ck *CacheKey) Bytes() []byte {
 func (ck *CacheKey) Hex() string {
 	return ck.hashHex
 }
+
+func (ck *CacheKey) String() string {
+	return ck.hashHex
+}
