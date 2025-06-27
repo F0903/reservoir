@@ -18,8 +18,8 @@ The prime usage of this is as a central cache proxy for apt.
 ### Generate a CA Certificate and Key (PEM format)
 
 ```sh
-openssl genrsa -out ca-key.pem 2048
-openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -out ca-cert.pem -subj "/CN=MITMProxy"
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=apt-cacher-go"
 ```
 
 ### Trust the CA Certificate
