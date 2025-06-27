@@ -1,24 +1,22 @@
 package cache
 
 import (
-	"crypto"
 	"fmt"
 	"net/http"
 	"path"
 	"strings"
-)
 
-// We just manage the hash function here, it's much easier to manage and
-// less error-prone compared with letting it be passed in as a parameter
-var hasher = crypto.BLAKE2b_256.New()
+	"golang.org/x/crypto/blake2b"
+)
 
 type CacheKey struct {
 	hashBytes []byte
 }
 
 func FromString(input string) *CacheKey {
+	sum := blake2b.Sum256([]byte(input))
 	return &CacheKey{
-		hashBytes: hasher.Sum([]byte(input)),
+		hashBytes: sum[:],
 	}
 }
 
