@@ -35,7 +35,7 @@ func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.Pr
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"MITM Proxy"},
+			Organization: []string{"apt-cacher-go"},
 		},
 		DNSNames:  dnsNames,
 		NotBefore: time.Now(),
