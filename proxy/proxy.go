@@ -136,26 +136,19 @@ func (p *CachingMitmProxy) parseRequestCacheStatus(header http.Header) requestCa
 // If the entry is expired, it removes it from the cache and returns nil.
 func (p *CachingMitmProxy) getCached(key *cache.CacheKey) (*cache.Entry[cachedRequestInfo], error) {
 	if cached, err := p.cache.Get(key); err == nil {
-		log.Printf("Cache hit for %v", key)
-
-		if cached.Metadata.Expires.Before(cached.Metadata.TimeWritten) {
-			log.Printf("Cache entry for %v is expired, removing from cache", key)
-			p.cache.Delete(key)
-		} else {
-			log.Printf("Cache entry for %v is valid, serving from cache", key)
-			return cached, nil
-		}
+		log.Printf("Cache hit for key %v", key)
+		return cached, nil
 
 	} else if !errors.Is(err, cache.ErrorCacheMiss) {
-		return nil, fmt.Errorf("error retrieving from cache for %v: %w", key, err)
+		return nil, fmt.Errorf("error retrieving from cache for key %v: %w", key, err)
 	}
 
-	log.Printf("Cache miss for %v", key)
+	log.Printf("Cache miss for key %v", key)
 	return nil, nil
 }
 
 func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, key *cache.CacheKey) error {
-	log.Printf("Received HTTP request from client (%v): %s %s", req.RemoteAddr, req.Method, req.URL)
+	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
 
 	cached, err := p.getCached(key)
 	if err != nil {
