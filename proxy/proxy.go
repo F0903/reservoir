@@ -192,7 +192,7 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ke
 	defer resp.Body.Close()
 	log.Printf("sent request to target %v, got response status: %s", req.URL, resp.Status)
 
-	// If 304 Not Modified, serve cached response
+	// If 304 Not Modified, serve cached response (if available)
 	if resp.StatusCode == http.StatusNotModified && cached != nil {
 		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
 		makeHTTPResponseWithStream(http.StatusOK, cached.Data, cached.Metadata.Object.Header).Write(w)
