@@ -16,6 +16,17 @@ import (
 	"time"
 )
 
+type cacheControl struct {
+	noCache        bool
+	mustRevalidate bool
+	maxAge         time.Duration
+}
+
+type requestCacheStatus struct {
+	noCache bool
+	expires time.Time
+}
+
 type cachedRequestInfo struct {
 	ETag         string
 	LastModified time.Time
@@ -60,12 +71,6 @@ func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Reque
 	}
 }
 
-type cacheControl struct {
-	noCache        bool
-	mustRevalidate bool
-	maxAge         time.Duration
-}
-
 func (p *CachingMitmProxy) parseCacheControl(header http.Header) (*cacheControl, error) {
 	ccHeader := header.Get("Cache-Control")
 	if ccHeader == "" {
@@ -98,23 +103,32 @@ func (p *CachingMitmProxy) parseCacheControl(header http.Header) (*cacheControl,
 	return cc, nil
 }
 
-func (p *CachingMitmProxy) getCacheExpirationTime(header http.Header) time.Time {
+func (p *CachingMitmProxy) parseRequestCacheStatus(header http.Header) requestCacheStatus {
 	// For now we only use max-age from Cache-Control
 	cc, err := p.parseCacheControl(header)
 	if err == nil {
-		return time.Now().Add(cc.maxAge)
+		return requestCacheStatus{
+			noCache: cc.noCache,
+			expires: time.Now().Add(cc.maxAge),
+		}
 	}
 	log.Printf("Error parsing Cache-Control header: %v", err)
 
 	expires, err := http.ParseTime(header.Get("Expires"))
 	if err == nil {
-		return expires
+		return requestCacheStatus{
+			noCache: false,
+			expires: expires,
+		}
 	}
 	log.Printf("Error parsing Expires header: %v", err)
 
 	defaultExpires := time.Now().Add(p.defaultExpires)
 	log.Printf("Using default expiration time of %v", defaultExpires)
-	return defaultExpires
+	return requestCacheStatus{
+		noCache: false,
+		expires: defaultExpires,
+	}
 }
 
 // Checks if the request is already cached. If it is, it returns the cached entry.
@@ -159,9 +173,6 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 	// The target server is specified in the original CONNECT request, which is proxyReq.
 	changeRequestToTarget(req, req.Host)
 
-	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
-	removeHopByHopHeaders(req.Header)
-
 	// Send the request to the target server and log the response.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -174,17 +185,18 @@ func (p *CachingMitmProxy) processHTTPRequest(w io.Writer, req *http.Request, ca
 	removeHopByHopHeaders(resp.Header)
 
 	lastModified := time.Now()
-	// Parse the Last-Modified header to a time.Time value.
 	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
 		lastModified = t
 	}
-	expiresTime := p.getCacheExpirationTime(resp.Header)
 	etag := resp.Header.Get("ETag")
+	requestCacheStatus := p.parseRequestCacheStatus(resp.Header)
 
-	p.cache.Cache(cacheKey, resp.Body, expiresTime, cachedRequestInfo{
-		ETag:         etag,
-		LastModified: lastModified,
-	})
+	if !requestCacheStatus.noCache {
+		p.cache.Cache(cacheKey, resp.Body, requestCacheStatus.expires, cachedRequestInfo{
+			ETag:         etag,
+			LastModified: lastModified,
+		})
+	}
 
 	// Send the target server's response back to the client.
 	if err := resp.Write(w); err != nil {
@@ -197,6 +209,9 @@ func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Requ
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
 	key := buildCacheKeyFromRequest(proxyReq)
+
+	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
+	removeHopByHopHeaders(proxyReq.Header)
 	return p.processHTTPRequest(w, proxyReq, key)
 }
 
