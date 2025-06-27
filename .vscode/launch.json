@@ -13,7 +13,7 @@
       "args": [
         "--listen",
         "localhost:9999",
-        "--ca-crt",
+        "--ca-cert",
         "ssl/ca.crt",
         "--ca-key",
         "ssl/ca.key"
