@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"apt_cacher_go/optional"
+	"apt_cacher_go/utils/optional"
 	"fmt"
 	"log"
 	"net/http"

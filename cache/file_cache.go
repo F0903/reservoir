@@ -1,11 +1,11 @@
 package cache
 
 import (
+	"apt_cacher_go/utils/asserted_path"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,26 +13,15 @@ import (
 )
 
 type FileCache[ObjectData any] struct {
-	rootDir string
+	rootDir *asserted_path.AssertedPath
 	locks   map[string]*sync.RWMutex
 	mu      sync.Mutex // protects locks map
 }
 
-func AssertRootDir(rootDir string) {
-	if _, err := os.Stat(rootDir); !errors.Is(err, os.ErrNotExist) {
-		return // Directory already exists, no need to create it
-	}
-
-	if err := os.MkdirAll(rootDir, 0755); err != nil {
-		log.Panicf("failed to create cache directory '%s': %v", rootDir, err)
-	}
-}
-
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
-	AssertRootDir(rootDir)
 	return &FileCache[ObjectData]{
-		rootDir: rootDir,
+		rootDir: asserted_path.Assert(rootDir),
 		locks:   make(map[string]*sync.RWMutex),
 	}
 }
@@ -60,7 +49,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	lock.RLock()
 	defer lock.RUnlock()
 
-	fileName := filepath.Join(c.rootDir, key.Hex())
+	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
 	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
 		return nil, ErrorCacheMiss
 	}
@@ -99,7 +88,7 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir, key.Hex())
+	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
 	file, err := os.Create(fileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cache file '%s': %v", fileName, err)
@@ -142,7 +131,7 @@ func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir, key.Hex())
+	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
 	if err := os.Remove(fileName); err != nil {
 		os.Remove(getMetaPath(fileName)) // Ensure no orphaned metadata file exists
 		return fmt.Errorf("failed to delete cache file '%s': %v", fileName, err)
@@ -161,7 +150,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	lock.Lock()
 	defer lock.Unlock()
 
-	metaPath := getMetaPath(filepath.Join(c.rootDir, key.Hex()))
+	metaPath := getMetaPath(filepath.Join(c.rootDir.GetPath(), key.Hex()))
 	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
 	if err != nil {
 		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
