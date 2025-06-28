@@ -12,21 +12,8 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 )
-
-type cacheControl struct {
-	noCache        bool
-	mustRevalidate bool
-	maxAge         time.Duration
-}
-
-type requestCacheStatus struct {
-	noCache bool
-	expires time.Time
-}
 
 type cachedRequestInfo struct {
 	ETag         string
@@ -35,10 +22,10 @@ type cachedRequestInfo struct {
 }
 
 type CachingMitmProxy struct {
-	caCert         *x509.Certificate
-	caKey          any
-	cache          cache.Cache[cachedRequestInfo]
-	defaultExpires time.Duration
+	caCert        *x509.Certificate
+	caKey         any
+	cache         cache.Cache[cachedRequestInfo]
+	defaultMaxAge time.Duration
 }
 
 // createMitmProxy creates a new MITM proxy. It should be passed the filenames
@@ -52,10 +39,10 @@ func NewCachingMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*Cachin
 	log.Printf("Loaded CA certificate: '%v' (IsCA=%v)\n", caCert.Subject.CommonName, caCert.IsCA)
 
 	return &CachingMitmProxy{
-		caCert:         caCert,
-		caKey:          caKey,
-		cache:          cache.NewFileCache[cachedRequestInfo](cacheDir),
-		defaultExpires: 1 * time.Hour, // Default expiration time for cached responses
+		caCert:        caCert,
+		caKey:         caKey,
+		cache:         cache.NewFileCache[cachedRequestInfo](cacheDir),
+		defaultMaxAge: 1 * time.Hour, // Default expiration time for cached responses
 	}, nil
 }
 
@@ -73,117 +60,18 @@ func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Reque
 	}
 }
 
-func (p *CachingMitmProxy) parseCacheControl(header http.Header) (*cacheControl, error) {
-	ccHeader := header.Get("Cache-Control")
-	if ccHeader == "" {
-		return nil, nil // No Cache-Control header, nothing to parse
-	}
-
-	cc := &cacheControl{}
-	// Parse the Cache-Control header for max-age directive
-	for directive := range strings.SplitSeq(ccHeader, ",") {
-		directive = strings.TrimSpace(directive)
-		if directive == "no-cache" || directive == "no-store" {
-			cc.noCache = true
-		} else if directive == "must-revalidate" || directive == "proxy-revalidate" {
-			// must-revalidate is used to indicate that the cache must revalidate
-			// the response with the origin server before serving it to the client.
-			// This is useful for ensuring that the client always gets the most up-to-date response.
-			// proxy-revalidate is similar, but specifically for proxies. (we interpret it the same way)
-			cc.mustRevalidate = true
-		} else if after, ok := strings.CutPrefix(directive, "max-age="); ok {
-			// max-age directive specifies the maximum amount of time a response is considered fresh in seconds.
-			maxAgeStr := after
-			maxAge, err := strconv.ParseInt(maxAgeStr, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse max-age: %v", err)
-			}
-			if maxAge < 1 {
-				cc.noCache = true // If max-age is less than 1, treat it as no-cache
-				log.Printf("max-age is less than 1 second, treating as no-cache")
-				continue
-			}
-			cc.maxAge = time.Duration(maxAge) * time.Second
-		}
-	}
-
-	return cc, nil
-}
-
-func (p *CachingMitmProxy) parseRequestCacheStatus(header http.Header) requestCacheStatus {
-	// For now we only use max-age from Cache-Control
-	cc, err := p.parseCacheControl(header)
-	if err == nil {
-		return requestCacheStatus{
-			noCache: cc.noCache,
-			expires: time.Now().Add(cc.maxAge),
-		}
-	}
-	log.Printf("Error parsing Cache-Control header: %v", err)
-
-	expiresString := header.Get("Expires")
-	if expiresString == "0" || expiresString == "-1" {
-		log.Printf("Expires header is set to %q, treating as no-cache", expiresString)
-		return requestCacheStatus{
-			noCache: true,
-			expires: time.Time{}, // No expiration time, treat as no-cache
-		}
-	}
-	expires, err := http.ParseTime(expiresString)
-	if err == nil {
-		return requestCacheStatus{
-			noCache: false,
-			expires: expires,
-		}
-	}
-	log.Printf("Error parsing Expires header: %v", err)
-
-	defaultExpires := time.Now().Add(p.defaultExpires)
-	log.Printf("Using default expiration time of %v", defaultExpires)
-	return requestCacheStatus{
-		noCache: false,
-		expires: defaultExpires,
-	}
-}
-
-// Checks if the request is already cached. If it is, it returns the cached entry.
-// If the entry is expired, it removes it from the cache and returns nil.
-func (p *CachingMitmProxy) getCached(key *cache.CacheKey) (*cache.Entry[cachedRequestInfo], error) {
-	if cached, err := p.cache.Get(key); err == nil {
-		log.Printf("Cache hit for key %v", key)
-		return cached, nil
-
-	} else if !errors.Is(err, cache.ErrorCacheMiss) {
+func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*cache.Entry[cachedRequestInfo], error) {
+	cached, err := p.cache.Get(key)
+	if errors.Is(err, cache.ErrorCacheMiss) {
+		log.Printf("Cache miss for key %v", key)
+		return nil, nil // Cache miss, return nil to indicate no cached entry
+	} else if cached == nil && !errors.Is(err, cache.ErrorCacheMiss) {
 		return nil, fmt.Errorf("error retrieving from cache for key %v: %w", key, err)
 	}
 
-	log.Printf("Cache miss for key %v", key)
-	return nil, nil
-}
-
-func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
-	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
-
-	cached, err := p.getCached(key)
-	if err != nil {
-		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
-		r.Error(err, http.StatusInternalServerError)
-		return err
-	}
-
-	if cached != nil {
-		defer cached.Data.Close() // Close the cached data stream when we return
-
-		// If the cached response is still valid, serve it directly.
-		if time.Now().Before(cached.Metadata.Expires) {
-			log.Printf("Serving cached response for %v", req.Host)
-			r.SetHeader(cached.Metadata.Object.Header)
-			if err := r.Write(cached.Data); err != nil {
-				log.Printf("error writing cached response for key %v: %v", key, err)
-			}
-			return nil
-		}
-		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
+	// If the cached response is still valid, serve it directly.
+	if cached.Stale {
+		log.Printf("Cached response for %v is stale. Setting conditional headers...", req.Host)
 
 		// Cache is stale: set conditional headers
 		if cached.Metadata.Object.ETag != "" {
@@ -192,59 +80,153 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 		if !cached.Metadata.Object.LastModified.IsZero() {
 			req.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 		}
+
+		return nil, nil // Return nil to indicate that we need to revalidate the request
 	}
 
-	// Take the request and changes its destination to be forwarded to the target server.
-	// The target server is specified in the original CONNECT request, which is proxyReq.
+	return cached, nil
+}
+
+func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
+	log.Printf("Processing HEAD request...")
+
+	cacheDirective := parseCacheDirective(req.Header)
+
+	cached, err := p.getCached(key, req)
+	if err != nil {
+		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
+		r.Error(err, http.StatusInternalServerError)
+		return err
+	} else if cached != nil {
+		defer cached.Data.Close() // Close the cached data stream when we return
+
+		log.Printf("Serving cached response for %v", req.Host)
+		r.SetHeader(cached.Metadata.Object.Header)
+		if err := r.WriteEmpty(http.StatusOK); err != nil {
+			log.Printf("error writing cached response for key %v: %v", key, err)
+		}
+		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
+	}
+
+	// Change request URL to point to the target server.
 	changeRequestToTarget(req)
 	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
 	removeHopByHopHeaders(req.Header)
 
-	log.Printf("Making request to %v", req)
-	// Send the request to the target server and log the response.
-
+	log.Printf("Making HEAD request to %v", req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("error sending request to target (%v): %w", req.URL, err)
 	}
 	defer resp.Body.Close()
-	log.Printf("sent request to target %v, got response status: %s", req.URL, resp.Status)
 
-	// If 304 Not Modified, serve cached response (if available)
+	// If 304 Not Modified and we have a cached response, serve the cached response.
 	if resp.StatusCode == http.StatusNotModified && cached != nil {
 		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
-		r.SetHeader(cached.Metadata.Object.Header)
-		if err := r.Write(cached.Data); err != nil {
-			log.Printf("error writing cached response for key %v: %v", key, err)
-		}
 		p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 			// Update the metadata to reflect that the cached response is still valid.
-			meta.Expires = time.Now().Add(p.defaultExpires)
+			meta.Expires = time.Now().Add(p.defaultMaxAge)
 		})
+		r.SetHeader(cached.Metadata.Object.Header)
+		if err := r.WriteEmpty(http.StatusOK); err != nil {
+			log.Printf("error writing cached response for key %v: %v", key, err)
+		}
 		return nil
-	}
-
-	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
-	removeHopByHopHeaders(resp.Header)
-
-	lastModified := time.Now()
-	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
-		lastModified = t
-	}
-	etag := resp.Header.Get("ETag")
-	requestCacheStatus := p.parseRequestCacheStatus(resp.Header)
-
-	var data io.Reader = resp.Body
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("status code '%v' was not 200 OK, skipping cache", resp.Status)
 	}
 
 	// Only cache if the status code is OK and caching is not disabled.
 	// It is important to make sure only 200 OK responses are cached to
 	// avoid mistakenly writing empty responses among other things.
-	if !requestCacheStatus.noCache && resp.StatusCode == http.StatusOK {
-		entry, err := p.cache.Cache(key, resp.Body, requestCacheStatus.expires, cachedRequestInfo{
+	if cacheDirective.shouldCache() && resp.StatusCode == http.StatusOK {
+		log.Printf("Caching response for %v", req.URL)
+
+		lastModified := time.Now()
+		if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
+			lastModified = t
+		}
+
+		etag := resp.Header.Get("ETag")
+
+		entry, err := p.cache.Cache(key, resp.Body, cacheDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
+			ETag:         etag,
+			LastModified: lastModified,
+			Header:       resp.Header,
+		})
+		if err != nil {
+			log.Printf("error caching response for %v: %v", req.URL, err)
+			r.Error(err, http.StatusInternalServerError)
+			return fmt.Errorf("error caching response for %v: %v", req.URL, err)
+		}
+		entry.Data.Close() // Since we are not writing the body, we can close it immediately.
+	}
+
+	// Send the target server's response headers back to the client.
+	r.SetHeader(resp.Header)
+	if err := r.WriteEmpty(resp.StatusCode); err != nil {
+		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
+	}
+	return nil
+}
+
+func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
+	log.Printf("Processing GET request...")
+
+	cacheDirective := parseCacheDirective(req.Header)
+
+	cached, err := p.getCached(key, req)
+	if err != nil {
+		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
+		r.Error(err, http.StatusInternalServerError)
+		return err
+	} else if cached != nil {
+		defer cached.Data.Close() // Close the cached data stream when we return
+
+		log.Printf("Serving cached response for %v", req.Host)
+		r.SetHeader(cached.Metadata.Object.Header)
+		if err := r.Write(http.StatusOK, cached.Data); err != nil {
+			log.Printf("error writing cached response for key %v: %v", key, err)
+		}
+		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
+	}
+
+	resp, err := sendRequestToTarget(req)
+	if err != nil {
+		log.Printf("error sending request to target (%v): %v", req.URL, err)
+		r.Error(err, http.StatusBadGateway)
+		return err
+	}
+	defer resp.Body.Close()
+
+	// If 304 Not Modified and we have a cached response, serve the cached response.
+	if resp.StatusCode == http.StatusNotModified && cached != nil {
+		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
+		p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
+			// Update the metadata to reflect that the cached response is still valid.
+			meta.Expires = time.Now().Add(p.defaultMaxAge)
+		})
+		r.SetHeader(cached.Metadata.Object.Header)
+		if err := r.Write(http.StatusOK, cached.Data); err != nil {
+			log.Printf("error writing cached response for key %v: %v", key, err)
+		}
+		return nil
+	}
+
+	var data io.Reader = resp.Body
+
+	// Only cache if the status code is OK and caching is not disabled.
+	// It is important to make sure only 200 OK responses are cached to
+	// avoid mistakenly writing empty responses among other things.
+	if cacheDirective.shouldCache() && resp.StatusCode == http.StatusOK {
+		log.Printf("Caching response for %v", req.URL)
+
+		lastModified := time.Now()
+		if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
+			lastModified = t
+		}
+
+		etag := resp.Header.Get("ETag")
+
+		entry, err := p.cache.Cache(key, resp.Body, cacheDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
 			Header:       resp.Header,
@@ -261,10 +243,26 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 
 	// Send the target server's response back to the client.
 	r.SetHeader(resp.Header)
-	if err := r.Write(data); err != nil {
+	if err := r.Write(resp.StatusCode, data); err != nil {
 		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
 	}
 	return nil
+}
+
+func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
+	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
+
+	switch req.Method {
+	case http.MethodGet:
+		return p.processGET(r, req, key)
+	case http.MethodHead:
+		return p.processHEAD(r, req, key)
+	// Add more methods as needed (e.g., POST, PUT, DELETE)
+	default:
+		err := fmt.Errorf("unsupported HTTP method: %s", req.Method)
+		r.Error(err, http.StatusMethodNotAllowed)
+		return err
+	}
 }
 
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {

@@ -82,9 +82,15 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 		return nil, fmt.Errorf("failed to unmarshal metadata from '%s': %v", metaPath, err)
 	}
 
+	stale := false
+	if !meta.Expires.IsZero() && meta.Expires.Before(time.Now()) {
+		stale = true // The entry is stale if the expiration time is in the past
+	}
+
 	return &Entry[ObjectData]{
 		Data:     dataFile,
 		Metadata: meta,
+		Stale:    stale,
 	}, nil
 }
 

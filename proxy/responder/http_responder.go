@@ -24,9 +24,15 @@ func (c *HTTPResponder) SetHeader(header http.Header) {
 	}
 }
 
-func (c *HTTPResponder) Write(body io.Reader) error {
-	c.writer.WriteHeader(200)
+func (c *HTTPResponder) Write(status int, body io.Reader) error {
+	c.writer.WriteHeader(status)
 	_, err := io.Copy(c.writer, body)
+	return err
+}
+
+func (c *HTTPResponder) WriteEmpty(status int) error {
+	c.writer.WriteHeader(status)
+	_, err := io.Copy(c.writer, http.NoBody)
 	return err
 }
 

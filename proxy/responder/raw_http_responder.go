@@ -41,9 +41,16 @@ func (c *RawHTTPResponder) SetHeader(header http.Header) {
 	c.response.Header = header
 }
 
-func (c *RawHTTPResponder) Write(body io.Reader) error {
+func (c *RawHTTPResponder) Write(status int, body io.Reader) error {
 	c.response.Body = io.NopCloser(body)
 	c.parseAndSetContentLength()
+	c.response.StatusCode = status
+	return c.response.Write(c.writer)
+}
+
+func (c *RawHTTPResponder) WriteEmpty(status int) error {
+	c.response.StatusCode = status
+	c.response.Body = http.NoBody
 	return c.response.Write(c.writer)
 }
 

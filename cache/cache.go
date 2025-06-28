@@ -13,6 +13,7 @@ var (
 type Entry[ObjectData any] struct {
 	Data     io.ReadCloser
 	Metadata EntryMetadata[ObjectData]
+	Stale    bool // Indicates if the entry is stale, meaning it has expired but is still present in the cache.
 }
 
 type EntryMetadata[ObjectData any] struct {
