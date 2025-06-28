@@ -132,12 +132,12 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 		return nil
 	}
 
-	cacheDirective := parseCacheDirective(resp.Header)
+	directive := parseCacheDirective(resp.Header)
 
 	// Only cache if the status code is OK and caching is not disabled.
 	// It is important to make sure only 200 OK responses are cached to
 	// avoid mistakenly writing empty responses among other things.
-	if cacheDirective.shouldCache() && resp.StatusCode == http.StatusOK {
+	if directive.shouldCache() && resp.StatusCode == http.StatusOK {
 		log.Printf("Caching response for %v", req.URL)
 
 		lastModified := time.Now()
@@ -147,7 +147,7 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 
 		etag := resp.Header.Get("ETag")
 
-		entry, err := p.cache.Cache(key, resp.Body, cacheDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
+		entry, err := p.cache.Cache(key, resp.Body, directive.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
 			Header:       resp.Header,
@@ -211,12 +211,12 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 
 	var data io.Reader = resp.Body
 
-	cacheDirective := parseCacheDirective(resp.Header)
+	upstreamDirective := parseCacheDirective(resp.Header)
 
 	// Only cache if the status code is OK and caching is not disabled.
 	// It is important to make sure only 200 OK responses are cached to
 	// avoid mistakenly writing empty responses among other things.
-	if cacheDirective.shouldCache() && resp.StatusCode == http.StatusOK {
+	if upstreamDirective.shouldCache() && resp.StatusCode == http.StatusOK {
 		log.Printf("Caching response for %v", req.URL)
 
 		lastModified := time.Now()
@@ -226,7 +226,7 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 
 		etag := resp.Header.Get("ETag")
 
-		entry, err := p.cache.Cache(key, resp.Body, cacheDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
+		entry, err := p.cache.Cache(key, resp.Body, upstreamDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
 			Header:       resp.Header,

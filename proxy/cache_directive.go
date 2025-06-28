@@ -22,10 +22,6 @@ type conditionalHeaders struct {
 	ifMatch           optional.Optional[string]
 }
 
-func (ch *conditionalHeaders) hasAny() bool {
-	return ch.ifModifiedSince.IsSome() || ch.ifUnmodifiedSince.IsSome() || ch.ifNoneMatch.IsSome() || ch.ifMatch.IsSome()
-}
-
 type cacheDirective struct {
 	conditionalHeaders conditionalHeaders
 	cacheControl       optional.Optional[cacheControl]
