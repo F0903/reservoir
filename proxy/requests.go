@@ -57,7 +57,6 @@ func sendRequestToTarget(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error sending request to target (%v): %w", req.URL, err)
 	}
-	resp.Body.Close()
 	log.Printf("Sent request to target %v, got response status: %s", req.URL, resp.Status)
 
 	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
