@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 type AssertedPath struct {
@@ -11,13 +12,14 @@ type AssertedPath struct {
 	path string
 }
 
-func assertDir(dir string) {
-	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
-		return // Directory already exists, no need to create it
+func assertPath(path string) {
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		return // Path already exists, no need to create it
 	}
 
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		log.Panicf("failed to create directories '%s': %v", dir, err)
+		log.Panicf("failed to create directories '%s': %v", path, err)
 	}
 }
 
@@ -28,7 +30,7 @@ func Assert(path string) *AssertedPath {
 }
 
 func (ap *AssertedPath) GetPath() string {
-	assertDir(ap.path)
+	assertPath(ap.path)
 	return ap.path
 }
 
