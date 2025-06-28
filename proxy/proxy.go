@@ -236,7 +236,14 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 
 	var data io.Reader = resp.Body
 
-	if !requestCacheStatus.noCache {
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("status code '%v' was not 200 OK, skipping cache", resp.Status)
+	}
+
+	// Only cache if the status code is OK and caching is not disabled.
+	// It is important to make sure only 200 OK responses are cached to
+	// avoid mistakenly writing empty responses among other things.
+	if !requestCacheStatus.noCache && resp.StatusCode == http.StatusOK {
 		entry, err := p.cache.Cache(key, resp.Body, requestCacheStatus.expires, cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
