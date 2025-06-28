@@ -1,33 +1,46 @@
 package proxy
 
 import (
-	"io"
+	"fmt"
 	"net/http"
-	"strconv"
+	"net/url"
 	"strings"
 )
 
-func makeHTTPResponseWithStream(status int, stream io.ReadCloser, header http.Header) *http.Response {
-	contentLen, err := strconv.ParseInt(header.Get("Content-Length"), 10, 64)
+func removeHopByHopHeaders(header http.Header) {
+	hopHeaders := []string{
+		"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate",
+		"Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade",
+	}
+	for _, h := range hopHeaders {
+		header.Del(h)
+	}
+}
+
+func changeRequestToTarget(req *http.Request) error {
+	targetHost := req.Host
+	targetUrl, err := addrToUrl(targetHost)
 	if err != nil {
-		contentLen = -1 // If Content-Length is not set or invalid, use -1 to indicate unknown length
+		return fmt.Errorf("invalid target host '%s': %v", targetHost, err)
 	}
 
-	return &http.Response{
-		StatusCode:    status,
-		Proto:         "HTTP/1.1",
-		ProtoMajor:    1,
-		ProtoMinor:    1,
-		Header:        header,
-		Body:          stream,
-		ContentLength: contentLen,
+	targetUrl.Path = req.URL.Path
+	targetUrl.RawQuery = req.URL.RawQuery
+	targetUrl.Fragment = req.URL.Fragment
+	req.URL = targetUrl
+	// Make sure this is unset for sending the request through a client
+	req.RequestURI = ""
+
+	return nil
+}
+
+func addrToUrl(addr string) (*url.URL, error) {
+	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
+		addr = "https://" + addr
 	}
-}
-
-func makeHTTPResponseWithString(status int, text string, header http.Header) *http.Response {
-	return makeHTTPResponseWithStream(status, io.NopCloser(strings.NewReader(text)), header)
-}
-
-func makeHTTPErrorResponse(err error) *http.Response {
-	return makeHTTPResponseWithString(http.StatusInternalServerError, err.Error(), make(http.Header))
+	u, err := url.Parse(addr)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
 }

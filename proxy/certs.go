@@ -5,12 +5,16 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
+	"net"
+	"net/http"
 	"os"
 	"time"
 )
@@ -95,4 +99,28 @@ func loadX509KeyPair(certFile, keyFile string) (cert *x509.Certificate, key any,
 	}
 
 	return cert, key, nil
+}
+
+func getCertForRequest(req *http.Request, caCert *x509.Certificate, caKey crypto.PrivateKey) (tls.Certificate, error) {
+	host, _, err := net.SplitHostPort(req.Host)
+	if err != nil {
+		err := fmt.Errorf("invalid host:port format %v: %v", req.Host, err)
+		return tls.Certificate{}, err
+	}
+
+	// Create a fake TLS certificate for the target host, signed by our CA.
+	pemCert, pemKey, err := createCert([]string{host}, caCert, caKey, 240)
+	if err != nil {
+		err := fmt.Errorf("failed to create TLS certificate for %v: %v", host, err)
+		return tls.Certificate{}, err
+	}
+
+	tlsCert, err := tls.X509KeyPair(pemCert, pemKey)
+	if err != nil {
+		err := fmt.Errorf("failed to create X509 key pair for cert %v: %v", tlsCert, err)
+		return tls.Certificate{}, err
+	}
+
+	log.Printf("Created TLS certificate for %v", host)
+	return tlsCert, nil
 }
