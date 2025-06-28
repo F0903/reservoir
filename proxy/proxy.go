@@ -90,8 +90,6 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
 	log.Printf("Processing HEAD request...")
 
-	cacheDirective := parseCacheDirective(req.Header)
-
 	cached, err := p.getCached(key, req)
 	if err != nil {
 		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
@@ -134,6 +132,8 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 		return nil
 	}
 
+	cacheDirective := parseCacheDirective(resp.Header)
+
 	// Only cache if the status code is OK and caching is not disabled.
 	// It is important to make sure only 200 OK responses are cached to
 	// avoid mistakenly writing empty responses among other things.
@@ -170,8 +170,6 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 
 func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
 	log.Printf("Processing GET request...")
-
-	cacheDirective := parseCacheDirective(req.Header)
 
 	cached, err := p.getCached(key, req)
 	if err != nil {
@@ -212,6 +210,8 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 	}
 
 	var data io.Reader = resp.Body
+
+	cacheDirective := parseCacheDirective(resp.Header)
 
 	// Only cache if the status code is OK and caching is not disabled.
 	// It is important to make sure only 200 OK responses are cached to
