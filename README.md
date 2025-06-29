@@ -15,6 +15,9 @@ The prime usage of this is as a central cache proxy for apt.
 
 ## Usage Guide
 
+To start with, you need to generate a certificate and key to be used as a certificate authority to generate new certificates for requests to HTTPS domains. This is the mechanism that allows the proxy to decrypt and cache HTTPS responses.
+The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors.
+
 ### Generate a CA Certificate and Key (PEM format)
 
 ```sh
