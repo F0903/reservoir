@@ -160,7 +160,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	if err := metaFile.Truncate(0); err != nil {
 		return fmt.Errorf("failed to truncate cache metadata file '%s': %v", metaPath, err)
 	}
-	if _, err := metaFile.Write(metaJson); err != nil {
+	if _, err := metaFile.WriteAt(metaJson, 0); err != nil {
 		return fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
 
