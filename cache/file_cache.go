@@ -47,13 +47,14 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	// We don't close dataFile here since we are returning it in the Entry.
 
 	metaPath := getMetaPath(fileName)
-	metaData, err := os.ReadFile(metaPath)
+	metaFile, err := os.Open(metaPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached metadata file '%s': %v", metaPath, err)
 	}
+	defer metaFile.Close()
 
 	var meta EntryMetadata[ObjectData]
-	if err := json.Unmarshal(metaData, &meta); err != nil {
+	if err := json.NewDecoder(metaFile).Decode(&meta); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal metadata from '%s': %v", metaPath, err)
 	}
 
@@ -143,13 +144,8 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	}
 	defer metaFile.Close()
 
-	metaData, err := io.ReadAll(metaFile)
-	if err != nil {
-		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
-	}
-
 	var meta EntryMetadata[ObjectData]
-	if err := json.Unmarshal(metaData, &meta); err != nil {
+	if err := json.NewDecoder(metaFile).Decode(&meta); err != nil {
 		return fmt.Errorf("failed to unmarshal metadata from '%s': %v", metaPath, err)
 	}
 
@@ -160,7 +156,11 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 		return fmt.Errorf("failed to encode json metadata for '%s': %v", metaPath, err)
 	}
 
-	if _, err := metaFile.WriteAt(metaJson, 0); err != nil {
+	// Clear the file before writing new data
+	if err := metaFile.Truncate(0); err != nil {
+		return fmt.Errorf("failed to truncate cache metadata file '%s': %v", metaPath, err)
+	}
+	if _, err := metaFile.Write(metaJson); err != nil {
 		return fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
 

@@ -134,8 +134,9 @@ func parseCacheDirective(header http.Header) cacheDirective {
 
 func removeUnsupportedHeaders(header http.Header) {
 	unsupportedHeaders := []string{
-		"Range",    // Range requests are currently not supported in this proxy
-		"If-Range", // Range requests are currently not supported in this proxy
+		"Range",         // Range requests are currently not supported in this proxy
+		"If-Range",      // Range requests are currently not supported in this proxy
+		"Accept-Ranges", // Range requests are currently not supported in this proxy
 	}
 	for _, h := range unsupportedHeaders {
 		header.Del(h)
