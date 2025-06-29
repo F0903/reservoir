@@ -118,7 +118,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 	}
 
 	if cached != nil && !cached.Stale {
-		log.Printf("Serving cached response for %v", req.Host)
+		log.Printf("Serving cached response for '%v' with key '%v'", req.URL, key)
 		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 		return nil
 	}
@@ -133,8 +133,8 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 
 	if resp.StatusCode == http.StatusNotModified {
 		if cached == nil {
-			log.Printf("Received 304 Not Modified but no cached response found for '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, req.Header)
-			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v'", req.URL)
+			log.Printf("Received 304 Not Modified but no cached response found for '%v' with key '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, key, req.Header)
+			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v' with key '%v'", req.URL, key)
 			r.Error(err, http.StatusInternalServerError)
 			return err
 		}
@@ -143,7 +143,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 			// Update the metadata to reflect that the cached response is still valid.
 			meta.Expires = time.Now().Add(p.defaultMaxAge)
 		})
-		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
+		log.Printf("Origin server returned 304 Not Modified, serving cached response for '%v' with key '%v'", req.URL, key)
 		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 		return nil
 	}
@@ -153,7 +153,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 	upstreamDirective := parseCacheDirective(resp.Header)
 
 	if shouldResponseBeCached(resp, upstreamDirective) {
-		log.Printf("Caching response for %v", req.URL)
+		log.Printf("Caching response for %s '%v' with key '%v'", resp.Status, req.URL, key)
 
 		lastModified := time.Now()
 		if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
@@ -168,16 +168,16 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 			Header:       resp.Header,
 		})
 		if err != nil {
-			log.Printf("error caching response for %v: %v", req.URL, err)
+			log.Printf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
 			r.Error(err, http.StatusInternalServerError)
-			return fmt.Errorf("error caching response for %v: %v", req.URL, err)
+			return fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
 		}
 
 		data.Close() // Close the old data stream since we are now using the cached entry.
 		data = entry.Data
 	}
 
-	log.Printf("Sending response for %v with status %d", req.URL, resp.StatusCode)
+	log.Printf("Sending response for '%v' with status %d", req.URL, resp.StatusCode)
 	sendResponse(r, data, resp.Header, req)
 	return nil
 }
