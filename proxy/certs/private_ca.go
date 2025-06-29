@@ -1,6 +1,7 @@
-package proxy
+package certs
 
 import (
+	"apt_cacher_go/utils/syncmap"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -14,16 +15,39 @@ import (
 	"log"
 	"math/big"
 	"net"
-	"net/http"
-	"os"
 	"time"
 )
+
+type PrivateCA struct {
+	key   crypto.PrivateKey
+	cert  *x509.Certificate
+	certs *syncmap.SyncMap[string, tls.Certificate]
+}
+
+func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
+	caCert, caKey, err := loadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
+	}
+
+	if !caCert.IsCA {
+		return nil, fmt.Errorf("loaded certificate is not a CA certificate")
+	}
+
+	log.Printf("Loaded CA certificate: '%v'\n", caCert.Subject.CommonName)
+
+	return &PrivateCA{
+		key:   caKey,
+		cert:  caCert,
+		certs: syncmap.NewSyncMap[string, tls.Certificate](),
+	}, nil
+}
 
 // createCert creates a new certificate/private key pair for the given domains,
 // signed by the parent/parentKey certificate. hoursValid is the duration of
 // the new certificate's validity.
 // https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go
-func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.PrivateKey, hoursValid int) (cert []byte, priv []byte, err error) {
+func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte, priv []byte, err error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 	if err != nil {
@@ -50,7 +74,7 @@ func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.Pr
 		BasicConstraintsValid: true,
 	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, parent, &privateKey.PublicKey, parentKey)
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, ca.cert, &privateKey.PublicKey, ca.key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create certificate: %v", err)
 	}
@@ -71,45 +95,28 @@ func createCert(dnsNames []string, parent *x509.Certificate, parentKey crypto.Pr
 	return pemCert, pemKey, nil
 }
 
-// loadX509KeyPair loads a certificate/key pair from files, and unmarshals them
-// into data structures from the x509 package. Note that private key types in Go
-// don't have a shared named interface and use `any` (for backwards
-// compatibility reasons).
-// https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go
-func loadX509KeyPair(certFile, keyFile string) (cert *x509.Certificate, key any, err error) {
-	cf, err := os.ReadFile(certFile)
+func (ca *PrivateCA) GetCertForHost(host string) (tls.Certificate, error) {
+	host, _, err := net.SplitHostPort(host)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read certificate file %s: %v", certFile, err)
-	}
-
-	kf, err := os.ReadFile(keyFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read key file %s: %v", keyFile, err)
-	}
-	certBlock, _ := pem.Decode(cf)
-	cert, err = x509.ParseCertificate(certBlock.Bytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse certificate: %v", err)
-	}
-
-	keyBlock, _ := pem.Decode(kf)
-	key, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse private key: %v", err)
-	}
-
-	return cert, key, nil
-}
-
-func getCertForRequest(req *http.Request, caCert *x509.Certificate, caKey crypto.PrivateKey) (tls.Certificate, error) {
-	host, _, err := net.SplitHostPort(req.Host)
-	if err != nil {
-		err := fmt.Errorf("invalid host:port format %v: %v", req.Host, err)
+		err := fmt.Errorf("invalid host:port format %v: %v", host, err)
 		return tls.Certificate{}, err
 	}
 
+	if cert, ok := ca.certs.Get(host); ok {
+		expired := cert.Leaf.NotAfter.Before(time.Now())
+		if expired {
+			log.Printf("Certificate for %v is expired, deleting...", host)
+			ca.certs.Delete(host)
+		} else {
+			log.Printf("Using cached certificate for %v", host)
+			return cert, nil
+		}
+	}
+
+	log.Printf("Creating new certificate for %v", host)
+
 	// Create a fake TLS certificate for the target host, signed by our CA.
-	pemCert, pemKey, err := createCert([]string{host}, caCert, caKey, 240)
+	pemCert, pemKey, err := ca.createCert([]string{host}, 240)
 	if err != nil {
 		err := fmt.Errorf("failed to create TLS certificate for %v: %v", host, err)
 		return tls.Certificate{}, err
@@ -121,6 +128,9 @@ func getCertForRequest(req *http.Request, caCert *x509.Certificate, caKey crypto
 		return tls.Certificate{}, err
 	}
 
-	log.Printf("Created TLS certificate for %v", host)
+	log.Printf("Created certificate for %v", host)
+
+	ca.certs.Set(host, tlsCert)
+
 	return tlsCert, nil
 }

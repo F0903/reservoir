@@ -2,6 +2,7 @@ package cache
 
 import (
 	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/syncmap"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,15 +15,14 @@ import (
 
 type FileCache[ObjectData any] struct {
 	rootDir *asserted_path.AssertedPath
-	locks   map[string]*sync.RWMutex
-	mu      sync.Mutex // protects locks map
+	locks   *syncmap.SyncMap[string, *sync.RWMutex]
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
 	return &FileCache[ObjectData]{
 		rootDir: asserted_path.Assert(rootDir),
-		locks:   make(map[string]*sync.RWMutex),
+		locks:   syncmap.NewSyncMap[string, *sync.RWMutex](),
 	}
 }
 
@@ -30,22 +30,8 @@ func getMetaPath(dataPath string) string {
 	return dataPath[:len(dataPath)-len(filepath.Ext(dataPath))] + ".meta"
 }
 
-// getLock returns the per-file lock for a given file name (creates if missing)
-func (c *FileCache[ObjectData]) getLock(fileName string) *sync.RWMutex {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	lock, ok := c.locks[fileName]
-	if !ok {
-		lock = &sync.RWMutex{}
-		c.locks[fileName] = lock
-	}
-
-	return lock
-}
-
 func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
-	lock := c.getLock(key.Hex())
+	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
 	lock.RLock()
 	defer lock.RUnlock()
 
@@ -84,7 +70,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 }
 
 func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
-	lock := c.getLock(key.Hex())
+	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -127,7 +113,7 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 }
 
 func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
-	lock := c.getLock(key.Hex())
+	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -146,7 +132,7 @@ func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
 }
 
 func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
-	lock := c.getLock(key.Hex())
+	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 

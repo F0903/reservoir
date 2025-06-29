@@ -2,10 +2,10 @@ package proxy
 
 import (
 	"apt_cacher_go/cache"
+	"apt_cacher_go/proxy/certs"
 	"apt_cacher_go/proxy/responder"
 	"bufio"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -22,8 +22,7 @@ type cachedRequestInfo struct {
 }
 
 type CachingMitmProxy struct {
-	caCert        *x509.Certificate
-	caKey         any
+	ca            certs.CertAuthority
 	cache         cache.Cache[cachedRequestInfo]
 	defaultMaxAge time.Duration
 }
@@ -31,16 +30,9 @@ type CachingMitmProxy struct {
 // createMitmProxy creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewCachingMitmProxy(caCertFile, caKeyFile string, cacheDir string) (*CachingMitmProxy, error) {
-	caCert, caKey, err := loadX509KeyPair(caCertFile, caKeyFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
-	}
-	log.Printf("Loaded CA certificate: '%v' (IsCA=%v)\n", caCert.Subject.CommonName, caCert.IsCA)
-
+func NewCachingMitmProxy(cacheDir string, ca certs.CertAuthority) (*CachingMitmProxy, error) {
 	return &CachingMitmProxy{
-		caCert:        caCert,
-		caKey:         caKey,
+		ca:            ca,
 		cache:         cache.NewFileCache[cachedRequestInfo](cacheDir),
 		defaultMaxAge: 1 * time.Hour, // Default expiration time for cached responses
 	}, nil
@@ -304,7 +296,7 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 		return err
 	}
 
-	tlsCert, err := getCertForRequest(proxyReq, p.caCert, p.caKey)
+	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
