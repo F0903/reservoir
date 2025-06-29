@@ -80,10 +80,13 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 }
 
 func shouldResponseBeCached(resp *http.Response, upstreamDirective cacheDirective) bool {
-	return (!config.Global.IgnoreNoCache && upstreamDirective.shouldCache()) &&
+	if config.Global.AlwaysCache {
+		return true
+	}
+	return upstreamDirective.shouldCache() &&
 		resp.StatusCode == http.StatusOK &&
-		resp.Request.Method == http.MethodGet ||
-		resp.Request.Method == http.MethodHead
+		(resp.Request.Method == http.MethodGet ||
+			resp.Request.Method == http.MethodHead)
 }
 
 func sendResponse(r responder.Responder, resp io.ReadCloser, header http.Header, req *http.Request) {
@@ -117,9 +120,10 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 	if cached != nil && !cached.Stale {
 		log.Printf("Serving cached response for %v", req.Host)
 		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
-		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
+		return nil
 	}
 
+	log.Printf("No cached response found. Sending request to upstream '%v'", req.URL)
 	resp, err := sendRequestToTarget(req)
 	if err != nil {
 		log.Printf("error sending request to target (%v): %v", req.URL, err)
@@ -131,7 +135,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 		if cached == nil {
 			log.Printf("Received 304 Not Modified but no cached response found for '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, req.Header)
 			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v'", req.URL)
-			r.Error(err, http.StatusNotFound)
+			r.Error(err, http.StatusInternalServerError)
 			return err
 		}
 

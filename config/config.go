@@ -21,12 +21,12 @@ var Global *Config = func() *Config {
 }()
 
 type Config struct {
-	IgnoreNoCache bool
+	AlwaysCache bool
 }
 
 func Default() *Config {
 	return &Config{
-		IgnoreNoCache: false,
+		AlwaysCache: false,
 	}
 }
 
