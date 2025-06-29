@@ -30,7 +30,8 @@ func (c *HTTPResponder) writeStatusHeader(status int) {
 	}
 }
 
-func (c *HTTPResponder) Write(status int, body io.Reader) error {
+func (c *HTTPResponder) Write(status int, body io.ReadCloser) error {
+	defer body.Close() // Ensure the body is closed after writing
 	c.writeStatusHeader(status)
 	_, err := io.Copy(c.writer, body)
 	return err

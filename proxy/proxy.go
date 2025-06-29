@@ -173,8 +173,6 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 		r.Error(err, http.StatusInternalServerError)
 		return err
 	} else if cached != nil {
-		defer cached.Data.Close() // Close the cached data stream when we return
-
 		log.Printf("Serving cached response for %v", req.Host)
 		r.SetHeader(cached.Metadata.Object.Header)
 		if err := r.Write(http.StatusOK, cached.Data); err != nil {
@@ -189,7 +187,6 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 		r.Error(err, http.StatusBadGateway)
 		return err
 	}
-	defer resp.Body.Close()
 
 	// If 304 Not Modified and we have a cached response, serve the cached response.
 	if resp.StatusCode == http.StatusNotModified && cached != nil {
@@ -205,7 +202,7 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 		return nil
 	}
 
-	var data io.Reader = resp.Body
+	var data io.ReadCloser = resp.Body
 
 	upstreamDirective := parseCacheDirective(resp.Header)
 
@@ -232,8 +229,8 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 			r.Error(err, http.StatusInternalServerError)
 			return fmt.Errorf("error caching response for %v: %v", req.URL, err)
 		}
-		defer entry.Data.Close() // Ensure we close the cached data stream
 
+		data.Close() // Close the old data stream since we are now using the cached entry.
 		data = entry.Data
 	}
 

@@ -138,7 +138,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	defer lock.Unlock()
 
 	metaPath := getMetaPath(filepath.Join(c.rootDir.GetPath(), key.Hex()))
-	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
+	metaFile, err := os.Create(metaPath)
 	if err != nil {
 		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
 	}
