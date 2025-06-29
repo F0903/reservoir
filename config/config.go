@@ -26,7 +26,7 @@ type Config struct {
 
 func Default() *Config {
 	return &Config{
-		IgnoreNoCache: true, // Since this is geared towards caching apt repositories, we aggressively cache responses.
+		IgnoreNoCache: false,
 	}
 }
 

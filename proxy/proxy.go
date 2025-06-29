@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"apt_cacher_go/cache"
+	"apt_cacher_go/config"
 	"apt_cacher_go/proxy/certs"
 	"apt_cacher_go/proxy/responder"
 	"bufio"
@@ -79,6 +80,10 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 	return cached, nil
 }
 
+func shouldResponseBeCached(resp *http.Response, upstreamDirective cacheDirective) bool {
+	return (!config.Global.IgnoreNoCache && upstreamDirective.shouldCache()) && (resp.StatusCode == http.StatusOK)
+}
+
 func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
 	log.Printf("Processing HEAD request...")
 
@@ -126,10 +131,7 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 
 	directive := parseCacheDirective(resp.Header)
 
-	// Only cache if the status code is OK and caching is not disabled.
-	// It is important to make sure only 200 OK responses are cached to
-	// avoid mistakenly writing empty responses among other things.
-	if directive.shouldCache() && resp.StatusCode == http.StatusOK {
+	if shouldResponseBeCached(resp, directive) {
 		log.Printf("Caching response for %v", req.URL)
 
 		lastModified := time.Now()
@@ -202,10 +204,7 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 
 	upstreamDirective := parseCacheDirective(resp.Header)
 
-	// Only cache if the status code is OK and caching is not disabled.
-	// It is important to make sure only 200 OK responses are cached to
-	// avoid mistakenly writing empty responses among other things.
-	if upstreamDirective.shouldCache() && resp.StatusCode == http.StatusOK {
+	if shouldResponseBeCached(resp, upstreamDirective) {
 		log.Printf("Caching response for %v", req.URL)
 
 		lastModified := time.Now()
