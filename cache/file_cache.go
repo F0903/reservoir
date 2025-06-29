@@ -151,16 +151,15 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 
 	modifier(&meta)
 
-	metaJson, err := json.Marshal(meta)
-	if err != nil {
-		return fmt.Errorf("failed to encode json metadata for '%s': %v", metaPath, err)
-	}
+	// Use Encoder to write JSON directly to the file
 
 	// Clear the file before writing new data
 	if err := metaFile.Truncate(0); err != nil {
 		return fmt.Errorf("failed to truncate cache metadata file '%s': %v", metaPath, err)
 	}
-	if _, err := metaFile.WriteAt(metaJson, 0); err != nil {
+	metaFile.Seek(0, io.SeekStart) // Reset file stream to the beginning
+
+	if err := json.NewEncoder(metaFile).Encode(&meta); err != nil {
 		return fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
 
