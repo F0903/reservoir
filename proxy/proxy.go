@@ -62,7 +62,6 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 		return nil, fmt.Errorf("error retrieving from cache for key %v: %w", key, err)
 	}
 
-	// If the cached response is still valid, serve it directly.
 	if cached.Stale {
 		log.Printf("Cached response for %v is stale. Setting conditional headers...", req.Host)
 
@@ -74,109 +73,50 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 			req.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 		}
 
-		return nil, nil // Return nil to indicate that we need to revalidate the request
+		return cached, nil
 	}
 
 	return cached, nil
 }
 
 func shouldResponseBeCached(resp *http.Response, upstreamDirective cacheDirective) bool {
-	return (!config.Global.IgnoreNoCache && upstreamDirective.shouldCache()) && (resp.StatusCode == http.StatusOK)
+	return (!config.Global.IgnoreNoCache && upstreamDirective.shouldCache()) &&
+		resp.StatusCode == http.StatusOK &&
+		resp.Request.Method == http.MethodGet ||
+		resp.Request.Method == http.MethodHead
 }
 
-func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
-	log.Printf("Processing HEAD request...")
+func sendResponse(r responder.Responder, resp io.ReadCloser, header http.Header, req *http.Request) {
+	body := resp
+	if req.Method == http.MethodHead {
+		body = http.NoBody
+	}
+
+	r.SetHeader(header)
+	if err := r.Write(http.StatusOK, body); err != nil {
+		log.Printf("error writing response for '%v': %v", req.URL, err)
+	}
+}
+
+func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request) error {
+	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
+
+	// Remove headers that we don't support before anything else.
+	// Otherwise we end up sending headers and getting responses that we don't know how to handle.
+	removeUnsupportedHeaders(req.Header)
+
+	key := cache.MakeFromRequest(req)
 
 	cached, err := p.getCached(key, req)
 	if err != nil {
 		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
 		r.Error(err, http.StatusInternalServerError)
 		return err
-	} else if cached != nil {
-		defer cached.Data.Close() // Close the cached data stream when we return
+	}
 
+	if cached != nil && !cached.Stale {
 		log.Printf("Serving cached response for %v", req.Host)
-		r.SetHeader(cached.Metadata.Object.Header)
-		if err := r.WriteEmpty(http.StatusOK); err != nil {
-			log.Printf("error writing cached response for key %v: %v", key, err)
-		}
-		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
-	}
-
-	// Change request URL to point to the target server.
-	changeRequestToTarget(req)
-	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
-	removeHopByHopHeaders(req.Header)
-
-	log.Printf("Making HEAD request to %v", req)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request to target (%v): %w", req.URL, err)
-	}
-	defer resp.Body.Close()
-
-	// If 304 Not Modified and we have a cached response, serve the cached response.
-	if resp.StatusCode == http.StatusNotModified && cached != nil {
-		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
-		p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
-			// Update the metadata to reflect that the cached response is still valid.
-			meta.Expires = time.Now().Add(p.defaultMaxAge)
-		})
-		r.SetHeader(cached.Metadata.Object.Header)
-		if err := r.WriteEmpty(http.StatusOK); err != nil {
-			log.Printf("error writing cached response for key %v: %v", key, err)
-		}
-		return nil
-	}
-
-	directive := parseCacheDirective(resp.Header)
-
-	if shouldResponseBeCached(resp, directive) {
-		log.Printf("Caching response for %v", req.URL)
-
-		lastModified := time.Now()
-		if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
-			lastModified = t
-		}
-
-		etag := resp.Header.Get("ETag")
-
-		entry, err := p.cache.Cache(key, resp.Body, directive.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
-			ETag:         etag,
-			LastModified: lastModified,
-			Header:       resp.Header,
-		})
-		if err != nil {
-			log.Printf("error caching response for %v: %v", req.URL, err)
-			r.Error(err, http.StatusInternalServerError)
-			return fmt.Errorf("error caching response for %v: %v", req.URL, err)
-		}
-		entry.Data.Close() // Since we are not writing the body, we can close it immediately.
-	}
-
-	log.Printf("Sending response for %v with status %d", req.URL, resp.StatusCode)
-	// Send the target server's response headers back to the client.
-	r.SetHeader(resp.Header)
-	if err := r.WriteEmpty(http.StatusOK); err != nil {
-		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
-	}
-	return nil
-}
-
-func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
-	log.Printf("Processing GET request...")
-
-	cached, err := p.getCached(key, req)
-	if err != nil {
-		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
-		r.Error(err, http.StatusInternalServerError)
-		return err
-	} else if cached != nil {
-		log.Printf("Serving cached response for %v", req.Host)
-		r.SetHeader(cached.Metadata.Object.Header)
-		if err := r.Write(http.StatusOK, cached.Data); err != nil {
-			log.Printf("error writing cached response for key %v: %v", key, err)
-		}
+		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 		log.Printf("Cached response for %v is stale. Revalidating...", req.Host)
 	}
 
@@ -187,17 +127,20 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 		return err
 	}
 
-	// If 304 Not Modified and we have a cached response, serve the cached response.
-	if resp.StatusCode == http.StatusNotModified && cached != nil {
-		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
+	if resp.StatusCode == http.StatusNotModified {
+		if cached == nil {
+			log.Printf("Received 304 Not Modified but no cached response found for '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, req.Header)
+			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v'", req.URL)
+			r.Error(err, http.StatusNotFound)
+			return err
+		}
+
 		p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 			// Update the metadata to reflect that the cached response is still valid.
 			meta.Expires = time.Now().Add(p.defaultMaxAge)
 		})
-		r.SetHeader(cached.Metadata.Object.Header)
-		if err := r.Write(http.StatusOK, cached.Data); err != nil {
-			log.Printf("error writing cached response for key %v: %v", key, err)
-		}
+		log.Printf("Origin server returned 304 Not Modified, serving cached response for %v", req.URL)
+		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 		return nil
 	}
 
@@ -231,34 +174,8 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 	}
 
 	log.Printf("Sending response for %v with status %d", req.URL, resp.StatusCode)
-	// Send the target server's response back to the client.
-	r.SetHeader(resp.Header)
-	if err := r.Write(http.StatusOK, data); err != nil {
-		log.Printf("error writing response back to client (%v): %v\n", req.RemoteAddr, err)
-	}
+	sendResponse(r, data, resp.Header, req)
 	return nil
-}
-
-func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request) error {
-	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
-
-	// Remove headers that we don't support before anything else.
-	// Otherwise we end up sending headers and getting responses that we don't know how to handle.
-	removeUnsupportedHeaders(req.Header)
-
-	key := cache.MakeFromRequest(req)
-
-	switch req.Method {
-	case http.MethodGet:
-		return p.processGET(r, req, key)
-	case http.MethodHead:
-		return p.processHEAD(r, req, key)
-	// Add more methods as needed (e.g., POST, PUT, DELETE)
-	default:
-		err := fmt.Errorf("unsupported HTTP method: %s", req.Method)
-		r.Error(err, http.StatusMethodNotAllowed)
-		return err
-	}
 }
 
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
