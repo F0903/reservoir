@@ -154,6 +154,7 @@ func (p *CachingMitmProxy) processHEAD(r responder.Responder, req *http.Request,
 		entry.Data.Close() // Since we are not writing the body, we can close it immediately.
 	}
 
+	log.Printf("Sending response for %v with status %d", req.URL, resp.StatusCode)
 	// Send the target server's response headers back to the client.
 	r.SetHeader(resp.Header)
 	if err := r.WriteEmpty(resp.StatusCode); err != nil {
@@ -229,6 +230,7 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 		data = entry.Data
 	}
 
+	log.Printf("Sending response for %v with status %d", req.URL, resp.StatusCode)
 	// Send the target server's response back to the client.
 	r.SetHeader(resp.Header)
 	if err := r.Write(resp.StatusCode, data); err != nil {
