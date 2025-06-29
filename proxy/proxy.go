@@ -237,12 +237,14 @@ func (p *CachingMitmProxy) processGET(r responder.Responder, req *http.Request, 
 	return nil
 }
 
-func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request, key *cache.CacheKey) error {
+func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request) error {
 	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
 
 	// Remove headers that we don't support before anything else.
 	// Otherwise we end up sending headers and getting responses that we don't know how to handle.
 	removeUnsupportedHeaders(req.Header)
+
+	key := cache.MakeFromRequest(req)
 
 	switch req.Method {
 	case http.MethodGet:
@@ -260,10 +262,8 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
-	key := cache.MakeFromRequest(proxyReq)
-
 	responder := responder.NewHTTPResponder(w)
-	return p.processHTTPRequest(responder, proxyReq, key)
+	return p.processHTTPRequest(responder, proxyReq)
 }
 
 func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
@@ -287,8 +287,6 @@ func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
 
 func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.URL, proxyReq.RemoteAddr)
-
-	key := cache.MakeFromRequest(proxyReq)
 
 	clientConn, err := hijackConnection(w)
 	if err != nil {
@@ -334,7 +332,7 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 			return fmt.Errorf("error reading request from client (%v): %w", proxyReq.RemoteAddr, err)
 		}
 
-		p.processHTTPRequest(responder, req, key)
+		p.processHTTPRequest(responder, req)
 	}
 
 	return nil

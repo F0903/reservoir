@@ -29,9 +29,13 @@ func FromString(input string) *CacheKey {
 }
 
 func MakeFromRequest(r *http.Request) *CacheKey {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
 	normHost := strings.ToLower(r.Host)
 	normPath := path.Clean(r.URL.Path)
-	stringKey := fmt.Sprintf("%s|%s|%s|%s", r.Method, normHost, normPath, r.URL.RawQuery)
+	stringKey := fmt.Sprintf("%s|%s|%s|%s|%s", scheme, r.Method, normHost, normPath, r.URL.RawQuery)
 	log.Printf("Creating cache key: %s", stringKey)
 	return FromString(stringKey)
 }
