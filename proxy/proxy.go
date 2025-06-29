@@ -39,6 +39,10 @@ func NewCachingMitmProxy(cacheDir string, ca certs.CertAuthority) (*CachingMitmP
 }
 
 func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
+	// Remove headers that we don't support before anything else.
+	// Otherwise we end up sending headers and getting responses that we don't know how to handle.
+	removeUnsupportedHeaders(proxyReq.Header)
+
 	if proxyReq.Method == http.MethodConnect {
 		if err := p.handleCONNECT(w, proxyReq); err != nil {
 			log.Printf("Error handling CONNECT request: %v", err)

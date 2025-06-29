@@ -20,11 +20,13 @@ type conditionalHeaders struct {
 	ifUnmodifiedSince optional.Optional[time.Time]
 	ifNoneMatch       optional.Optional[string]
 	ifMatch           optional.Optional[string]
+	ifRange           optional.Optional[string] // Currently not used, but can be extended for range requests
 }
 
 type cacheDirective struct {
 	conditionalHeaders conditionalHeaders
 	cacheControl       optional.Optional[cacheControl]
+	rangeHeader        optional.Optional[string] // Currently not used, but can be extended for range requests
 	expires            optional.Optional[time.Time]
 }
 
@@ -109,6 +111,14 @@ func parseCacheDirective(header http.Header) cacheDirective {
 			if value != "" {
 				cd.conditionalHeaders.ifMatch = optional.Some(&value)
 			}
+		case "If-Range":
+			if value != "" {
+				cd.conditionalHeaders.ifRange = optional.Some(&value)
+			}
+		case "Range":
+			if value != "" {
+				cd.rangeHeader = optional.Some(&value)
+			}
 		case "Cache-Control":
 			if cc, err := parseCacheControl(value); err == nil {
 				cd.cacheControl = optional.Some(cc)
@@ -120,4 +130,14 @@ func parseCacheDirective(header http.Header) cacheDirective {
 		}
 	}
 	return cd
+}
+
+func removeUnsupportedHeaders(header http.Header) {
+	unsupportedHeaders := []string{
+		"Range",    // Range requests are currently not supported in this proxy
+		"If-Range", // Range requests are currently not supported in this proxy
+	}
+	for _, h := range unsupportedHeaders {
+		header.Del(h)
+	}
 }
