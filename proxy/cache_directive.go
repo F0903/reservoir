@@ -23,6 +23,32 @@ type conditionalHeaders struct {
 	ifRange           optional.Optional[string] // Currently not used, but can be extended for range requests
 }
 
+func (ch *conditionalHeaders) hasAny() bool {
+	return ch.ifModifiedSince.IsSome() ||
+		ch.ifUnmodifiedSince.IsSome() ||
+		ch.ifNoneMatch.IsSome() ||
+		ch.ifMatch.IsSome() ||
+		ch.ifRange.IsSome()
+}
+
+func (ch *conditionalHeaders) removeFromHeader(header http.Header) {
+	if ch.ifModifiedSince.IsSome() {
+		header.Del("If-Modified-Since")
+	}
+	if ch.ifUnmodifiedSince.IsSome() {
+		header.Del("If-Unmodified-Since")
+	}
+	if ch.ifNoneMatch.IsSome() {
+		header.Del("If-None-Match")
+	}
+	if ch.ifMatch.IsSome() {
+		header.Del("If-Match")
+	}
+	if ch.ifRange.IsSome() {
+		header.Del("If-Range")
+	}
+}
+
 type cacheDirective struct {
 	conditionalHeaders conditionalHeaders
 	cacheControl       optional.Optional[cacheControl]

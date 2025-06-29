@@ -104,6 +104,12 @@ func sendResponse(r responder.Responder, resp io.ReadCloser, header http.Header,
 func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request) error {
 	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
 
+	clientDirective := parseCacheDirective(req.Header)
+
+	// The way we handle handle caching should already line up with the client's expectations, so we can remove these headers.
+	// If we don't remove them, we might end up getting an unexpected response from the upstream server.
+	clientDirective.conditionalHeaders.removeFromHeader(req.Header)
+
 	// Remove headers that we don't support before anything else.
 	// Otherwise we end up sending headers and getting responses that we don't know how to handle.
 	removeUnsupportedHeaders(req.Header)
