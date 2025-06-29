@@ -89,7 +89,7 @@ func shouldResponseBeCached(resp *http.Response, upstreamDirective cacheDirectiv
 			resp.Request.Method == http.MethodHead)
 }
 
-func sendResponse(r responder.Responder, resp io.ReadCloser, header http.Header, req *http.Request) {
+func sendResponse(r responder.Responder, resp io.Reader, header http.Header, req *http.Request) {
 	body := resp
 	if req.Method == http.MethodHead {
 		body = http.NoBody
@@ -123,10 +123,13 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 		return err
 	}
 
-	if cached != nil && !cached.Stale {
-		log.Printf("Serving cached response for '%v' with key '%v'", req.URL, key)
-		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
-		return nil
+	if cached != nil {
+		defer cached.Data.Close() // Ensure we close the cached data when done
+		if !cached.Stale {
+			log.Printf("Serving cached response for '%v' with key '%v'", req.URL, key)
+			sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
+			return nil
+		}
 	}
 
 	log.Printf("No cached response found. Sending request to upstream '%v'", req.URL)
@@ -136,6 +139,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 		r.Error(err, http.StatusBadGateway)
 		return err
 	}
+	defer resp.Body.Close() // Ensure we close the response body when done
 
 	if resp.StatusCode == http.StatusNotModified {
 		if cached == nil {
@@ -154,7 +158,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 		return nil
 	}
 
-	var data io.ReadCloser = resp.Body
+	var data io.Reader = resp.Body
 
 	upstreamDirective := parseCacheDirective(resp.Header)
 
@@ -178,8 +182,8 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 			r.Error(err, http.StatusInternalServerError)
 			return fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
 		}
+		defer entry.Data.Close() // Ensure we close the cached data when done
 
-		data.Close() // Close the old data stream since we are now using the cached entry.
 		data = entry.Data
 	}
 

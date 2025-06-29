@@ -1,12 +1,16 @@
 package responder
 
 import (
+	"bufio"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
+// A responder that manually constructs and writes HTTP responses.
+// Used by the CONNECT handler with HTTPS, since it works on a raw TCP connection.
 type RawHTTPResponder struct {
 	writer   io.Writer
 	response *http.Response
@@ -41,17 +45,41 @@ func (c *RawHTTPResponder) SetHeader(header http.Header) {
 	c.response.Header = header
 }
 
-func (c *RawHTTPResponder) Write(status int, body io.ReadCloser) error {
-	c.response.Body = body
-	c.parseAndSetContentLength()
+func (c *RawHTTPResponder) writeResponse() error {
+	// If Content-Length is unknown, we must either use chunked encoding or close the connection.
+	if c.response.ContentLength < 0 {
+		c.response.TransferEncoding = []string{"chunked"}
+	}
+
+	err := c.response.Write(c.writer)
+	if err != nil {
+		log.Printf("error writing response in RawHTTPResponder: %v", err)
+		return err
+	}
+	if buf, ok := c.writer.(*bufio.Writer); ok {
+		buf.Flush()
+	}
+
+	return nil
+}
+
+func (c *RawHTTPResponder) Write(status int, body io.Reader) error {
+	c.response.Body = io.NopCloser(body)
 	c.response.StatusCode = status
-	return c.response.Write(c.writer)
+	c.parseAndSetContentLength()
+
+	return c.writeResponse()
 }
 
 func (c *RawHTTPResponder) WriteEmpty(status int) error {
-	c.response.StatusCode = status
 	c.response.Body = http.NoBody
-	return c.response.Write(c.writer)
+	c.response.StatusCode = status
+
+	header := c.response.Header
+	header.Set("Content-Length", "0") // Explicitly set Content-Length to 0 for empty responses
+	c.response.ContentLength = 0
+
+	return c.writeResponse()
 }
 
 func (c *RawHTTPResponder) Error(err error, errorCode int) {

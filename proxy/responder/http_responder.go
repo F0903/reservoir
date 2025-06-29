@@ -5,6 +5,9 @@ import (
 	"net/http"
 )
 
+// Essentially a simple wrapper around http.ResponseWriter
+// Used when getting simple HTTP requests from the client
+// as we can use the provided http.ResponseWriter directly
 type HTTPResponder struct {
 	writer http.ResponseWriter
 }
@@ -30,8 +33,7 @@ func (c *HTTPResponder) writeStatusHeader(status int) {
 	}
 }
 
-func (c *HTTPResponder) Write(status int, body io.ReadCloser) error {
-	defer body.Close() // Ensure the body is closed after writing
+func (c *HTTPResponder) Write(status int, body io.Reader) error {
 	c.writeStatusHeader(status)
 	_, err := io.Copy(c.writer, body)
 	return err

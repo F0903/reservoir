@@ -10,7 +10,7 @@ type Responder interface {
 	SetHeader(header http.Header)
 
 	// Write writes the response with the given status code and body.
-	Write(status int, body io.ReadCloser) error
+	Write(status int, body io.Reader) error
 
 	// WriteEmpty writes an empty response with the given status code.
 	// It is useful for responses that do not require a body.
