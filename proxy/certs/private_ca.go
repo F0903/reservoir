@@ -21,7 +21,7 @@ import (
 type PrivateCA struct {
 	key   crypto.PrivateKey
 	cert  *x509.Certificate
-	certs *syncmap.SyncMap[string, tls.Certificate]
+	certs *syncmap.SyncMap[string, *tls.Certificate]
 }
 
 func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
@@ -39,7 +39,7 @@ func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
 	return &PrivateCA{
 		key:   caKey,
 		cert:  caCert,
-		certs: syncmap.NewSyncMap[string, tls.Certificate](),
+		certs: syncmap.NewSyncMap[string, *tls.Certificate](),
 	}, nil
 }
 
@@ -95,11 +95,11 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 	return pemCert, pemKey, nil
 }
 
-func (ca *PrivateCA) GetCertForHost(host string) (tls.Certificate, error) {
+func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 	host, _, err := net.SplitHostPort(host)
 	if err != nil {
 		err := fmt.Errorf("invalid host:port format %v: %v", host, err)
-		return tls.Certificate{}, err
+		return nil, err
 	}
 
 	if cert, ok := ca.certs.Get(host); ok {
@@ -119,18 +119,18 @@ func (ca *PrivateCA) GetCertForHost(host string) (tls.Certificate, error) {
 	pemCert, pemKey, err := ca.createCert([]string{host}, 240)
 	if err != nil {
 		err := fmt.Errorf("failed to create TLS certificate for %v: %v", host, err)
-		return tls.Certificate{}, err
+		return nil, err
 	}
 
 	tlsCert, err := tls.X509KeyPair(pemCert, pemKey)
 	if err != nil {
 		err := fmt.Errorf("failed to create X509 key pair for cert %v: %v", tlsCert, err)
-		return tls.Certificate{}, err
+		return nil, err
 	}
 
 	log.Printf("Created certificate for %v", host)
 
-	ca.certs.Set(host, tlsCert)
+	ca.certs.Set(host, &tlsCert)
 
-	return tlsCert, nil
+	return &tlsCert, nil
 }

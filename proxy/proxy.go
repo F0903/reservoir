@@ -79,7 +79,7 @@ func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*c
 	return cached, nil
 }
 
-func shouldResponseBeCached(resp *http.Response, upstreamDirective cacheDirective) bool {
+func shouldResponseBeCached(resp *http.Response, upstreamDirective *cacheDirective) bool {
 	if config.Global.AlwaysCache {
 		return true
 	}
@@ -245,7 +245,7 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 	// our certificate. This server will now pretend being the target.
 	tlsConfig := &tls.Config{
 		MinVersion:   tls.VersionTLS12,
-		Certificates: []tls.Certificate{tlsCert},
+		Certificates: []tls.Certificate{*tlsCert},
 	}
 	tlsConn := tls.Server(clientConn, tlsConfig)
 	defer tlsConn.Close()

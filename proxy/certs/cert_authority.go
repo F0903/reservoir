@@ -5,5 +5,5 @@ import (
 )
 
 type CertAuthority interface {
-	GetCertForHost(host string) (tls.Certificate, error)
+	GetCertForHost(host string) (*tls.Certificate, error)
 }

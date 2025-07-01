@@ -108,8 +108,8 @@ func parseCacheControl(ccHeader string) (*cacheControl, error) {
 	return cc, nil
 }
 
-func parseCacheDirective(header http.Header) cacheDirective {
-	var cd cacheDirective
+func parseCacheDirective(header http.Header) *cacheDirective {
+	cd := &cacheDirective{}
 	for key, values := range header {
 		value := values[0] // Header.Get also uses the first value, so we do the same here
 		switch key {
