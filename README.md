@@ -1,12 +1,14 @@
 # apt-cacher-go
 
-A simple caching MITM forward proxy written in Go.
+A simple caching MITM forward proxy with a dashboard, written in Go and Svelte.
 
 Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
 
 The prime usage of this is as a central cache proxy for apt.
 
-[Based on the MITM forward proxy written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
+The dashboard is directly embedded into the executable, so the final build artifact is a single file.
+
+[Based on the MITM forward proxy example written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
 
 ## Requirements
 
@@ -33,23 +35,15 @@ openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "
 
 ### Running the Proxy
 
-You can run the proxy either directly with `go run` or build it into an executable first.
-
-#### Directly
+First you have to build the executable with make by running the following command in the project directory:
 
 ```sh
-go run main.go --listen 127.0.0.1:9999 --ca-cert ca.crt --ca-key ca.key
+make build
 ```
 
-#### Executable
+This will automatically build both the frontend and the proxy executable.
 
-First you have to build the executable by running the following command in the project directory:
-
-```sh
-go build
-```
-
-Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can setup a systemd service for it.
+Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it.
 
 ## Proxy Configuration
 
@@ -73,4 +67,10 @@ If your CA is not trusted by the system, you can specify it for curl:
 
 ```sh
 curl --cacert ca-cert.pem -x http://127.0.0.1:9999 https://example.com/
+```
+
+Alternatively if you are too lazy to specify the cert (like me), you can use the `-k` option to skip cert validation:
+
+```sh
+curl -k -x http://127.0.0.1:9999 https://example.com/
 ```
