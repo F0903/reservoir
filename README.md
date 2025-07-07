@@ -57,10 +57,11 @@ Configuration currently takes place via command-line arguments.
 
 The arguments currently available are the following:
 
-- **listen** (localhost:9999) - The address and port that the proxy will listen on.
+- **listen** (0.0.0.0:9999) - The address and port that the proxy will listen on.
 - **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
 - **cache-dir** (var/cache) - The path where the cache should be stored.
+- **dashboard-listen** (localhost:8080) - The address and port that the dashboard will listen on.
 
 ## Example: Using curl with the Proxy
 
