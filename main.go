@@ -5,7 +5,6 @@ import (
 	"apt_cacher_go/proxy/certs"
 	"flag"
 	"log"
-	"net/http"
 )
 
 func main() {
@@ -19,13 +18,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create CA: %v", err)
 	}
+
 	proxy, err := proxy.NewCachingMitmProxy(*cacheDir, ca)
 	if err != nil {
 		log.Fatalf("Failed to create proxy: %v", err)
 	}
 
 	log.Println("Starting proxy server on", *address)
-	if err := http.ListenAndServe(*address, proxy); err != nil {
-		log.Fatalf("ListenAndServe error: %v", err)
-	}
+	proxy.Listen(*address)
 }
