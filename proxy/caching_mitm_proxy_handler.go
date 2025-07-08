@@ -130,7 +130,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 	}
 
 	log.Printf("No cached response found. Sending request to upstream '%v'", req.URL)
-	resp, err := sendRequestToTarget(req)
+	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps)
 	if err != nil {
 		log.Printf("error sending request to target (%v): %v", req.URL, err)
 		r.Error(err, http.StatusBadGateway)

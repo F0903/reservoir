@@ -21,12 +21,14 @@ var Global *Config = func() *Config {
 }()
 
 type Config struct {
-	AlwaysCache bool
+	AlwaysCache          bool
+	UpstreamDefaultHttps bool
 }
 
 func Default() *Config {
 	return &Config{
-		AlwaysCache: false,
+		AlwaysCache:          false,
+		UpstreamDefaultHttps: true,
 	}
 }
 
