@@ -226,10 +226,11 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
+	defer clientConn.Close() // Ensure we close the client connection when done
 
 	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
 		return err
 	}
 
