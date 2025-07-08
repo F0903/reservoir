@@ -175,7 +175,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 		etag := resp.Header.Get("ETag")
 
-		maxAge := upstreamDirective.getExpiresOrDefault(config.Global.DefaultCacheMaxAge.Cast())
+		maxAge := upstreamDirective.getExpiresOrDefault()
 		entry, err := p.cache.Cache(key, resp.Body, maxAge, cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
@@ -203,6 +203,8 @@ func (p *cachingMitmProxyHandler) handleHTTP(w http.ResponseWriter, proxyReq *ht
 	return p.processHTTPRequest(responder, proxyReq)
 }
 
+// Helper function to hijack the connection from the ResponseWriter.
+// NOTE: Remember to close the hijacked connection when done.
 func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)

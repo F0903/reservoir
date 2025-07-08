@@ -23,16 +23,18 @@ var Global *Config = func() *Config {
 }()
 
 type Config struct {
-	AlwaysCache          bool
-	UpstreamDefaultHttps bool
-	DefaultCacheMaxAge   duration.Duration
+	AlwaysCache             bool              // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
+	UpstreamDefaultHttps    bool              // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	DefaultCacheMaxAge      duration.Duration // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
+	ForceDefaultCacheMaxAge bool              // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
 }
 
 func Default() *Config {
 	return &Config{
-		AlwaysCache:          true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		UpstreamDefaultHttps: true,
-		DefaultCacheMaxAge:   duration.Duration(1 * time.Hour),
+		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		UpstreamDefaultHttps:    true,
+		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),
+		ForceDefaultCacheMaxAge: true, // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
 	}
 }
 

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"apt_cacher_go/config"
 	"apt_cacher_go/utils/optional"
 	"fmt"
 	"log"
@@ -70,16 +71,20 @@ func (cd *cacheDirective) shouldCache() bool {
 	return true // If no cache control or expires headers prevent caching, we can cache
 }
 
-func (cd *cacheDirective) getExpiresOrDefault(defaultMaxAge time.Duration) time.Time {
-	if cd.cacheControl.IsSome() {
-		cc := cd.cacheControl.ForceUnwrap()
-		if cc.maxAge > 0 {
-			return time.Now().Add(cc.maxAge)
+func (cd *cacheDirective) getExpiresOrDefault() time.Time {
+	if !config.Global.ForceDefaultCacheMaxAge {
+		if cd.cacheControl.IsSome() {
+			cc := cd.cacheControl.ForceUnwrap()
+			if cc.maxAge > 0 {
+				return time.Now().Add(cc.maxAge)
+			}
+		}
+		if cd.expires.IsSome() {
+			return *cd.expires.ForceUnwrap()
 		}
 	}
-	if cd.expires.IsSome() {
-		return *cd.expires.ForceUnwrap()
-	}
+
+	defaultMaxAge := config.Global.DefaultCacheMaxAge.Cast()
 	return time.Now().Add(defaultMaxAge)
 }
 
