@@ -22,24 +22,21 @@ type cachedRequestInfo struct {
 	Header       http.Header
 }
 
-type CachingMitmProxy struct {
+type cachingMitmProxyHandler struct {
 	ca            certs.CertAuthority
 	cache         cache.Cache[cachedRequestInfo]
 	defaultMaxAge time.Duration
 }
 
-// createMitmProxy creates a new MITM proxy. It should be passed the filenames
-// for the certificate and private key of a certificate authority trusted by the
-// client's machine.
-func NewCachingMitmProxy(cacheDir string, ca certs.CertAuthority) (*CachingMitmProxy, error) {
-	return &CachingMitmProxy{
+func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority) (*cachingMitmProxyHandler, error) {
+	return &cachingMitmProxyHandler{
 		ca:            ca,
 		cache:         cache.NewFileCache[cachedRequestInfo](cacheDir),
 		defaultMaxAge: 1 * time.Hour, // Default expiration time for cached responses
 	}, nil
 }
 
-func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
+func (p *cachingMitmProxyHandler) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 	if proxyReq.Method == http.MethodConnect {
 		if err := p.handleCONNECT(w, proxyReq); err != nil {
 			log.Printf("Error handling CONNECT request: %v", err)
@@ -53,7 +50,7 @@ func (p *CachingMitmProxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Reque
 	}
 }
 
-func (p *CachingMitmProxy) getCached(key *cache.CacheKey, req *http.Request) (*cache.Entry[cachedRequestInfo], error) {
+func (p *cachingMitmProxyHandler) getCached(key *cache.CacheKey, req *http.Request) (*cache.Entry[cachedRequestInfo], error) {
 	cached, err := p.cache.Get(key)
 	if errors.Is(err, cache.ErrorCacheMiss) {
 		log.Printf("Cache miss for key %v", key)
@@ -101,7 +98,7 @@ func sendResponse(r responder.Responder, resp io.Reader, header http.Header, req
 	}
 }
 
-func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.Request) error {
+func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req *http.Request) error {
 	log.Printf("Processing HTTP request %s -> %s %s", req.RemoteAddr, req.Method, req.URL)
 
 	clientDirective := parseCacheDirective(req.Header)
@@ -192,7 +189,7 @@ func (p *CachingMitmProxy) processHTTPRequest(r responder.Responder, req *http.R
 	return nil
 }
 
-func (p *CachingMitmProxy) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
+func (p *cachingMitmProxyHandler) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
 	responder := responder.NewHTTPResponder(w)
@@ -218,7 +215,7 @@ func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
 	return clientConn, nil
 }
 
-func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
+func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.URL, proxyReq.RemoteAddr)
 
 	clientConn, err := hijackConnection(w)
@@ -226,10 +223,11 @@ func (p *CachingMitmProxy) handleCONNECT(w http.ResponseWriter, proxyReq *http.R
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
-	defer clientConn.Close() // Ensure we close the client connection when done
+	defer clientConn.Close() // Ensure we always close the hijacked connection
 
 	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
+		// Note: can't use http.Error after hijacking, so we write directly
 		clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
 		return err
 	}
