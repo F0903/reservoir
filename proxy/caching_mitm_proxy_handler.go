@@ -23,16 +23,14 @@ type cachedRequestInfo struct {
 }
 
 type cachingMitmProxyHandler struct {
-	ca            certs.CertAuthority
-	cache         cache.Cache[cachedRequestInfo]
-	defaultMaxAge time.Duration
+	ca    certs.CertAuthority
+	cache cache.Cache[cachedRequestInfo]
 }
 
 func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority) (*cachingMitmProxyHandler, error) {
 	return &cachingMitmProxyHandler{
-		ca:            ca,
-		cache:         cache.NewFileCache[cachedRequestInfo](cacheDir),
-		defaultMaxAge: 1 * time.Hour, // Default expiration time for cached responses
+		ca:    ca,
+		cache: cache.NewFileCache[cachedRequestInfo](cacheDir),
 	}, nil
 }
 
@@ -116,7 +114,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 	cached, err := p.getCached(key, req)
 	if err != nil {
 		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
-		r.Error(err, http.StatusInternalServerError)
+		r.Error("error retrieving from cache", http.StatusInternalServerError)
 		return err
 	}
 
@@ -129,11 +127,11 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 		}
 	}
 
-	log.Printf("No cached response found. Sending request to upstream '%v'", req.URL)
+	log.Printf("Sending request to upstream '%v'", req.URL)
 	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps)
 	if err != nil {
 		log.Printf("error sending request to target (%v): %v", req.URL, err)
-		r.Error(err, http.StatusBadGateway)
+		r.Error("error sending request to upstream target", http.StatusBadGateway)
 		return err
 	}
 	defer resp.Body.Close() // Ensure we close the response body when done
@@ -142,14 +140,22 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 		if cached == nil {
 			log.Printf("Received 304 Not Modified but no cached response found for '%v' with key '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, key, req.Header)
 			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v' with key '%v'", req.URL, key)
-			r.Error(err, http.StatusInternalServerError)
+			r.Error("malformed state", http.StatusInternalServerError)
 			return err
 		}
 
-		p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
+		err := p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 			// Update the metadata to reflect that the cached response is still valid.
-			meta.Expires = time.Now().Add(p.defaultMaxAge)
+			maxAge := config.Global.DefaultCacheMaxAge.Cast()
+			meta.Expires = time.Now().Add(maxAge)
 		})
+		if err != nil {
+			errMsg := fmt.Errorf("error updating cache metadata for '%v' with key '%v': %v", req.URL, key, err)
+			log.Printf("error updating cache metadata for '%v' with key '%v': %v", req.URL, key, err)
+			r.Error("error updating cache metadata", http.StatusInternalServerError)
+			return errMsg
+		}
+
 		log.Printf("Origin server returned 304 Not Modified, serving cached response for '%v' with key '%v'", req.URL, key)
 		sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 		return nil
@@ -169,14 +175,15 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 		etag := resp.Header.Get("ETag")
 
-		entry, err := p.cache.Cache(key, resp.Body, upstreamDirective.getExpiresOrDefault(p.defaultMaxAge), cachedRequestInfo{
+		maxAge := upstreamDirective.getExpiresOrDefault(config.Global.DefaultCacheMaxAge.Cast())
+		entry, err := p.cache.Cache(key, resp.Body, maxAge, cachedRequestInfo{
 			ETag:         etag,
 			LastModified: lastModified,
 			Header:       resp.Header,
 		})
 		if err != nil {
 			log.Printf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
-			r.Error(err, http.StatusInternalServerError)
+			r.Error("error caching response", http.StatusInternalServerError)
 			return fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
 		}
 		defer entry.Data.Close() // Ensure we close the cached data when done

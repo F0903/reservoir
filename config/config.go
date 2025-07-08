@@ -2,10 +2,12 @@ package config
 
 import (
 	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/duration"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 //TODO: add file watcher to reload config on changes
@@ -23,12 +25,14 @@ var Global *Config = func() *Config {
 type Config struct {
 	AlwaysCache          bool
 	UpstreamDefaultHttps bool
+	DefaultCacheMaxAge   duration.Duration
 }
 
 func Default() *Config {
 	return &Config{
-		AlwaysCache:          false,
+		AlwaysCache:          true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		UpstreamDefaultHttps: true,
+		DefaultCacheMaxAge:   duration.Duration(1 * time.Hour),
 	}
 }
 
@@ -55,8 +59,11 @@ func Load(path string) (*Config, error) {
 	}
 	defer f.Close()
 
+	decoder := json.NewDecoder(f)
+	decoder.DisallowUnknownFields()
+
 	var cfg Config
-	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
 	return &cfg, nil

@@ -16,6 +16,6 @@ type Responder interface {
 	// It is useful for responses that do not require a body.
 	WriteEmpty(status int) error
 
-	// Error writes an error response with the given error and status code.
-	Error(err error, errorCode int)
+	// Error writes an error response with the given error message and status code.
+	Error(message string, errorCode int)
 }
