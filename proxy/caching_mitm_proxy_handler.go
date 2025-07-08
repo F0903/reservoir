@@ -223,10 +223,12 @@ func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err
 	}
+	defer clientConn.Close() // Ensure we always close the hijacked connection
 
 	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Note: can't use http.Error after hijacking, so we write directly
+		clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
 		return err
 	}
 
