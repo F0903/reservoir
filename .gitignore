@@ -1,5 +1,6 @@
 # Binaries
 apt-cacher-go*
+apt_cacher_go*
 
 # Debugging files
 __debug*
