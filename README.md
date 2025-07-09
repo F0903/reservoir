@@ -45,6 +45,10 @@ This will automatically build both the frontend and the proxy executable.
 
 Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it.
 
+### Note When Updating
+
+When updating it is recommended to delete the local var/ folder, as changes to the config or metadata format could cause unexpected behaviour.
+
 ## Proxy Configuration
 
 Configuration currently takes place via command-line arguments.

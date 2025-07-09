@@ -45,6 +45,6 @@ func (c *HTTPResponder) WriteEmpty(status int) error {
 	return err
 }
 
-func (c *HTTPResponder) Error(err error, errorCode int) {
-	http.Error(c.writer, err.Error(), errorCode)
+func (c *HTTPResponder) Error(message string, errorCode int) {
+	http.Error(c.writer, message, errorCode)
 }

@@ -82,9 +82,8 @@ func (c *RawHTTPResponder) WriteEmpty(status int) error {
 	return c.writeResponse()
 }
 
-func (c *RawHTTPResponder) Error(err error, errorCode int) {
-	content := err.Error()
+func (c *RawHTTPResponder) Error(message string, errorCode int) {
 	c.response.StatusCode = errorCode
-	c.response.Body = io.NopCloser(strings.NewReader(content))
-	c.response.ContentLength = int64(len(content))
+	c.response.Body = io.NopCloser(strings.NewReader(message))
+	c.response.ContentLength = int64(len(message))
 }

@@ -18,9 +18,13 @@ func removeHopByHopHeaders(header http.Header) {
 	}
 }
 
-func addrToUrl(addr string) (*url.URL, error) {
+func addrToUrl(addr string, httpsDefault bool) (*url.URL, error) {
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		addr = "https://" + addr
+		if httpsDefault {
+			addr = "https://" + addr
+		} else {
+			addr = "http://" + addr
+		}
 	}
 	u, err := url.Parse(addr)
 	if err != nil {
@@ -29,9 +33,9 @@ func addrToUrl(addr string) (*url.URL, error) {
 	return u, nil
 }
 
-func changeRequestToTarget(req *http.Request) error {
+func changeRequestToTarget(req *http.Request, httpsDefault bool) error {
 	targetHost := req.Host
-	targetUrl, err := addrToUrl(targetHost)
+	targetUrl, err := addrToUrl(targetHost, httpsDefault)
 	if err != nil {
 		return fmt.Errorf("invalid target host '%s': %v", targetHost, err)
 	}
@@ -46,9 +50,9 @@ func changeRequestToTarget(req *http.Request) error {
 	return nil
 }
 
-func sendRequestToTarget(req *http.Request) (*http.Response, error) {
+func sendRequestToTarget(req *http.Request, httpsDefault bool) (*http.Response, error) {
 	// Change request URL to point to the target server.
-	changeRequestToTarget(req)
+	changeRequestToTarget(req, httpsDefault)
 	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
 	removeHopByHopHeaders(req.Header)
 

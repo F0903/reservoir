@@ -31,6 +31,24 @@ func getMetaPath(dataPath string) string {
 	return dataPath[:len(dataPath)-len(filepath.Ext(dataPath))] + ".meta"
 }
 
+// Removes cached file, metadata and lock without acquiring the lock first.
+func (c *FileCache[ObjectData]) deleteNoLock(key *CacheKey) error {
+	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
+	if err := os.Remove(fileName); err != nil && !errors.Is(err, os.ErrNotExist) {
+		os.Remove(getMetaPath(fileName)) // Ensure no orphaned metadata file exists
+		return fmt.Errorf("failed to delete cache file '%s': %v", fileName, err)
+	}
+
+	metaPath := getMetaPath(fileName)
+	if err := os.Remove(metaPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to delete cache metadata file '%s': %v", metaPath, err)
+	}
+
+	c.locks.Delete(key.Hex()) // Remove the lock for this key
+
+	return nil
+}
+
 func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
 	lock.RLock()
@@ -51,7 +69,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err == nil && dataInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
 		log.Printf("Empty data file for key '%s', treating as cache miss", key.Hex())
-		c.Delete(key)
+		c.deleteNoLock(key)
 		return nil, ErrorCacheMiss
 	}
 
@@ -66,7 +84,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err == nil && metaInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
 		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex())
-		c.Delete(key)
+		c.deleteNoLock(key)
 		return nil, ErrorCacheMiss
 	}
 
@@ -74,7 +92,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err := json.NewDecoder(metaFile).Decode(&meta); err != nil {
 		// If EOF, treat as cache miss and clean up
 		if errors.Is(err, io.EOF) {
-			c.Delete(key)
+			c.deleteNoLock(key)
 			log.Printf("EOF while reading metadata for key '%s', treating as cache miss", key.Hex())
 			return nil, ErrorCacheMiss
 		}
@@ -116,11 +134,8 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	}
 	defer metaFile.Close()
 
-	metaJson, err := json.Marshal(EntryMetadata[ObjectData]{
-		TimeWritten: time.Now(),
-		Expires:     expires,
-		Object:      objectData,
-	})
+	meta := EntryMetadata[ObjectData]{TimeWritten: time.Now(), Expires: expires, Object: objectData}
+	metaJson, err := json.Marshal(meta)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode json metadata for '%s': %v", metaPath, err)
 	}
@@ -132,7 +147,7 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	file.Seek(0, io.SeekStart) // Reset file stream to the beginning
 	return &Entry[ObjectData]{
 		Data:     file,
-		Metadata: EntryMetadata[ObjectData]{TimeWritten: time.Now(), Expires: expires, Object: objectData},
+		Metadata: meta,
 	}, nil
 }
 
@@ -141,20 +156,7 @@ func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
-	if err := os.Remove(fileName); err != nil && !errors.Is(err, os.ErrNotExist) {
-		os.Remove(getMetaPath(fileName)) // Ensure no orphaned metadata file exists
-		return fmt.Errorf("failed to delete cache file '%s': %v", fileName, err)
-	}
-
-	metaPath := getMetaPath(fileName)
-	if err := os.Remove(metaPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("failed to delete cache metadata file '%s': %v", metaPath, err)
-	}
-
-	c.locks.Delete(key.Hex()) // Remove the lock for this key
-
-	return nil
+	return c.deleteNoLock(key)
 }
 
 func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
@@ -163,7 +165,8 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	defer lock.Unlock()
 
 	metaPath := getMetaPath(filepath.Join(c.rootDir.GetPath(), key.Hex()))
-	metaFile, err := os.Create(metaPath)
+	// Since we don't want to want to immediately truncate the file, we open it and manually specify read and write perms for later truncation.
+	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
 	if err != nil {
 		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
 	}
@@ -173,7 +176,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	if err == nil && metaInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
 		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex())
-		c.Delete(key)
+		c.deleteNoLock(key)
 		return fmt.Errorf("cannot update metadata for key '%s': file is empty", key.Hex())
 	}
 
