@@ -33,10 +33,9 @@ func (c *HTTPResponder) writeStatusHeader(status int) {
 	}
 }
 
-func (c *HTTPResponder) Write(status int, body io.Reader) error {
+func (c *HTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
 	c.writeStatusHeader(status)
-	_, err := io.Copy(c.writer, body)
-	return err
+	return io.Copy(c.writer, body)
 }
 
 func (c *HTTPResponder) WriteEmpty(status int) error {

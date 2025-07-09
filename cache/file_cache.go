@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"apt_cacher_go/metrics"
 	"apt_cacher_go/utils/asserted_path"
 	"apt_cacher_go/utils/syncmap"
 	"encoding/json"
@@ -15,15 +16,18 @@ import (
 )
 
 type FileCache[ObjectData any] struct {
-	rootDir *asserted_path.AssertedPath
-	locks   *syncmap.SyncMap[string, *sync.RWMutex]
+	rootDir      asserted_path.AssertedPath
+	locks        *syncmap.SyncMap[string, *sync.RWMutex]
+	entriesCount int64
+	byteSize     int64
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
 	return &FileCache[ObjectData]{
-		rootDir: asserted_path.Assert(rootDir),
-		locks:   syncmap.NewSyncMap[string, *sync.RWMutex](),
+		rootDir:  asserted_path.Assert(rootDir),
+		locks:    syncmap.NewSyncMap[string, *sync.RWMutex](),
+		byteSize: 0,
 	}
 }
 
@@ -31,20 +35,60 @@ func getMetaPath(dataPath string) string {
 	return dataPath[:len(dataPath)-len(filepath.Ext(dataPath))] + ".meta"
 }
 
-// Removes cached file, metadata and lock without acquiring the lock first.
-func (c *FileCache[ObjectData]) deleteNoLock(key *CacheKey) error {
-	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
-	if err := os.Remove(fileName); err != nil && !errors.Is(err, os.ErrNotExist) {
-		os.Remove(getMetaPath(fileName)) // Ensure no orphaned metadata file exists
-		return fmt.Errorf("failed to delete cache file '%s': %v", fileName, err)
+func (c *FileCache[ObjectData]) addCacheCount(delta int64) {
+	c.entriesCount += delta
+	metrics.Global.Cache.CacheEntries.Add(delta)
+}
+
+func (c *FileCache[ObjectData]) addCacheSize(delta int64) {
+	c.byteSize += delta
+	metrics.Global.Cache.BytesCached.Add(delta)
+}
+
+func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
+	stat, err := os.Stat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		err := fmt.Errorf("failed to stat file '%s': %v", path, err)
+		log.Println(err)
+		return err
 	}
 
-	metaPath := getMetaPath(fileName)
-	if err := os.Remove(metaPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("failed to delete cache metadata file '%s': %v", metaPath, err)
+	if err := os.Remove(path); err != nil {
+		// We checked earlier that the file exists, so if we get an error here, it is unexpected.
+		err := fmt.Errorf("failed to remove file '%s': %v", path, err)
+		log.Println(err)
+		return err
 	}
+
+	log.Printf("Removed file '%s'", path)
+	size := stat.Size()
+
+	c.addCacheSize(-size) // Adjust cached bytes
+	c.addCacheCount(-1)   // Decrement the cache entry count
+
+	return nil
+}
+
+// Ensures that both the cached file, its metadata and lock are removed without acquiring a lock.
+func (c *FileCache[ObjectData]) ensureRemove(key *CacheKey) error {
+	filePath := filepath.Join(c.rootDir.GetPath(), key.Hex())
+	metaPath := getMetaPath(filePath)
+
+	// We first try to force remove both files, since we don't want to leave orphaned files behind, and then check for errors later.
+	fileErr := c.ensureRemoveFile(filePath)
+	metaErr := c.ensureRemoveFile(metaPath)
 
 	c.locks.Delete(key.Hex()) // Remove the lock for this key
+
+	if fileErr != nil {
+		return fmt.Errorf("failed to remove cache file '%s': %v", filePath, fileErr)
+	}
+	if metaErr != nil {
+		return fmt.Errorf("failed to remove cache metadata file '%s': %v", metaPath, metaErr)
+	}
 
 	return nil
 }
@@ -56,11 +100,14 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 
 	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
 	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
+		metrics.Global.Cache.CacheMisses.Increment()
+		log.Printf("Cache miss for key '%s'", key.Hex())
 		return nil, ErrorCacheMiss
 	}
 
 	dataFile, err := os.Open(fileName)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to read cached data file '%s': %v", fileName, err)
 	}
 	// We don't close dataFile here since we are returning it in the Entry.
@@ -69,13 +116,15 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err == nil && dataInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
 		log.Printf("Empty data file for key '%s', treating as cache miss", key.Hex())
-		c.deleteNoLock(key)
+		c.ensureRemove(key)
+		metrics.Global.Cache.CacheMisses.Increment()
 		return nil, ErrorCacheMiss
 	}
 
 	metaPath := getMetaPath(fileName)
 	metaFile, err := os.Open(metaPath)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to read cached metadata file '%s': %v", metaPath, err)
 	}
 	defer metaFile.Close()
@@ -84,7 +133,8 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err == nil && metaInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
 		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex())
-		c.deleteNoLock(key)
+		c.ensureRemove(key)
+		metrics.Global.Cache.CacheMisses.Increment()
 		return nil, ErrorCacheMiss
 	}
 
@@ -92,10 +142,12 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	if err := json.NewDecoder(metaFile).Decode(&meta); err != nil {
 		// If EOF, treat as cache miss and clean up
 		if errors.Is(err, io.EOF) {
-			c.deleteNoLock(key)
+			c.ensureRemove(key)
 			log.Printf("EOF while reading metadata for key '%s', treating as cache miss", key.Hex())
+			metrics.Global.Cache.CacheMisses.Increment()
 			return nil, ErrorCacheMiss
 		}
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to unmarshal metadata from '%s': %v", metaPath, err)
 	}
 
@@ -104,6 +156,8 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 		stale = true // The entry is stale if the expiration time is in the past
 	}
 
+	metrics.Global.Cache.CacheHits.Increment()
+	log.Printf("Cache hit for key '%s'", key.Hex())
 	return &Entry[ObjectData]{
 		Data:     dataFile,
 		Metadata: meta,
@@ -119,17 +173,21 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
 	file, err := os.Create(fileName)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to create cache file '%s': %v", fileName, err)
 	}
 	// We don't close file here since we are returning it in the Entry.
 
-	if _, err := io.Copy(file, data); err != nil {
+	fileSize, err := io.Copy(file, data)
+	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to write cache file '%s': %v", fileName, err)
 	}
 
 	metaPath := getMetaPath(fileName)
 	metaFile, err := os.Create(metaPath)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to create cache metadata file '%s': %v", metaPath, err)
 	}
 	defer metaFile.Close()
@@ -137,12 +195,17 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	meta := EntryMetadata[ObjectData]{TimeWritten: time.Now(), Expires: expires, Object: objectData}
 	metaJson, err := json.Marshal(meta)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to encode json metadata for '%s': %v", metaPath, err)
 	}
 
 	if _, err := metaFile.Write(metaJson); err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
+
+	c.addCacheCount(1)
+	c.addCacheSize(int64(len(metaJson)) + fileSize)
 
 	file.Seek(0, io.SeekStart) // Reset file stream to the beginning
 	return &Entry[ObjectData]{
@@ -156,7 +219,7 @@ func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	return c.deleteNoLock(key)
+	return c.ensureRemove(key)
 }
 
 func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
@@ -168,20 +231,29 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	// Since we don't want to want to immediately truncate the file, we open it and manually specify read and write perms for later truncation.
 	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return fmt.Errorf("failed to read cache metadata file '%s': %v", metaPath, err)
 	}
 	defer metaFile.Close()
 
-	metaInfo, err := metaFile.Stat()
-	if err == nil && metaInfo.Size() == 0 {
-		// Empty file, treat as cache miss and clean up
-		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex())
-		c.deleteNoLock(key)
-		return fmt.Errorf("cannot update metadata for key '%s': file is empty", key.Hex())
+	metaStat, err := metaFile.Stat()
+	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
+		return fmt.Errorf("failed to stat cache metadata file '%s': %v", metaPath, err)
+	}
+	metaSize := metaStat.Size()
+
+	if metaSize == 0 {
+		err := fmt.Errorf("cannot update metadata for key '%s': file is empty", key.Hex())
+		log.Print(err)
+		c.ensureRemove(key)
+		metrics.Global.Cache.CacheErrors.Increment()
+		return err
 	}
 
 	var meta EntryMetadata[ObjectData]
 	if err := json.NewDecoder(metaFile).Decode(&meta); err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return fmt.Errorf("failed to unmarshal metadata from '%s': %v", metaPath, err)
 	}
 
@@ -189,13 +261,25 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 
 	// Clear the file before writing new data
 	if err := metaFile.Truncate(0); err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return fmt.Errorf("failed to truncate cache metadata file '%s': %v", metaPath, err)
 	}
 	metaFile.Seek(0, io.SeekStart) // Reset file stream to the beginning
 
 	if err := json.NewEncoder(metaFile).Encode(&meta); err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
 
+	newMetaStat, err := metaFile.Stat()
+	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
+		return fmt.Errorf("failed to stat newly encoded metadata file '%s': %v", metaPath, err)
+	}
+
+	metrics.Global.Cache.CacheHits.Increment()
+	c.addCacheSize(newMetaStat.Size() - metaSize) // Adjust cached bytes based on the new size
+
+	log.Printf("Updated metadata for key '%s'", key.Hex())
 	return nil
 }

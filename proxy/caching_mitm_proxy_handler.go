@@ -3,6 +3,7 @@ package proxy
 import (
 	"apt_cacher_go/cache"
 	"apt_cacher_go/config"
+	"apt_cacher_go/metrics"
 	"apt_cacher_go/proxy/certs"
 	"apt_cacher_go/proxy/responder"
 	"bufio"
@@ -48,32 +49,6 @@ func (p *cachingMitmProxyHandler) ServeHTTP(w http.ResponseWriter, proxyReq *htt
 	}
 }
 
-func (p *cachingMitmProxyHandler) getCached(key *cache.CacheKey, req *http.Request) (*cache.Entry[cachedRequestInfo], error) {
-	cached, err := p.cache.Get(key)
-	if errors.Is(err, cache.ErrorCacheMiss) {
-		log.Printf("Cache miss for key %v", key)
-		return nil, nil // Cache miss, return nil to indicate no cached entry
-	} else if cached == nil && !errors.Is(err, cache.ErrorCacheMiss) {
-		return nil, fmt.Errorf("error retrieving from cache for key %v: %w", key, err)
-	}
-
-	if cached.Stale {
-		log.Printf("Cached response for %v is stale. Setting conditional headers...", req.Host)
-
-		// Cache is stale: set conditional headers
-		if cached.Metadata.Object.ETag != "" {
-			req.Header.Set("If-None-Match", cached.Metadata.Object.ETag)
-		}
-		if !cached.Metadata.Object.LastModified.IsZero() {
-			req.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
-		}
-
-		return cached, nil
-	}
-
-	return cached, nil
-}
-
 func shouldResponseBeCached(resp *http.Response, upstreamDirective *cacheDirective) bool {
 	if config.Global.AlwaysCache {
 		return true
@@ -91,9 +66,13 @@ func sendResponse(r responder.Responder, resp io.Reader, header http.Header, req
 	}
 
 	r.SetHeader(header)
-	if err := r.Write(http.StatusOK, body); err != nil {
+	written, err := r.Write(http.StatusOK, body)
+	if err != nil {
 		log.Printf("error writing response for '%v': %v", req.URL, err)
 	}
+
+	metrics.Global.Requests.BytesServed.Add(written)
+	log.Printf("Response for '%v' sent, %d bytes written", req.URL, written)
 }
 
 func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req *http.Request) error {
@@ -111,8 +90,8 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 	key := cache.MakeFromRequest(req)
 
-	cached, err := p.getCached(key, req)
-	if err != nil {
+	cached, err := p.cache.Get(key)
+	if err != nil && !errors.Is(err, cache.ErrorCacheMiss) {
 		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
 		r.Error("error retrieving from cache", http.StatusInternalServerError)
 		return err
@@ -125,12 +104,23 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 			sendResponse(r, cached.Data, cached.Metadata.Object.Header, req)
 			return nil
 		}
+
+		log.Printf("Cached response for %v is stale. Setting conditional headers...", req.Host)
+
+		// Cache is stale: set conditional headers
+		if cached.Metadata.Object.ETag != "" {
+			req.Header.Set("If-None-Match", cached.Metadata.Object.ETag)
+		}
+		if !cached.Metadata.Object.LastModified.IsZero() {
+			req.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
+		}
 	}
 
 	log.Printf("Sending request to upstream '%v'", req.URL)
 	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps)
 	if err != nil {
-		log.Printf("error sending request to target (%v): %v", req.URL, err)
+		err := fmt.Errorf("error sending request to target (%v): %v", req.URL, err)
+		log.Print(err)
 		r.Error("error sending request to upstream target", http.StatusBadGateway)
 		return err
 	}
@@ -138,8 +128,8 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 	if resp.StatusCode == http.StatusNotModified {
 		if cached == nil {
-			log.Printf("Received 304 Not Modified but no cached response found for '%v' with key '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, key, req.Header)
-			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v' with key '%v'", req.URL, key)
+			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v' with key '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, key, req.Header)
+			log.Print(err)
 			r.Error("malformed state", http.StatusInternalServerError)
 			return err
 		}
@@ -151,7 +141,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 		})
 		if err != nil {
 			errMsg := fmt.Errorf("error updating cache metadata for '%v' with key '%v': %v", req.URL, key, err)
-			log.Printf("error updating cache metadata for '%v' with key '%v': %v", req.URL, key, err)
+			log.Print(errMsg)
 			r.Error("error updating cache metadata", http.StatusInternalServerError)
 			return errMsg
 		}
@@ -182,9 +172,10 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 			Header:       resp.Header,
 		})
 		if err != nil {
-			log.Printf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
+			err := fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
+			log.Print(err)
 			r.Error("error caching response", http.StatusInternalServerError)
-			return fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
+			return err
 		}
 		defer entry.Data.Close() // Ensure we close the cached data when done
 
@@ -198,6 +189,8 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 func (p *cachingMitmProxyHandler) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
+
+	metrics.Global.Requests.HTTPProxyequests.Increment()
 
 	responder := responder.NewHTTPResponder(w)
 	return p.processHTTPRequest(responder, proxyReq)
@@ -227,6 +220,8 @@ func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
 func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("CONNECT request to %v (from %v)", proxyReq.URL, proxyReq.RemoteAddr)
 
+	metrics.Global.Requests.HTTPSProxyRequests.Increment()
+
 	clientConn, err := hijackConnection(w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -234,17 +229,19 @@ func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq 
 	}
 	defer clientConn.Close() // Ensure we always close the hijacked connection
 
+	intermediateResponder := responder.NewRawHTTPResponder(clientConn)
+
 	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
-		// Note: can't use http.Error after hijacking, so we write directly
-		clientConn.Write([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		// can't use http.Error after hijacking, so we write directly
+		intermediateResponder.Error("Error getting TLS certificate", http.StatusInternalServerError)
 		return err
 	}
 
 	// Send an HTTP OK response back to the client; this initiates the CONNECT
 	// tunnel. From this point on the client will assume it's connected directly
 	// to the target.
-	if _, err := clientConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
+	if err := intermediateResponder.WriteEmpty(http.StatusOK); err != nil {
 		return fmt.Errorf("failed to write HTTP OK response to client: %v", err)
 	}
 	log.Print("Sent HTTP 200 OK response to client, established CONNECT tunnel")

@@ -1,6 +1,7 @@
 package responder
 
 import (
+	"apt_cacher_go/utils/counting_reader"
 	"bufio"
 	"io"
 	"log"
@@ -51,8 +52,7 @@ func (c *RawHTTPResponder) writeResponse() error {
 		c.response.TransferEncoding = []string{"chunked"}
 	}
 
-	err := c.response.Write(c.writer)
-	if err != nil {
+	if err := c.response.Write(c.writer); err != nil {
 		log.Printf("error writing response in RawHTTPResponder: %v", err)
 		return err
 	}
@@ -63,12 +63,13 @@ func (c *RawHTTPResponder) writeResponse() error {
 	return nil
 }
 
-func (c *RawHTTPResponder) Write(status int, body io.Reader) error {
-	c.response.Body = io.NopCloser(body)
+func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
+	var read int
+	c.response.Body = io.NopCloser(counting_reader.NewCountingReader(body, &read))
 	c.response.StatusCode = status
 	c.parseAndSetContentLength()
 
-	return c.writeResponse()
+	return int64(read), c.writeResponse()
 }
 
 func (c *RawHTTPResponder) WriteEmpty(status int) error {

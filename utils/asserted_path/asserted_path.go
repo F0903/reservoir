@@ -23,8 +23,8 @@ func assertPath(path string) {
 	}
 }
 
-func Assert(path string) *AssertedPath {
-	return &AssertedPath{
+func Assert(path string) AssertedPath {
+	return AssertedPath{
 		path: path,
 	}
 }
