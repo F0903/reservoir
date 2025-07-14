@@ -33,8 +33,8 @@ func Init() *Dashboard {
 }
 
 func (d *Dashboard) ListenBlocking(address string) error {
-	log.Println("Starting dashboard server on :8080")
-	return http.ListenAndServe(":8080", d.mux)
+	log.Println("Starting dashboard server on", address)
+	return http.ListenAndServe(address, d.mux)
 }
 
 func (d *Dashboard) Listen(address string) {
