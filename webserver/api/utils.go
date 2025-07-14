@@ -8,7 +8,7 @@ import (
 // Returns the component and the remainder of the path.
 // If no slash is found, the entire path is considered the component and remainder is empty.
 func parseNextPathComponent(path string) (component string, remainder string) {
-	parts := strings.SplitN(path, "/", 1)
+	parts := strings.SplitN(path, "/", 2)
 
 	if len(parts) < 2 {
 		return path, "" // If there's no slash, then the path is the component and there's no remainder
