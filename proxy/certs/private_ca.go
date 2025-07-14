@@ -39,7 +39,7 @@ func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
 	return &PrivateCA{
 		key:   caKey,
 		cert:  caCert,
-		certs: syncmap.NewSyncMap[string, *tls.Certificate](),
+		certs: syncmap.New[string, *tls.Certificate](),
 	}, nil
 }
 

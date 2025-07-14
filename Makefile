@@ -2,7 +2,7 @@
 
 # Build the Svelte frontend
 build-frontend:
-	cd dashboard/frontend && pnpm install && pnpm run build
+	cd webserver/dashboard/frontend && pnpm install && pnpm run build
 
 # Build the entire project
 build: build-frontend
@@ -11,4 +11,4 @@ build: build-frontend
 # Remove build artifacts
 clean:
 	rm -f apt-cacher-go.exe
-	rm -rf dashboard/frontend/build
+	rm -rf webserver/dashboard/frontend/build

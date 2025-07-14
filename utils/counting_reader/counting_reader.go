@@ -9,7 +9,7 @@ type CountingReader struct {
 	read   *int
 }
 
-func NewCountingReader(reader io.Reader, read *int) CountingReader {
+func New(reader io.Reader, read *int) CountingReader {
 	return CountingReader{
 		reader: reader,
 		read:   read,

@@ -2,8 +2,8 @@ package proxy
 
 import (
 	"apt_cacher_go/proxy/certs"
-	"log"
-	"net/http"
+	"apt_cacher_go/utils/http_listener"
+	"context"
 )
 
 type CachingMitmProxy struct {
@@ -13,7 +13,7 @@ type CachingMitmProxy struct {
 // Creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewCachingMitmProxy(cacheDir string, ca certs.CertAuthority) (*CachingMitmProxy, error) {
+func New(cacheDir string, ca certs.CertAuthority) (*CachingMitmProxy, error) {
 	handler, err := newCachingMitmProxyHandler(cacheDir, ca)
 	if err != nil {
 		return nil, err
@@ -23,14 +23,7 @@ func NewCachingMitmProxy(cacheDir string, ca certs.CertAuthority) (*CachingMitmP
 	}, nil
 }
 
-func (p *CachingMitmProxy) ListenBlocking(address string) error {
-	return http.ListenAndServe(address, p.handler)
-}
-
-func (p *CachingMitmProxy) Listen(address string) {
-	go func() {
-		if err := p.ListenBlocking(address); err != nil {
-			log.Println("Error during non-blocking listen:", err)
-		}
-	}()
+func (p *CachingMitmProxy) Listen(address string, errChan chan error, ctx context.Context) {
+	listener := http_listener.New(address, p.handler)
+	listener.ListenWithCancel(errChan, ctx)
 }

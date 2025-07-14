@@ -26,7 +26,7 @@ type FileCache[ObjectData any] struct {
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
 	return &FileCache[ObjectData]{
 		rootDir:  asserted_path.Assert(rootDir),
-		locks:    syncmap.NewSyncMap[string, *sync.RWMutex](),
+		locks:    syncmap.New[string, *sync.RWMutex](),
 		byteSize: 0,
 	}
 }

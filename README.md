@@ -59,7 +59,7 @@ The arguments currently available are the following:
 - **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
 - **cache-dir** (var/cache) - The path where the cache should be stored.
-- **dashboard-listen** (localhost:8080) - The address and port that the dashboard will listen on.
+- **webserver-listen** (localhost:8080) - The address and port that the webserver (dashboard and API) will listen on.
 
 ## Example: Using curl with the Proxy
 
