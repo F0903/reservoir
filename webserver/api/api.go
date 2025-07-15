@@ -1,18 +1,35 @@
 package api
 
-import "net/http"
+import (
+	"apt_cacher_go/webserver/api/endpoints/metrics"
+	"fmt"
+	"net/http"
+)
 
 type API struct {
-	handler *apiHandler
+	basePath  string
+	endpoints []apiEndpoint
 }
 
 func New() *API {
 	return &API{
-		handler: newAPIHandler(),
+		basePath: "/api",
+		endpoints: []apiEndpoint{
+			// Register all our current API routes here.
+			&metrics.GetAllMetricsEndpoint{},
+			&metrics.GetCacheMetricsEndpoint{},
+			&metrics.GetRequestsMetricsEndpoint{},
+			&metrics.GetTimingMetricsEndpoint{},
+		},
 	}
 }
 
 func (api *API) RegisterHandlers(mux *http.ServeMux) error {
-	mux.Handle("/api/", api.handler)
+
+	for _, endpoint := range api.endpoints {
+		pattern := fmt.Sprintf("%s %s%s", endpoint.Method(), api.basePath, endpoint.Path())
+		mux.HandleFunc(pattern, endpoint.Endpoint)
+	}
+
 	return nil
 }
