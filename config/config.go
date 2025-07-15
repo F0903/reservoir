@@ -2,6 +2,7 @@ package config
 
 import (
 	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/bytesize"
 	"apt_cacher_go/utils/duration"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 )
 
 //TODO: add file watcher to reload config on changes
+
+const configVersion = 1
 
 var configPath = asserted_path.Assert("var/config.json")
 
@@ -23,18 +26,23 @@ var Global *Config = func() *Config {
 }()
 
 type Config struct {
+	ConfigVersion           int               // Version of the config file format, used for future migrations to ensure compatibility.
 	AlwaysCache             bool              // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
-	UpstreamDefaultHttps    bool              // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	MaxCacheSize            bytesize.ByteSize // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
 	DefaultCacheMaxAge      duration.Duration // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
 	ForceDefaultCacheMaxAge bool              // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheCleanupInterval    duration.Duration // The interval at which the cache will be cleaned up to remove expired entries.
+	UpstreamDefaultHttps    bool              // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 }
 
 func Default() *Config {
 	return &Config{
 		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		UpstreamDefaultHttps:    true,
+		MaxCacheSize:            bytesize.ParseUnchecked("10G"),
 		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),
 		ForceDefaultCacheMaxAge: true, // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		CacheCleanupInterval:    duration.Duration(90 * time.Minute),
+		UpstreamDefaultHttps:    true,
 	}
 }
 
@@ -68,6 +76,11 @@ func Load(path string) (*Config, error) {
 	if err := decoder.Decode(&cfg); err != nil {
 		return nil, err
 	}
+
+	if cfg.ConfigVersion != configVersion {
+		return nil, fmt.Errorf("config version mismatch: expected %d, got %d", configVersion, cfg.ConfigVersion)
+	}
+
 	return &cfg, nil
 }
 

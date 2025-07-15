@@ -18,12 +18,12 @@ import (
 func startProxy(address, caCertFile, caKeyFile, cacheDir string, errChan chan error, ctx context.Context) error {
 	ca, err := certs.NewPrivateCA(caCertFile, caKeyFile)
 	if err != nil {
-		return fmt.Errorf("Failed to create CA: %v", err)
+		return fmt.Errorf("failed to create CA: %v", err)
 	}
 
-	proxy, err := proxy.New(cacheDir, ca)
+	proxy, err := proxy.New(cacheDir, ca, ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to create proxy: %v", err)
+		return fmt.Errorf("failed to create proxy: %v", err)
 	}
 
 	log.Println("Starting proxy server on", address)
@@ -36,12 +36,12 @@ func startWebServer(address string, errChan chan error, ctx context.Context) err
 
 	dashboard := dashboard.New()
 	if err := webserver.Register(dashboard); err != nil {
-		return fmt.Errorf("Failed to register dashboard: %v", err)
+		return fmt.Errorf("failed to register dashboard: %v", err)
 	}
 
 	api := api.New()
 	if err := webserver.Register(api); err != nil {
-		return fmt.Errorf("Failed to register API: %v", err)
+		return fmt.Errorf("failed to register API: %v", err)
 	}
 
 	log.Println("Starting webserver server on", address)
@@ -58,7 +58,7 @@ func main() {
 	flag.Parse()
 
 	// Channel to handle OS signals for graceful shutdown
-	sigChan := make(chan os.Signal)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	errChan := make(chan error)

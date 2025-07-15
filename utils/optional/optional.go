@@ -1,6 +1,9 @@
 package optional
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+)
 
 var (
 	ErrorUnwrapNone = errors.New("attempted to unwrap a None value")
@@ -38,4 +41,25 @@ func (o Optional[T]) ForceUnwrap() *T {
 		panic(ErrorUnwrapNone)
 	}
 	return o.value
+}
+
+func (o Optional[T]) MarshalJSON() ([]byte, error) {
+	if o.value == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(o.value)
+}
+
+func (o *Optional[T]) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		o.value = nil
+		return nil
+	}
+
+	var value T
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	o.value = &value
+	return nil
 }

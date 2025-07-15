@@ -26,6 +26,7 @@ func (d *Duration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Converts Duration to regular time.Duration
 func (d Duration) Cast() time.Duration {
 	return time.Duration(d)
 }

@@ -7,6 +7,7 @@ import (
 	"apt_cacher_go/proxy/certs"
 	"apt_cacher_go/proxy/responder"
 	"bufio"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -25,13 +26,13 @@ type cachedRequestInfo struct {
 
 type cachingMitmProxyHandler struct {
 	ca    certs.CertAuthority
-	cache cache.Cache[cachedRequestInfo]
+	cache *cache.FileCache[cachedRequestInfo]
 }
 
-func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority) (*cachingMitmProxyHandler, error) {
+func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*cachingMitmProxyHandler, error) {
 	return &cachingMitmProxyHandler{
 		ca:    ca,
-		cache: cache.NewFileCache[cachedRequestInfo](cacheDir),
+		cache: cache.NewFileCache[cachedRequestInfo](cacheDir, config.Global.CacheCleanupInterval.Cast(), ctx),
 	}, nil
 }
 
