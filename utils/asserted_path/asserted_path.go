@@ -2,14 +2,22 @@ package asserted_path
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 )
 
 type AssertedPath struct {
-	// Path is the asserted path.
-	path string
+	Path string
+}
+
+func createDirs(path string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directories '%s': %v", path, err)
+	}
+	return nil
 }
 
 func assertPath(path string) {
@@ -17,23 +25,27 @@ func assertPath(path string) {
 		return // Path already exists, no need to create it
 	}
 
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		log.Panicf("failed to create directories '%s': %v", path, err)
+	if err := createDirs(path); err != nil {
+		log.Panic(err)
 	}
 }
 
 func Assert(path string) AssertedPath {
+	assertPath(path)
 	return AssertedPath{
-		path: path,
+		Path: path,
 	}
 }
 
-func (ap *AssertedPath) GetPath() string {
-	assertPath(ap.path)
-	return ap.path
+func (ap AssertedPath) EnsureCleared() AssertedPath {
+	// Just remove the path and recreate it, simpler and faster than iterating through the directory
+	os.RemoveAll(ap.Path)
+	if err := createDirs(ap.Path); err != nil {
+		log.Panic(err)
+	}
+	return ap
 }
 
 func (ap *AssertedPath) String() string {
-	return ap.GetPath()
+	return ap.Path
 }

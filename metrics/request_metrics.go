@@ -1,9 +1,9 @@
 package metrics
 
 type requestMetrics struct {
-	HTTPProxyequests   AtomicInt64
-	HTTPSProxyRequests AtomicInt64
-	BytesServed        AtomicInt64
+	HTTPProxyRequests  AtomicInt64 `json:"http_proxy_requests"`
+	HTTPSProxyRequests AtomicInt64 `json:"https_proxy_requests"`
+	BytesServed        AtomicInt64 `json:"bytes_served"`
 }
 
 func NewRequestMetrics() requestMetrics {

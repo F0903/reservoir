@@ -3,7 +3,7 @@ package metrics
 import "time"
 
 type timingMetrics struct {
-	StartTime AtomicTime
+	StartTime AtomicTime `json:"start_time"`
 }
 
 func NewTimingMetrics() timingMetrics {

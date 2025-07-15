@@ -15,7 +15,7 @@ import (
 var configPath = asserted_path.Assert("var/config.json")
 
 var Global *Config = func() *Config {
-	cfg, err := LoadOrDefault(configPath.GetPath())
+	cfg, err := LoadOrDefault(configPath.Path)
 	if err != nil {
 		log.Panicf("Failed to load global config: %v", err)
 	}
@@ -40,7 +40,7 @@ func Default() *Config {
 
 // Writes the configuration to disk.
 func (c *Config) Persist() error {
-	f, err := os.Create(configPath.GetPath())
+	f, err := os.Create(configPath.Path)
 	if err != nil {
 		return fmt.Errorf("failed to open config file for writing: %v", err)
 	}

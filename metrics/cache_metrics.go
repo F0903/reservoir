@@ -1,11 +1,11 @@
 package metrics
 
 type cacheMetrics struct {
-	CacheHits    AtomicInt64
-	CacheMisses  AtomicInt64
-	CacheErrors  AtomicInt64
-	CacheEntries AtomicInt64
-	BytesCached  AtomicInt64
+	CacheHits    AtomicInt64 `json:"cache_hits"`
+	CacheMisses  AtomicInt64 `json:"cache_misses"`
+	CacheErrors  AtomicInt64 `json:"cache_errors"`
+	CacheEntries AtomicInt64 `json:"cache_entries"`
+	BytesCached  AtomicInt64 `json:"bytes_cached"`
 }
 
 func NewCacheMetrics() cacheMetrics {

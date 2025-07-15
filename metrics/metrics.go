@@ -3,9 +3,9 @@ package metrics
 var Global Metrics = NewMetrics()
 
 type Metrics struct {
-	Cache    cacheMetrics
-	Requests requestMetrics
-	Timing   timingMetrics
+	Cache    cacheMetrics   `json:"cache"`
+	Requests requestMetrics `json:"requests"`
+	Timing   timingMetrics  `json:"timing"`
 }
 
 func NewMetrics() Metrics {

@@ -190,7 +190,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 func (p *cachingMitmProxyHandler) handleHTTP(w http.ResponseWriter, proxyReq *http.Request) error {
 	log.Printf("HTTP request to %v (from %v)", proxyReq.Host, proxyReq.RemoteAddr)
 
-	metrics.Global.Requests.HTTPProxyequests.Increment()
+	metrics.Global.Requests.HTTPProxyRequests.Increment()
 
 	responder := responder.NewHTTPResponder(w)
 	return p.processHTTPRequest(responder, proxyReq)

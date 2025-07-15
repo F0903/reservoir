@@ -3,6 +3,7 @@ package cache
 import (
 	"apt_cacher_go/metrics"
 	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/set"
 	"apt_cacher_go/utils/syncmap"
 	"encoding/json"
 	"errors"
@@ -16,17 +17,18 @@ import (
 )
 
 type FileCache[ObjectData any] struct {
-	rootDir      asserted_path.AssertedPath
-	locks        *syncmap.SyncMap[string, *sync.RWMutex]
-	entriesCount int64
-	byteSize     int64
+	rootDir  asserted_path.AssertedPath
+	locks    *syncmap.SyncMap[string, *sync.RWMutex]
+	entries  *set.Set[CacheKey]
+	byteSize int64
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string) *FileCache[ObjectData] {
 	return &FileCache[ObjectData]{
-		rootDir:  asserted_path.Assert(rootDir),
+		rootDir:  asserted_path.Assert(rootDir).EnsureCleared(),
 		locks:    syncmap.New[string, *sync.RWMutex](),
+		entries:  set.New[CacheKey](),
 		byteSize: 0,
 	}
 }
@@ -36,7 +38,6 @@ func getMetaPath(dataPath string) string {
 }
 
 func (c *FileCache[ObjectData]) addCacheCount(delta int64) {
-	c.entriesCount += delta
 	metrics.Global.Cache.CacheEntries.Add(delta)
 }
 
@@ -73,15 +74,16 @@ func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
 }
 
 // Ensures that both the cached file, its metadata and lock are removed without acquiring a lock.
-func (c *FileCache[ObjectData]) ensureRemove(key *CacheKey) error {
-	filePath := filepath.Join(c.rootDir.GetPath(), key.Hex())
+func (c *FileCache[ObjectData]) ensureRemove(key CacheKey) error {
+	filePath := filepath.Join(c.rootDir.Path, key.Hex)
 	metaPath := getMetaPath(filePath)
 
 	// We first try to force remove both files, since we don't want to leave orphaned files behind, and then check for errors later.
 	fileErr := c.ensureRemoveFile(filePath)
 	metaErr := c.ensureRemoveFile(metaPath)
 
-	c.locks.Delete(key.Hex()) // Remove the lock for this key
+	c.locks.Delete(key.Hex) // Remove the lock for this key
+	c.entries.Remove(key)   // Remove the entry from the set
 
 	if fileErr != nil {
 		return fmt.Errorf("failed to remove cache file '%s': %v", filePath, fileErr)
@@ -93,15 +95,15 @@ func (c *FileCache[ObjectData]) ensureRemove(key *CacheKey) error {
 	return nil
 }
 
-func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
-	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
+func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
+	lock := c.locks.GetOrSet(key.Hex, &sync.RWMutex{})
 	lock.RLock()
 	defer lock.RUnlock()
 
-	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
-	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
+	fileName := filepath.Join(c.rootDir.Path, key.Hex)
+	if !c.entries.Contains(key) {
 		metrics.Global.Cache.CacheMisses.Increment()
-		log.Printf("Cache miss for key '%s'", key.Hex())
+		log.Printf("Cache miss for key '%s'", key.Hex)
 		return nil, ErrorCacheMiss
 	}
 
@@ -115,7 +117,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	dataInfo, err := dataFile.Stat()
 	if err == nil && dataInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
-		log.Printf("Empty data file for key '%s', treating as cache miss", key.Hex())
+		log.Printf("Empty data file for key '%s', treating as cache miss", key.Hex)
 		c.ensureRemove(key)
 		metrics.Global.Cache.CacheMisses.Increment()
 		return nil, ErrorCacheMiss
@@ -132,7 +134,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	metaInfo, err := metaFile.Stat()
 	if err == nil && metaInfo.Size() == 0 {
 		// Empty file, treat as cache miss and clean up
-		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex())
+		log.Printf("Empty metadata file for key '%s', treating as cache miss", key.Hex)
 		c.ensureRemove(key)
 		metrics.Global.Cache.CacheMisses.Increment()
 		return nil, ErrorCacheMiss
@@ -143,7 +145,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 		// If EOF, treat as cache miss and clean up
 		if errors.Is(err, io.EOF) {
 			c.ensureRemove(key)
-			log.Printf("EOF while reading metadata for key '%s', treating as cache miss", key.Hex())
+			log.Printf("EOF while reading metadata for key '%s', treating as cache miss", key.Hex)
 			metrics.Global.Cache.CacheMisses.Increment()
 			return nil, ErrorCacheMiss
 		}
@@ -157,7 +159,7 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	}
 
 	metrics.Global.Cache.CacheHits.Increment()
-	log.Printf("Cache hit for key '%s'", key.Hex())
+	log.Printf("Cache hit for key '%s'", key.Hex)
 	return &Entry[ObjectData]{
 		Data:     dataFile,
 		Metadata: meta,
@@ -165,12 +167,12 @@ func (c *FileCache[ObjectData]) Get(key *CacheKey) (*Entry[ObjectData], error) {
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
-	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
+func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
+	lock := c.locks.GetOrSet(key.Hex, &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir.GetPath(), key.Hex())
+	fileName := filepath.Join(c.rootDir.Path, key.Hex)
 	file, err := os.Create(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
@@ -204,6 +206,8 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 		return nil, fmt.Errorf("failed to write cache metadata file '%s': %v", metaPath, err)
 	}
 
+	c.entries.Add(key)
+
 	c.addCacheCount(1)
 	c.addCacheSize(int64(len(metaJson)) + fileSize)
 
@@ -214,20 +218,20 @@ func (c *FileCache[ObjectData]) Cache(key *CacheKey, data io.Reader, expires tim
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Delete(key *CacheKey) error {
-	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
+func (c *FileCache[ObjectData]) Delete(key CacheKey) error {
+	lock := c.locks.GetOrSet(key.Hex, &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 
 	return c.ensureRemove(key)
 }
 
-func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
-	lock := c.locks.GetOrSet(key.Hex(), &sync.RWMutex{})
+func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
+	lock := c.locks.GetOrSet(key.Hex, &sync.RWMutex{})
 	lock.Lock()
 	defer lock.Unlock()
 
-	metaPath := getMetaPath(filepath.Join(c.rootDir.GetPath(), key.Hex()))
+	metaPath := getMetaPath(filepath.Join(c.rootDir.Path, key.Hex))
 	// Since we don't want to want to immediately truncate the file, we open it and manually specify read and write perms for later truncation.
 	metaFile, err := os.OpenFile(metaPath, os.O_RDWR, 0)
 	if err != nil {
@@ -244,7 +248,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	metaSize := metaStat.Size()
 
 	if metaSize == 0 {
-		err := fmt.Errorf("cannot update metadata for key '%s': file is empty", key.Hex())
+		err := fmt.Errorf("cannot update metadata for key '%s': file is empty", key.Hex)
 		log.Print(err)
 		c.ensureRemove(key)
 		metrics.Global.Cache.CacheErrors.Increment()
@@ -280,6 +284,6 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key *CacheKey, modifier func(*Ent
 	metrics.Global.Cache.CacheHits.Increment()
 	c.addCacheSize(newMetaStat.Size() - metaSize) // Adjust cached bytes based on the new size
 
-	log.Printf("Updated metadata for key '%s'", key.Hex())
+	log.Printf("Updated metadata for key '%s'", key.Hex)
 	return nil
 }
