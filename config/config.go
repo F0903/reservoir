@@ -37,6 +37,7 @@ type Config struct {
 
 func Default() *Config {
 	return &Config{
+		ConfigVersion:           configVersion,
 		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		MaxCacheSize:            bytesize.ParseUnchecked("10G"),
 		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),
