@@ -18,7 +18,7 @@ The dashboard is directly embedded into the executable, so the final build artif
 ## Usage Guide
 
 To start with, you need to generate a certificate and key to be used as a certificate authority to generate new certificates for requests to HTTPS domains. This is the mechanism that allows the proxy to decrypt and cache HTTPS responses.
-The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors.
+The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors relating to the untrusted cert.
 
 ### Generate a CA Certificate and Key (PEM format)
 
