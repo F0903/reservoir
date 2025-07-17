@@ -1,6 +1,6 @@
 # apt-cacher-go
 
-A simple caching MITM forward proxy with a dashboard, written in Go and Svelte.
+A caching MITM forward proxy with a dashboard, written in Go and Svelte.
 
 Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
 
