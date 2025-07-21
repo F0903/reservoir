@@ -1,5 +1,5 @@
 <header>
-    <h1>Dashboard</h1>
+    <h1>apt-cacher-go</h1>
 </header>
 
 <style>

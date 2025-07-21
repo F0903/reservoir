@@ -3,6 +3,8 @@
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import RoundedCornerBox from "$lib/components/ui/RoundedCornerBox.svelte";
+    import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
+    import { LayoutDashboard, Settings } from "@lucide/svelte";
 
     let { children } = $props();
 </script>
@@ -12,7 +14,10 @@
         <Header />
     </div>
     <div class="sidenav-area">
-        <SideNav><p>hello</p></SideNav>
+        <SideNav>
+            <SideNavButton url="/"><LayoutDashboard />Dashboard</SideNavButton>
+            <SideNavButton url="/settings"><Settings />Settings</SideNavButton>
+        </SideNav>
     </div>
     <div class="main-area">
         <RoundedCornerBox

@@ -18,10 +18,15 @@
     --background-secondary: #2d2d2d;
     /* Even lighter dark cards/elements */
     --background-tertiary: #353535;
+
+    --sidenav-normal: var(--primary-color);
+    --sidenav-selected: var(--tertiary-color);
+
     /* Light text on dark background */
     --text-primary: #e9ecef;
     /* Dimmer text for secondary content */
     --text-secondary: #adb5bd;
+
     --border-color: #495057;
     --default-shadow: rgba(0, 0, 0, 0.5);
 }

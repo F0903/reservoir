@@ -13,5 +13,11 @@
 
         height: 100%;
         width: 200px;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: start;
+        gap: 1rem;
     }
 </style>
