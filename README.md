@@ -6,8 +6,6 @@ Supports caching of both HTTP and HTTPS requests by injecting its own certificat
 
 The prime usage of this is as a central cache proxy for apt.
 
-[Based on the MITM forward proxy written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
-
 ## Requirements
 
 - Go 1.24 or newer
