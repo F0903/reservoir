@@ -8,8 +8,6 @@ The prime usage of this is as a central cache proxy for apt.
 
 The dashboard is directly embedded into the executable, so the final build artifact is a single file.
 
-[Based on the MITM forward proxy example written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
-
 ## Requirements
 
 - Go 1.24 or newer
