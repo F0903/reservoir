@@ -2,22 +2,28 @@ package metrics
 
 import (
 	"apt_cacher_go/metrics"
+	"apt_cacher_go/webserver/api/api_types"
 	"encoding/json"
 	"log"
 	"net/http"
 )
 
-type GetTimingMetricsEndpoint struct{}
+type TimingMetricsEndpoint struct{}
 
-func (m *GetTimingMetricsEndpoint) Path() string {
+func (m *TimingMetricsEndpoint) Path() string {
 	return "/metrics/timing"
 }
 
-func (m *GetTimingMetricsEndpoint) Method() string {
-	return "GET"
+func (m *TimingMetricsEndpoint) EndpointMethods() []api_types.EndpointMethod {
+	return []api_types.EndpointMethod{
+		{
+			Method: "GET",
+			Func:   m.Get,
+		},
+	}
 }
 
-func (m *GetTimingMetricsEndpoint) Endpoint(w http.ResponseWriter, r *http.Request) {
+func (m *TimingMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	timingJson, err := json.Marshal(metrics.Global.Timing)
 	if err != nil {
 		log.Printf("Error marshaling timing metrics: %v", err)

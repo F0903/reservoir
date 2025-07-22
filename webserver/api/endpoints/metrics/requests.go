@@ -2,22 +2,28 @@ package metrics
 
 import (
 	"apt_cacher_go/metrics"
+	"apt_cacher_go/webserver/api/api_types"
 	"encoding/json"
 	"log"
 	"net/http"
 )
 
-type GetRequestsMetricsEndpoint struct{}
+type RequestsMetricsEndpoint struct{}
 
-func (m *GetRequestsMetricsEndpoint) Path() string {
+func (m *RequestsMetricsEndpoint) Path() string {
 	return "/metrics/requests"
 }
 
-func (m *GetRequestsMetricsEndpoint) Method() string {
-	return "GET"
+func (m *RequestsMetricsEndpoint) EndpointMethods() []api_types.EndpointMethod {
+	return []api_types.EndpointMethod{
+		{
+			Method: "GET",
+			Func:   m.Get,
+		},
+	}
 }
 
-func (m *GetRequestsMetricsEndpoint) Endpoint(w http.ResponseWriter, r *http.Request) {
+func (m *RequestsMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	requestsJson, err := json.Marshal(metrics.Global.Requests)
 	if err != nil {
 		log.Printf("Error marshaling requests metrics: %v", err)
