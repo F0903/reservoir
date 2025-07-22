@@ -3,7 +3,7 @@
     import "@fontsource-variable/open-sans";
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
-    import RoundedCornerBox from "$lib/components/ui/RoundedCornerBox.svelte";
+    import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
     import { LayoutDashboard, Settings } from "@lucide/svelte";
 
@@ -21,14 +21,15 @@
         </SideNav>
     </div>
     <div class="main-area">
-        <RoundedCornerBox
+        <BackdropBox
+            --box-backdrop-color="var(--quaternary-color)"
             --box-border-radius="25px 0px 0px 0px"
             --box-shadow="5px 5px 15px 2px var(--default-shadow)"
         >
             <div class="page-container">
                 {@render children()}
             </div>
-        </RoundedCornerBox>
+        </BackdropBox>
     </div>
 </div>
 

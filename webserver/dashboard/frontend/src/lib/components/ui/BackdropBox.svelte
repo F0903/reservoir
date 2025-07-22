@@ -23,7 +23,7 @@
         left: 0;
         width: var(--box-width, 100%);
         height: var(--box-height, 100%);
-        background-color: var(--box-backdrop-color, var(--quaternary-color));
+        background-color: var(--box-backdrop-color, var(--background-secondary));
     }
 
     .box {
