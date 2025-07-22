@@ -1,9 +1,11 @@
 package metrics
 
+import "apt_cacher_go/utils/atomics"
+
 type requestMetrics struct {
-	HTTPProxyRequests  AtomicInt64 `json:"http_proxy_requests"`
-	HTTPSProxyRequests AtomicInt64 `json:"https_proxy_requests"`
-	BytesServed        AtomicInt64 `json:"bytes_served"`
+	HTTPProxyRequests  atomics.Int64 `json:"http_proxy_requests"`
+	HTTPSProxyRequests atomics.Int64 `json:"https_proxy_requests"`
+	BytesServed        atomics.Int64 `json:"bytes_served"`
 }
 
 func NewRequestMetrics() requestMetrics {

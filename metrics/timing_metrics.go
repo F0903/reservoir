@@ -1,13 +1,16 @@
 package metrics
 
-import "time"
+import (
+	"apt_cacher_go/utils/atomics"
+	"time"
+)
 
 type timingMetrics struct {
-	StartTime AtomicTime `json:"start_time"`
+	StartTime atomics.Time `json:"start_time"`
 }
 
 func NewTimingMetrics() timingMetrics {
 	return timingMetrics{
-		StartTime: NewAtomicTime(time.Now()),
+		StartTime: atomics.NewAtomicTime(time.Now()),
 	}
 }

@@ -1,4 +1,4 @@
-package metrics
+package atomics
 
 import (
 	"encoding/json"
@@ -6,30 +6,31 @@ import (
 	"time"
 )
 
-type AtomicTime struct {
+type Time struct {
 	timeMicro int64
 }
 
-func NewAtomicTime(initial time.Time) AtomicTime {
-	return AtomicTime{
+func NewAtomicTime(initial time.Time) Time {
+	return Time{
 		timeMicro: initial.UnixMicro(),
 	}
 }
 
-func (t *AtomicTime) Set(value time.Time) {
+func (t *Time) Set(value time.Time) {
 	atomic.StoreInt64(&t.timeMicro, value.UnixMicro())
 }
 
-func (t *AtomicTime) Get() time.Time {
+func (t *Time) Get() time.Time {
 	return time.UnixMicro(atomic.LoadInt64(&t.timeMicro))
 }
 
-func (t AtomicTime) MarshalJSON() ([]byte, error) {
+func (t Time) MarshalJSON() ([]byte, error) {
 	timeValue := time.UnixMicro(atomic.LoadInt64(&t.timeMicro))
-	return json.Marshal(timeValue.Format(time.RFC3339))
+	timeStr := timeValue.Format(time.RFC3339)
+	return json.Marshal(timeStr)
 }
 
-func (t *AtomicTime) UnmarshalJSON(data []byte) error {
+func (t *Time) UnmarshalJSON(data []byte) error {
 	var timeStr string
 	if err := json.Unmarshal(data, &timeStr); err != nil {
 		return err
