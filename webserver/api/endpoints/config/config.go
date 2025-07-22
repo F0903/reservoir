@@ -4,7 +4,7 @@ import (
 	"apt_cacher_go/config"
 	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -36,7 +36,7 @@ func (m *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 func (m *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	configJson, err := json.Marshal(config.Global)
 	if err != nil {
-		log.Printf("Error marshaling config: %v", err)
+		slog.Error("Error marshaling config", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -48,7 +48,7 @@ func (m *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 func (m *ConfigEndpoint) Post(w http.ResponseWriter, r *http.Request) {
 	var newConfig config.Config
 	if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
-		log.Printf("Error decoding config: %v", err)
+		slog.Error("Error decoding config", "error", err)
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}

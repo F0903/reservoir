@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,7 +48,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 		return
 	}
 
-	log.Printf("Cache size (%d bytes) exceeds limit (%d bytes), starting eviction", c.byteSize, config.Global.MaxCacheSize.Bytes())
+	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", c.byteSize, "max_cache_size", config.Global.MaxCacheSize.Bytes())
 
 	type entryForEviction struct {
 		key      CacheKey
@@ -83,7 +83,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 	// Evict entries until we're under the limit
 	targetSize := int64(float64(config.Global.MaxCacheSize.Bytes()) * 0.8) // Evict to 80% to avoid thrashing
 
-	log.Printf("Target size for eviction: %v", bytesize.ByteSize(targetSize))
+	slog.Info("Target size for eviction", "target_size", bytesize.ByteSize(targetSize))
 	evictions := 0
 	for _, candidate := range candidates {
 		if c.byteSize <= targetSize {
@@ -92,16 +92,15 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 
 		lock := c.getLock(candidate.key)
 		if lock.TryLock() {
-			log.Printf("Evicting cache entry '%s' (size: %d bytes, last access: %v)",
-				candidate.key.Hex, candidate.meta.FileSize, candidate.meta.LastAccess)
+			slog.Info("Evicting cache entry", "key", candidate.key.Hex, "size", candidate.meta.FileSize, "last_access", candidate.meta.LastAccess)
 
 			if err := c.ensureRemove(candidate.key); err != nil {
-				log.Printf("Failed to evict cache entry '%s': %v", candidate.key.Hex, err)
+				slog.Info("Failed to evict cache entry", "key", candidate.key.Hex, "error", err)
 			}
 			evictions++
 			lock.Unlock()
 		} else {
-			log.Printf("Failed to acquire lock for cache entry '%s', skipping eviction", candidate.key.Hex)
+			slog.Info("Failed to acquire lock for cache entry", "key", candidate.key.Hex)
 			continue
 		}
 	}
@@ -110,11 +109,11 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 	metrics.Global.Cache.BytesCached.Set(endCacheSize)
 	metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
 
-	log.Printf("Cache eviction complete. Evicted: %d entries. New size: %d bytes", evictions, endCacheSize)
+	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)
 }
 
 func (c *FileCache[ObjectData]) cleanExpiredEntries() {
-	log.Println("Cleaning up expired cache entries")
+	slog.Info("Cleaning up expired cache entries")
 
 	startCacheSize := c.byteSize
 
@@ -127,35 +126,35 @@ func (c *FileCache[ObjectData]) cleanExpiredEntries() {
 			continue
 		}
 
-		log.Printf("Found expired cache entry for key '%s', marking for removal", key.Hex)
+		slog.Info("Found expired cache entry for key", "key", key.Hex)
 		keysToRemove = append(keysToRemove, key)
 	}
 
 	for _, key := range keysToRemove {
-		log.Printf("Removing expired cache entry for key '%s', acquiring lock...", key.Hex)
+		slog.Info("Removing expired cache entry for key", "key", key.Hex)
 
 		lock := c.getLock(key)
 		locked := lock.TryLock()
 		if !locked {
-			log.Printf("Failed to acquire lock for key '%s', skipping removal", key.Hex)
+			slog.Info("Failed to acquire lock for key", "key", key.Hex)
 			continue
 		}
 
 		if err := c.ensureRemove(key); err != nil {
-			log.Printf("Failed to remove expired cache entry for key '%s': %v", key.Hex, err)
+			slog.Info("Failed to remove expired cache entry for key", "key", key.Hex, "error", err)
 			lock.Unlock()
 			continue
 		}
 		lock.Unlock()
 
-		log.Printf("Removed expired cache entry for key '%s'", key.Hex)
+		slog.Info("Removed expired cache entry for key", "key", key.Hex)
 	}
 
 	endCacheSize := c.byteSize
 	metrics.Global.Cache.BytesCached.Set(endCacheSize)
 	metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
 
-	log.Printf("Cache cleanup complete. New size: %d bytes", endCacheSize)
+	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
 }
 
 func (c *FileCache[ObjectData]) startCleanupTask(interval time.Duration, ctx context.Context) {
@@ -163,17 +162,17 @@ func (c *FileCache[ObjectData]) startCleanupTask(interval time.Duration, ctx con
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		log.Println("Cache cleanup task started")
+		slog.Info("Cache cleanup task started")
 		for {
 			select {
 			case <-ticker.C:
-				log.Println("Running cache cleanup cycle...")
+				slog.Info("Running cache cleanup cycle...")
 				c.cleanExpiredEntries()
 				c.ensureCacheSize()
 				metrics.Global.Cache.CleanupRuns.Increment()
-				log.Println("Cache cleanup cycle complete")
+				slog.Info("Cache cleanup cycle complete")
 			case <-ctx.Done():
-				log.Println("Cache cleanup task stopped")
+				slog.Info("Cache cleanup task stopped")
 				return
 			}
 		}
@@ -192,19 +191,15 @@ func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
 			// We only want to return critical errors, not if the file doesn't exist
 			return nil
 		}
-		err := fmt.Errorf("failed to stat file '%s': %v", path, err)
-		log.Println(err)
-		return err
+		return fmt.Errorf("failed to stat file '%s': %v", path, err)
 	}
 
 	if err := os.Remove(path); err != nil {
 		// We checked earlier that the file exists, so if we get an error here, it is unexpected.
-		err := fmt.Errorf("failed to remove file '%s': %v", path, err)
-		log.Println(err)
-		return err
+		return fmt.Errorf("failed to remove file '%s': %v", path, err)
 	}
 
-	log.Printf("Removed file '%s'", path)
+	slog.Info("Removed file", "path", path)
 	size := stat.Size()
 
 	metrics.Global.Cache.CacheEntries.Add(-1)
@@ -236,7 +231,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	entryMeta, exists := c.entries[key]
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
-		log.Printf("Cache miss for key '%s'", key.Hex)
+		slog.Info("Cache miss", "key", key.Hex)
 		return nil, ErrorCacheMiss
 	}
 
@@ -255,7 +250,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	entryMeta.LastAccess = time.Now()
 
 	metrics.Global.Cache.CacheHits.Increment()
-	log.Printf("Cache hit for key '%s'", key.Hex)
+	slog.Info("Successful cache hit", "key", key.Hex)
 	return &Entry[ObjectData]{
 		Data:     dataFile,
 		Metadata: entryMeta,
@@ -299,7 +294,7 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	metrics.Global.Cache.CacheEntries.Add(1)
 	c.addCacheSize(fileSize)
 
-	log.Printf("Cached data for key '%s' with size %d bytes", key.Hex, fileSize)
+	slog.Info("Successfully cached data", "key", key.Hex, "size", fileSize)
 
 	// Check if cache size exceeded limit and evict if necessary
 	c.ensureCacheSize()
@@ -337,6 +332,6 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*Entr
 
 	metrics.Global.Cache.CacheHits.Increment()
 
-	log.Printf("Updated metadata for key '%s'", key.Hex)
+	slog.Info("Successfully updated metadata", "key", key.Hex)
 	return nil
 }

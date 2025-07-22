@@ -6,7 +6,7 @@ import (
 	"apt_cacher_go/utils/duration"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -20,7 +20,8 @@ var configPath = assertedpath.Assert("var/config.json")
 var Global *Config = func() *Config {
 	cfg, err := LoadOrDefault(configPath.Path)
 	if err != nil {
-		log.Panicf("Failed to load global config: %v", err)
+		slog.Error("Failed to load global config", "error", err)
+		panic(err)
 	}
 	return cfg
 }()
@@ -88,7 +89,7 @@ func Load(path string) (*Config, error) {
 func LoadOrDefault(path string) (*Config, error) {
 	cfg, err := Load(path)
 	if err != nil {
-		log.Printf("Failed to load config from '%s': '%v' Using default configuration...", path, err)
+		slog.Warn("Failed to load config, using defaults", "path", path, "error", err)
 		cfg = Default()
 		if err := cfg.Persist(); err != nil {
 			return nil, fmt.Errorf("failed to persist default config: %v", err)

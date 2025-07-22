@@ -3,7 +3,7 @@ package cache
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"path"
 	"strings"
@@ -34,7 +34,7 @@ func MakeFromRequest(r *http.Request) CacheKey {
 	normHost := strings.ToLower(r.Host)
 	normPath := path.Clean(r.URL.Path)
 	stringKey := fmt.Sprintf("%s|%s|%s|%s|%s", scheme, r.Method, normHost, normPath, r.URL.RawQuery)
-	log.Printf("Creating cache key: %s", stringKey)
+	slog.Debug("Creating cache key", "key", stringKey)
 	return FromString(stringKey)
 }
 

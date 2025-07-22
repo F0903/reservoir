@@ -4,7 +4,6 @@ import (
 	"apt_cacher_go/utils/countingreader"
 	"bufio"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -53,7 +52,6 @@ func (c *RawHTTPResponder) writeResponse() error {
 	}
 
 	if err := c.response.Write(c.writer); err != nil {
-		log.Printf("error writing response in RawHTTPResponder: %v", err)
 		return err
 	}
 	if buf, ok := c.writer.(*bufio.Writer); ok {

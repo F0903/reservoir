@@ -12,7 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/big"
 	"net"
 	"time"
@@ -34,7 +34,7 @@ func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
 		return nil, fmt.Errorf("loaded certificate is not a CA certificate")
 	}
 
-	log.Printf("Loaded CA certificate: '%v'\n", caCert.Subject.CommonName)
+	slog.Info("Loaded CA certificate", "common_name", caCert.Subject.CommonName)
 
 	return &PrivateCA{
 		key:   caKey,
@@ -105,15 +105,15 @@ func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 	if cert, ok := ca.certs.Get(host); ok {
 		expired := cert.Leaf.NotAfter.Before(time.Now())
 		if expired {
-			log.Printf("Certificate for %v is expired, deleting...", host)
+			slog.Warn("Certificate for %v is expired, deleting...", "host", host)
 			ca.certs.Delete(host)
 		} else {
-			log.Printf("Using cached certificate for %v", host)
+			slog.Debug("Using cached TLS certificate", "host", host, "expires", cert.Leaf.NotAfter)
 			return cert, nil
 		}
 	}
 
-	log.Printf("Creating new certificate for %v", host)
+	slog.Debug("Creating new TLS certificate", "host", host)
 
 	// Create a fake TLS certificate for the target host, signed by our CA.
 	pemCert, pemKey, err := ca.createCert([]string{host}, 240)
@@ -128,7 +128,7 @@ func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	log.Printf("Created certificate for %v", host)
+	slog.Info("Created TLS certificate", "host", host, "expires", tlsCert.Leaf.NotAfter)
 
 	ca.certs.Set(host, &tlsCert)
 

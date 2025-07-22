@@ -4,7 +4,7 @@ import (
 	"apt_cacher_go/metrics"
 	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -26,7 +26,7 @@ func (m *TimingMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 func (m *TimingMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	timingJson, err := json.Marshal(metrics.Global.Timing)
 	if err != nil {
-		log.Printf("Error marshaling timing metrics: %v", err)
+		slog.Error("Error marshaling timing metrics", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

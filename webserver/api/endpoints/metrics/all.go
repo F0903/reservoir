@@ -4,7 +4,7 @@ import (
 	"apt_cacher_go/metrics"
 	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -26,7 +26,7 @@ func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	metricsJson, err := json.Marshal(metrics.Global)
 	if err != nil {
-		log.Printf("Error marshaling all metrics: %v", err)
+		slog.Error("Error marshaling all metrics", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

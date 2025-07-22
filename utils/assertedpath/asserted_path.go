@@ -3,7 +3,7 @@ package assertedpath
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -26,7 +26,8 @@ func assertPath(path string) {
 	}
 
 	if err := createDirs(path); err != nil {
-		log.Panic(err)
+		slog.Error("Failed to create directories", "path", path, "error", err)
+		panic(err)
 	}
 }
 
@@ -41,7 +42,8 @@ func (ap AssertedPath) EnsureCleared() AssertedPath {
 	// Just remove the path and recreate it, simpler and faster than iterating through the directory
 	os.RemoveAll(ap.Path)
 	if err := createDirs(ap.Path); err != nil {
-		log.Panic(err)
+		slog.Error("Failed to recreate cleared directory", "path", ap.Path, "error", err)
+		panic(err)
 	}
 	return ap
 }

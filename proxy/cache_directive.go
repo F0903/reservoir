@@ -4,7 +4,7 @@ import (
 	"apt_cacher_go/config"
 	"apt_cacher_go/utils/optional"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,7 +103,7 @@ func parseCacheControl(ccHeader string) (*cacheControl, error) {
 			}
 			if maxAge < 1 {
 				cc.noCache = true // If max-age is less than 1, treat it as no-cache
-				log.Printf("max-age is less than 1 second, treating as no-cache")
+				slog.Debug("max-age is less than 1 second, treating as no-cache", "raw", directive)
 				continue
 			}
 			cc.maxAge = time.Duration(maxAge) * time.Second

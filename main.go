@@ -9,7 +9,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -26,7 +26,7 @@ func startProxy(address, caCertFile, caKeyFile, cacheDir string, errChan chan er
 		return fmt.Errorf("failed to create proxy: %v", err)
 	}
 
-	log.Println("Starting proxy server on", address)
+	slog.Info("Starting proxy server", "address", address)
 	proxy.Listen(address, errChan, ctx)
 	return nil
 }
@@ -44,7 +44,7 @@ func startWebServer(address string, errChan chan error, ctx context.Context) err
 		return fmt.Errorf("failed to register API: %v", err)
 	}
 
-	log.Println("Starting webserver server on", address)
+	slog.Info("Starting webserver", "address", address)
 	webserver.Listen(address, errChan, ctx)
 	return nil
 }
@@ -67,19 +67,22 @@ func main() {
 	defer cancel()
 
 	if err := startProxy(*address, *caCertFile, *caKeyFile, *cacheDir, errChan, ctx); err != nil {
-		log.Fatalf("Failed to start proxy: %v", err)
+		slog.Error("Failed to start proxy", "error", err)
+		panic(err)
 	}
 
 	if err := startWebServer(*webserverAddress, errChan, ctx); err != nil {
-		log.Fatalf("Failed to start webserver: %v", err)
+		slog.Error("Failed to start webserver", "error", err)
+		panic(err)
 	}
 
 	select {
 	case err := <-errChan:
-		log.Fatalf("Service error: %v", err)
+		slog.Error("Service error", "error", err)
 		cancel()
+		panic(err)
 	case sig := <-sigChan:
-		log.Printf("Received signal %s, shutting down...", sig)
+		slog.Info("Received shutdown signal, shutting down gracefully...", "signal", sig)
 		cancel()
 	}
 }

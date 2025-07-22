@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 )
 
 type ByteSize int64
@@ -71,7 +71,8 @@ func (b ByteSize) Bytes() int64 {
 func ParseUnchecked(s string) ByteSize {
 	result, err := Parse(s)
 	if err != nil {
-		log.Fatalf("failed to parse byte size: %v", err)
+		slog.Error("Failed to parse byte size", "input", s, "error", err)
+		panic(err)
 	}
 	return result
 }

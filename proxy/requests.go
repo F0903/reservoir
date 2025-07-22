@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -56,12 +56,12 @@ func sendRequestToTarget(req *http.Request, httpsDefault bool) (*http.Response, 
 	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
 	removeHopByHopHeaders(req.Header)
 
-	log.Printf("Sending request %v", req)
+	slog.Debug("Sending request", "url", req.URL, "method", req.Method)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending request to target (%v): %w", req.URL, err)
 	}
-	log.Printf("Sent request to target %v, got response status: %s", req.URL, resp.Status)
+	slog.Debug("Sent request to target", "url", req.URL, "status", resp.Status)
 
 	// Remove any hop-by-hop headers in the response that should not be forwarded to the client.
 	removeHopByHopHeaders(resp.Header)
