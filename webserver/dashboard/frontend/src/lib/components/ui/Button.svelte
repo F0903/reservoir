@@ -1,18 +1,17 @@
 <script lang="ts">
-    let { onClick, children } = $props();
+    let { onClick, disabled = false, children } = $props();
 </script>
 
-<button class="btn" onclick={onClick}>
+<button class="btn" onclick={onClick} {disabled}>
     {@render children()}
 </button>
 
 <style>
-    .btn:hover {
+    .btn:enabled:hover {
         filter: brightness(0.9);
-        scale: 1.05;
     }
 
-    .btn:active {
+    .btn:enabled:active {
         filter: brightness(0.8);
         scale: 0.95;
     }

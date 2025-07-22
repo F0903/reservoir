@@ -15,7 +15,7 @@
     }
 </script>
 
-<Button {onClick} --btn-background-color={backgroundColor}>
+<Button {onClick} disabled={isCurrent} --btn-background-color={backgroundColor}>
     <div class="content">
         {@render children?.()}
     </div>

@@ -1,5 +1,6 @@
 <script>
     import "../global.css";
+    import "@fontsource-variable/open-sans";
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import RoundedCornerBox from "$lib/components/ui/RoundedCornerBox.svelte";
@@ -24,9 +25,9 @@
             --box-border-radius="25px 0px 0px 0px"
             --box-shadow="5px 5px 15px 2px var(--default-shadow)"
         >
-            <main>
+            <div class="page-container">
                 {@render children()}
-            </main>
+            </div>
         </RoundedCornerBox>
     </div>
 </div>
@@ -55,8 +56,8 @@
         grid-area: main;
     }
 
-    main {
+    .page-container {
         overflow-y: auto;
-        padding: 1rem;
+        padding: 2rem;
     }
 </style>
