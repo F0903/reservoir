@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"apt_cacher_go/metrics"
-	"apt_cacher_go/webserver/api/api_types"
+	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -14,8 +14,8 @@ func (m *AllMetricsEndpoint) Path() string {
 	return "/metrics"
 }
 
-func (m *AllMetricsEndpoint) EndpointMethods() []api_types.EndpointMethod {
-	return []api_types.EndpointMethod{
+func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
+	return []apitypes.EndpointMethod{
 		{
 			Method: "GET",
 			Func:   m.Get,

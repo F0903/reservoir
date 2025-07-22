@@ -1,7 +1,7 @@
 package responder
 
 import (
-	"apt_cacher_go/utils/counting_reader"
+	"apt_cacher_go/utils/countingreader"
 	"bufio"
 	"io"
 	"log"
@@ -65,7 +65,7 @@ func (c *RawHTTPResponder) writeResponse() error {
 
 func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
 	var read int
-	c.response.Body = io.NopCloser(counting_reader.New(body, &read))
+	c.response.Body = io.NopCloser(countingreader.New(body, &read))
 	c.response.StatusCode = status
 	c.parseAndSetContentLength()
 

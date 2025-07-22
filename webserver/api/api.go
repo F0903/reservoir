@@ -1,7 +1,7 @@
 package api
 
 import (
-	"apt_cacher_go/webserver/api/api_types"
+	"apt_cacher_go/webserver/api/apitypes"
 	"apt_cacher_go/webserver/api/endpoints/metrics"
 	"fmt"
 	"net/http"
@@ -9,13 +9,13 @@ import (
 
 type API struct {
 	basePath  string
-	endpoints []api_types.Endpoint
+	endpoints []apitypes.Endpoint
 }
 
 func New() *API {
 	return &API{
 		basePath: "/api",
-		endpoints: []api_types.Endpoint{
+		endpoints: []apitypes.Endpoint{
 			// Register all our current API routes here.
 			&metrics.AllMetricsEndpoint{},
 			&metrics.CacheMetricsEndpoint{},

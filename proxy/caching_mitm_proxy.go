@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"apt_cacher_go/proxy/certs"
-	"apt_cacher_go/utils/http_listener"
+	"apt_cacher_go/utils/httplistener"
 	"context"
 )
 
@@ -24,6 +24,6 @@ func New(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*Caching
 }
 
 func (p *CachingMitmProxy) Listen(address string, errChan chan error, ctx context.Context) {
-	listener := http_listener.New(address, p.handler)
+	listener := httplistener.New(address, p.handler)
 	listener.ListenWithCancel(errChan, ctx)
 }

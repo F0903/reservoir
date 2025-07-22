@@ -3,7 +3,7 @@ package cache
 import (
 	"apt_cacher_go/config"
 	"apt_cacher_go/metrics"
-	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/assertedpath"
 	"apt_cacher_go/utils/bytesize"
 	"apt_cacher_go/utils/syncmap"
 	"cmp"
@@ -20,7 +20,7 @@ import (
 )
 
 type FileCache[ObjectData any] struct {
-	rootDir  asserted_path.AssertedPath
+	rootDir  assertedpath.AssertedPath
 	locks    *syncmap.SyncMap[string, *sync.RWMutex]
 	entries  map[CacheKey]*EntryMetadata[ObjectData]
 	byteSize int64
@@ -29,7 +29,7 @@ type FileCache[ObjectData any] struct {
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[ObjectData any](rootDir string, cleanupInterval time.Duration, ctx context.Context) *FileCache[ObjectData] {
 	c := &FileCache[ObjectData]{
-		rootDir:  asserted_path.Assert(rootDir).EnsureCleared(),
+		rootDir:  assertedpath.Assert(rootDir).EnsureCleared(),
 		locks:    syncmap.New[string, *sync.RWMutex](),
 		entries:  make(map[CacheKey]*EntryMetadata[ObjectData]),
 		byteSize: 0,

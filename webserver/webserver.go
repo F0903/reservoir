@@ -1,7 +1,7 @@
 package webserver
 
 import (
-	"apt_cacher_go/utils/http_listener"
+	"apt_cacher_go/utils/httplistener"
 	"context"
 	"net/http"
 )
@@ -20,6 +20,6 @@ func (ws *WebServer) Register(s Servable) error {
 }
 
 func (ws *WebServer) Listen(address string, errChan chan error, ctx context.Context) {
-	listener := http_listener.New(address, ws.mux)
+	listener := httplistener.New(address, ws.mux)
 	listener.ListenWithCancel(errChan, ctx)
 }

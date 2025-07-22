@@ -1,7 +1,7 @@
 package config
 
 import (
-	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/assertedpath"
 	"apt_cacher_go/utils/bytesize"
 	"apt_cacher_go/utils/duration"
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 
 const configVersion = 1
 
-var configPath = asserted_path.Assert("var/config.json")
+var configPath = assertedpath.Assert("var/config.json")
 
 var Global *Config = func() *Config {
 	cfg, err := LoadOrDefault(configPath.Path)
