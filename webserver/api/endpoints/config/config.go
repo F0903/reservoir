@@ -17,7 +17,7 @@ type configUpdateResponse struct {
 type ConfigEndpoint struct{}
 
 func (m *ConfigEndpoint) Path() string {
-	return "/settings"
+	return "/config"
 }
 
 func (m *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
@@ -27,14 +27,19 @@ func (m *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 			Func:   m.Get,
 		},
 		{
-			Method: "POST",
-			Func:   m.Post,
+			Method: "PUT",
+			Func:   m.Put,
+		},
+		{
+			Method: "PATCH",
+			Func:   m.Patch,
 		},
 	}
 }
 
 func (m *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request) {
-	configJson, err := json.Marshal(config.Global)
+	config := config.Get()
+	configJson, err := json.Marshal(config)
 	if err != nil {
 		slog.Error("Error marshaling config", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -45,7 +50,12 @@ func (m *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	w.Write(configJson)
 }
 
-func (m *ConfigEndpoint) Post(w http.ResponseWriter, r *http.Request) {
+func (m *ConfigEndpoint) Put(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+
 	var newConfig config.Config
 	if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
 		slog.Error("Error decoding config", "error", err)
@@ -53,17 +63,36 @@ func (m *ConfigEndpoint) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	config.Global = &newConfig
+	if err := config.Update(func(cfg *config.Config) {
+		*cfg = newConfig
+	}); err != nil {
+		slog.Error("Error updating config", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	response := configUpdateResponse{
 		Success:       true,
-		RestartNeeded: true,
+		RestartNeeded: false,
 		Message:       "Configuration updated successfully",
 	}
 
-	responseJson, _ := json.Marshal(response)
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		slog.Error("Error marshaling response", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(responseJson)
 }
 
-//TODO: Patch endpoint to partially update config
+func (m *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	http.Error(w, "PATCH method is not implemented", http.StatusNotImplemented)
+}

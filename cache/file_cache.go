@@ -53,11 +53,13 @@ func (c *FileCache[ObjectData]) getLock(key CacheKey) *sync.RWMutex {
 }
 
 func (c *FileCache[ObjectData]) ensureCacheSize() {
-	if c.byteSize < config.Global.MaxCacheSize.Bytes() {
+	config := config.Get()
+
+	if c.byteSize < config.MaxCacheSize.Bytes() {
 		return
 	}
 
-	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", c.byteSize, "max_cache_size", config.Global.MaxCacheSize.Bytes())
+	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", c.byteSize, "max_cache_size", config.MaxCacheSize.Bytes())
 
 	type entryForEviction struct {
 		key      CacheKey
@@ -90,7 +92,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 	})
 
 	// Evict entries until we're under the limit
-	targetSize := int64(float64(config.Global.MaxCacheSize.Bytes()) * 0.8) // Evict to 80% to avoid thrashing
+	targetSize := int64(float64(config.MaxCacheSize.Bytes()) * 0.8) // Evict to 80% to avoid thrashing
 
 	slog.Info("Target size for eviction", "target_size", bytesize.ByteSize(targetSize))
 	evictions := 0
