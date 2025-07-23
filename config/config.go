@@ -1,13 +1,13 @@
 package config
 
 import (
-	"apt_cacher_go/utils/bytesize"
-	"apt_cacher_go/utils/duration"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"reservoir/utils/bytesize"
+	"reservoir/utils/duration"
 	"time"
 )
 

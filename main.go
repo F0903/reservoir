@@ -1,17 +1,17 @@
 package main
 
 import (
-	"apt_cacher_go/proxy"
-	"apt_cacher_go/proxy/certs"
-	"apt_cacher_go/webserver"
-	"apt_cacher_go/webserver/api"
-	"apt_cacher_go/webserver/dashboard"
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"reservoir/proxy"
+	"reservoir/proxy/certs"
+	"reservoir/webserver"
+	"reservoir/webserver/api"
+	"reservoir/webserver/dashboard"
 	"syscall"
 )
 

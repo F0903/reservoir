@@ -1,11 +1,11 @@
 package config
 
 import (
-	"apt_cacher_go/config"
-	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"reservoir/config"
+	"reservoir/webserver/api/apitypes"
 )
 
 type configUpdateResponse struct {

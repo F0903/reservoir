@@ -1,7 +1,7 @@
 package metrics
 
 import (
-	"apt_cacher_go/utils/atomics"
+	"reservoir/utils/atomics"
 	"time"
 )
 

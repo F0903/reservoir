@@ -1,7 +1,6 @@
 package certs
 
 import (
-	"apt_cacher_go/utils/syncmap"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -15,6 +14,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net"
+	"reservoir/utils/syncmap"
 	"time"
 )
 
@@ -80,7 +80,7 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"apt-cacher-go"},
+			Organization: []string{"reservoir"},
 		},
 		DNSNames:  dnsNames,
 		NotBefore: time.Now(),

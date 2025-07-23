@@ -1,10 +1,10 @@
 package responder
 
 import (
-	"apt_cacher_go/utils/countingreader"
 	"bufio"
 	"io"
 	"net/http"
+	"reservoir/utils/countingreader"
 	"strconv"
 	"strings"
 )

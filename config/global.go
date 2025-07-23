@@ -1,11 +1,11 @@
 package config
 
 import (
-	"apt_cacher_go/utils/assertedpath"
-	"apt_cacher_go/utils/writesynced"
 	"errors"
 	"fmt"
 	"log/slog"
+	"reservoir/utils/assertedpath"
+	"reservoir/utils/writesynced"
 )
 
 var (

@@ -1,8 +1,8 @@
 package cache
 
 import (
-	"apt_cacher_go/utils/bytesize"
 	"io"
+	"reservoir/utils/bytesize"
 	"time"
 )
 

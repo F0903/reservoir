@@ -1,11 +1,11 @@
 package metrics
 
 import (
-	"apt_cacher_go/metrics"
-	"apt_cacher_go/webserver/api/apitypes"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"reservoir/metrics"
+	"reservoir/webserver/api/apitypes"
 )
 
 type TimingMetricsEndpoint struct{}

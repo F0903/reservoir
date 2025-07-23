@@ -1,9 +1,9 @@
 package proxy
 
 import (
-	"apt_cacher_go/proxy/certs"
-	"apt_cacher_go/utils/httplistener"
 	"context"
+	"reservoir/proxy/certs"
+	"reservoir/utils/httplistener"
 )
 
 type CachingMitmProxy struct {

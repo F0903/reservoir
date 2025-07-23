@@ -1,11 +1,6 @@
 package cache
 
 import (
-	"apt_cacher_go/config"
-	"apt_cacher_go/metrics"
-	"apt_cacher_go/utils/assertedpath"
-	"apt_cacher_go/utils/bytesize"
-	"apt_cacher_go/utils/syncmap"
 	"cmp"
 	"context"
 	"errors"
@@ -14,6 +9,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reservoir/config"
+	"reservoir/metrics"
+	"reservoir/utils/assertedpath"
+	"reservoir/utils/bytesize"
+	"reservoir/utils/syncmap"
 	"slices"
 	"sync"
 	"time"

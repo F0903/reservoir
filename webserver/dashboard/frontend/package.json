@@ -1,5 +1,5 @@
 {
-    "name": "apt-cacher-go-dashboard",
+    "name": "reservoir-dashboard",
     "private": true,
     "version": "0.0.1",
     "type": "module",

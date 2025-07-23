@@ -1,6 +1,6 @@
 package metrics
 
-import "apt_cacher_go/utils/atomics"
+import "reservoir/utils/atomics"
 
 type cacheMetrics struct {
 	CacheHits      atomics.Int64 `json:"cache_hits"`

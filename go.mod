@@ -1,4 +1,4 @@
-module apt_cacher_go
+module reservoir
 
 go 1.24.4
 

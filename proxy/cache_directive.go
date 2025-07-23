@@ -1,12 +1,12 @@
 package proxy
 
 import (
-	"apt_cacher_go/config"
-	"apt_cacher_go/utils/optional"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reservoir/config"
+	"reservoir/utils/optional"
 	"strconv"
 	"strings"
 	"time"

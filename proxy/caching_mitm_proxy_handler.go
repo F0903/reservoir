@@ -1,11 +1,6 @@
 package proxy
 
 import (
-	"apt_cacher_go/cache"
-	"apt_cacher_go/config"
-	"apt_cacher_go/metrics"
-	"apt_cacher_go/proxy/certs"
-	"apt_cacher_go/proxy/responder"
 	"bufio"
 	"context"
 	"crypto/tls"
@@ -15,6 +10,11 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reservoir/cache"
+	"reservoir/config"
+	"reservoir/metrics"
+	"reservoir/proxy/certs"
+	"reservoir/proxy/responder"
 	"time"
 )
 

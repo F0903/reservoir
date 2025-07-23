@@ -1,6 +1,6 @@
 package metrics
 
-import "apt_cacher_go/utils/atomics"
+import "reservoir/utils/atomics"
 
 type requestMetrics struct {
 	HTTPProxyRequests  atomics.Int64 `json:"http_proxy_requests"`

@@ -1,10 +1,10 @@
-# apt-cacher-go
+# reservoir
 
-A caching MITM (Man-in-the-Middle) forward proxy with a dashboard, written in Go and Svelte.
+A caching MITM (Man-in-the-Middle) forward proxy written in Go with an embedded dashboard written with Svelte.
 
 Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
 
-The prime usage of this is as a central cache proxy for apt.
+The original intended usage is as a central cache proxy for apt or other package managers.
 
 The dashboard is directly embedded into the executable, so the final build artifact is a single file.
 
@@ -22,7 +22,7 @@ The caveat being that EVERY client that proxies HTTPS requests through this MUST
 
 ```sh
 openssl genrsa -out ca.key 2048
-openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "//CN=apt-cacher-go"
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "//CN=reservoir"
 ```
 
 ### Trust the CA Certificate

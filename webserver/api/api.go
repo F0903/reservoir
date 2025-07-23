@@ -1,13 +1,13 @@
 package api
 
 import (
-	"apt_cacher_go/webserver/api/apitypes"
-	"apt_cacher_go/webserver/api/endpoints/config"
-	"apt_cacher_go/webserver/api/endpoints/metrics"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"reservoir/webserver/api/apitypes"
+	"reservoir/webserver/api/endpoints/config"
+	"reservoir/webserver/api/endpoints/metrics"
 )
 
 var (
