@@ -27,16 +27,19 @@ func (c *HTTPResponder) SetHeader(header http.Header) {
 	}
 }
 
+func (c *HTTPResponder) GetHeader() http.Header {
+	return c.writer.Header()
+}
+
 func (c *HTTPResponder) writeStatusHeader(status int) {
 	if status != http.StatusOK {
 		c.writer.WriteHeader(status)
 	}
 }
 
-func (c *HTTPResponder) Write(status int, body io.Reader) error {
+func (c *HTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
 	c.writeStatusHeader(status)
-	_, err := io.Copy(c.writer, body)
-	return err
+	return io.Copy(c.writer, body)
 }
 
 func (c *HTTPResponder) WriteEmpty(status int) error {
@@ -45,6 +48,7 @@ func (c *HTTPResponder) WriteEmpty(status int) error {
 	return err
 }
 
-func (c *HTTPResponder) Error(message string, errorCode int) {
+func (c *HTTPResponder) WriteError(message string, errorCode int) error {
 	http.Error(c.writer, message, errorCode)
+	return nil
 }

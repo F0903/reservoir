@@ -3,12 +3,17 @@ package proxy
 import (
 	"apt_cacher_go/config"
 	"apt_cacher_go/utils/optional"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	ErrParseMaxAge = errors.New("failed to parse max-age")
 )
 
 type cacheControl struct {
@@ -72,7 +77,9 @@ func (cd *cacheDirective) shouldCache() bool {
 }
 
 func (cd *cacheDirective) getExpiresOrDefault() time.Time {
-	if !config.Global.ForceDefaultCacheMaxAge {
+	config := config.Get()
+
+	if !config.ForceDefaultCacheMaxAge {
 		if cd.cacheControl.IsSome() {
 			cc := cd.cacheControl.ForceUnwrap()
 			if cc.maxAge > 0 {
@@ -84,7 +91,7 @@ func (cd *cacheDirective) getExpiresOrDefault() time.Time {
 		}
 	}
 
-	defaultMaxAge := config.Global.DefaultCacheMaxAge.Cast()
+	defaultMaxAge := config.DefaultCacheMaxAge.Cast()
 	return time.Now().Add(defaultMaxAge)
 }
 
@@ -99,11 +106,12 @@ func parseCacheControl(ccHeader string) (*cacheControl, error) {
 			// max-age directive specifies the maximum amount of time a response is considered fresh in seconds.
 			maxAge, err := strconv.ParseInt(after, 10, 64)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse max-age: %v", err)
+				slog.Error("Failed to parse max-age", "raw", directive, "error", err)
+				return nil, fmt.Errorf("%w: %v", ErrParseMaxAge, err)
 			}
 			if maxAge < 1 {
 				cc.noCache = true // If max-age is less than 1, treat it as no-cache
-				log.Printf("max-age is less than 1 second, treating as no-cache")
+				slog.Debug("max-age is less than 1 second, treating as no-cache", "raw", directive)
 				continue
 			}
 			cc.maxAge = time.Duration(maxAge) * time.Second

@@ -7,7 +7,7 @@ type SyncMap[K comparable, V any] struct {
 	mu sync.RWMutex // protects locks map
 }
 
-func NewSyncMap[K comparable, V any]() *SyncMap[K, V] {
+func New[K comparable, V any]() *SyncMap[K, V] {
 	return &SyncMap[K, V]{
 		ma: make(map[K]V),
 	}

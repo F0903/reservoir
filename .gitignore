@@ -17,3 +17,6 @@ ssl/
 # Directory for files used by the executable
 # This is where apt-cacher-go will store its cache and other data.
 var/
+
+# Bruno files
+.bruno

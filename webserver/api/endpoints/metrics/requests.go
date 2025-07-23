@@ -1,0 +1,36 @@
+package metrics
+
+import (
+	"apt_cacher_go/metrics"
+	"apt_cacher_go/webserver/api/apitypes"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+)
+
+type RequestsMetricsEndpoint struct{}
+
+func (m *RequestsMetricsEndpoint) Path() string {
+	return "/metrics/requests"
+}
+
+func (m *RequestsMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
+	return []apitypes.EndpointMethod{
+		{
+			Method: "GET",
+			Func:   m.Get,
+		},
+	}
+}
+
+func (m *RequestsMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
+	requestsJson, err := json.Marshal(metrics.Global.Requests)
+	if err != nil {
+		slog.Error("Error marshaling requests metrics", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(requestsJson)
+}

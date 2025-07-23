@@ -1,63 +1,81 @@
 package config
 
 import (
-	"apt_cacher_go/utils/asserted_path"
+	"apt_cacher_go/utils/bytesize"
 	"apt_cacher_go/utils/duration"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 )
 
-//TODO: add file watcher to reload config on changes
+const configVersion = 1
 
-var configPath = asserted_path.Assert("var/config.json")
-
-var Global *Config = func() *Config {
-	cfg, err := LoadOrDefault(configPath.GetPath())
-	if err != nil {
-		log.Panicf("Failed to load global config: %v", err)
-	}
-	return cfg
-}()
+var (
+	ErrConfigFileOpen        = errors.New("config file open failed")
+	ErrConfigFileWrite       = errors.New("config file write failed")
+	ErrConfigFileRead        = errors.New("config file read failed")
+	ErrConfigVersionMismatch = errors.New("config version mismatch")
+	ErrConfigInvalidFormat   = errors.New("config invalid format")
+	ErrConfigPersist         = errors.New("config persist failed")
+)
 
 type Config struct {
-	AlwaysCache             bool              // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
-	UpstreamDefaultHttps    bool              // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
-	DefaultCacheMaxAge      duration.Duration // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
-	ForceDefaultCacheMaxAge bool              // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	ConfigVersion           int               `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
+	AlwaysCache             bool              `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
+	MaxCacheSize            bytesize.ByteSize `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
+	DefaultCacheMaxAge      duration.Duration `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
+	ForceDefaultCacheMaxAge bool              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheCleanupInterval    duration.Duration `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
+	UpstreamDefaultHttps    bool              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 }
 
-func Default() *Config {
-	return &Config{
+func newDefault() Config {
+	return Config{
+		ConfigVersion:           configVersion,
 		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		UpstreamDefaultHttps:    true,
+		MaxCacheSize:            bytesize.ParseUnchecked("10G"),
 		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),
 		ForceDefaultCacheMaxAge: true, // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		CacheCleanupInterval:    duration.Duration(90 * time.Minute),
+		UpstreamDefaultHttps:    true,
 	}
 }
 
 // Writes the configuration to disk.
-func (c *Config) Persist() error {
-	f, err := os.Create(configPath.GetPath())
+func (c Config) persist() error {
+	f, err := os.Create(configPath.Path)
 	if err != nil {
-		return fmt.Errorf("failed to open config file for writing: %v", err)
+		slog.Error("Failed to create config file", "path", configPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, configPath.Path)
 	}
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ") // Pretty print the JSON output
 	if err := enc.Encode(c); err != nil {
-		return fmt.Errorf("failed to write config to file: %v", err)
+		slog.Error("Failed to encode config to JSON", "path", configPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to write config to file '%s'", ErrConfigFileWrite, configPath.Path)
+	}
+
+	slog.Info("Successfully persisted config", "path", configPath.Path)
+	return nil
+}
+
+func (c Config) verify() error {
+	if c.ConfigVersion != configVersion {
+		return ErrConfigVersionMismatch
 	}
 	return nil
 }
 
-func Load(path string) (*Config, error) {
+func load(path string) (Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		slog.Error("Failed to open config file", "path", path, "error", err)
+		return Config{}, fmt.Errorf("%w: failed to open config file '%s'", ErrConfigFileRead, path)
 	}
 	defer f.Close()
 
@@ -66,19 +84,29 @@ func Load(path string) (*Config, error) {
 
 	var cfg Config
 	if err := decoder.Decode(&cfg); err != nil {
-		return nil, err
+		slog.Error("Failed to decode config JSON", "path", path, "error", err)
+		return Config{}, fmt.Errorf("%w: failed to decode config from '%s'", ErrConfigInvalidFormat, path)
 	}
-	return &cfg, nil
+
+	if err := cfg.verify(); err != nil {
+		slog.Error("Unable to verify config", "path", path, "error", err)
+		return Config{}, fmt.Errorf("%w: %v", ErrConfigVersionMismatch, err)
+	}
+
+	slog.Info("Successfully loaded config", "path", path)
+	return cfg, nil
 }
 
-func LoadOrDefault(path string) (*Config, error) {
-	cfg, err := Load(path)
+func loadOrDefault(path string) (Config, error) {
+	cfg, err := load(path)
 	if err != nil {
-		log.Printf("Failed to load config from '%s': '%v' Using default configuration...", path, err)
-		cfg = Default()
-		if err := cfg.Persist(); err != nil {
-			return nil, fmt.Errorf("failed to persist default config: %v", err)
+		slog.Warn("Failed to load config, using defaults", "path", path, "error", err)
+		cfg = newDefault()
+		if err := cfg.persist(); err != nil {
+			slog.Error("Failed to persist default config", "error", err)
+			return Config{}, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)
 		}
+		slog.Info("Created default config file", "path", path)
 	}
 	return cfg, nil
 }

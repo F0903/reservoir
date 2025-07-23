@@ -1,12 +1,12 @@
 # apt-cacher-go
 
-A simple caching MITM forward proxy written in Go.
+A caching MITM (Man-in-the-Middle) forward proxy with a dashboard, written in Go and Svelte.
 
 Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
 
 The prime usage of this is as a central cache proxy for apt.
 
-[Based on the MITM forward proxy written by Eli Bendersky](https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go)
+The dashboard is directly embedded into the executable, so the final build artifact is a single file.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The prime usage of this is as a central cache proxy for apt.
 ## Usage Guide
 
 To start with, you need to generate a certificate and key to be used as a certificate authority to generate new certificates for requests to HTTPS domains. This is the mechanism that allows the proxy to decrypt and cache HTTPS responses.
-The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors.
+The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors relating to the untrusted cert.
 
 ### Generate a CA Certificate and Key (PEM format)
 
@@ -33,23 +33,15 @@ openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "
 
 ### Running the Proxy
 
-You can run the proxy either directly with `go run` or build it into an executable first.
-
-#### Directly
+First you have to build the executable with make by running the following command in the project directory:
 
 ```sh
-go run main.go --listen 127.0.0.1:9999 --ca-cert ca.crt --ca-key ca.key
+make build
 ```
 
-#### Executable
+This will automatically build both the frontend and the proxy executable.
 
-First you have to build the executable by running the following command in the project directory:
-
-```sh
-go build
-```
-
-Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can setup a systemd service for it.
+Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it.
 
 ### Note When Updating
 
@@ -61,10 +53,11 @@ Configuration currently takes place via command-line arguments.
 
 The arguments currently available are the following:
 
-- **listen** (localhost:9999) - The address and port that the proxy will listen on.
+- **listen** (0.0.0.0:9999) - The address and port that the proxy will listen on.
 - **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
 - **cache-dir** (var/cache) - The path where the cache should be stored.
+- **webserver-listen** (localhost:8080) - The address and port that the webserver (dashboard and API) will listen on.
 
 ## Example: Using curl with the Proxy
 
@@ -76,4 +69,10 @@ If your CA is not trusted by the system, you can specify it for curl:
 
 ```sh
 curl --cacert ca-cert.pem -x http://127.0.0.1:9999 https://example.com/
+```
+
+Alternatively if you are too lazy to specify the cert (like me), you can use the `-k` option to skip cert validation:
+
+```sh
+curl -k -x http://127.0.0.1:9999 https://example.com/
 ```

@@ -1,0 +1,107 @@
+/* The Global CSS File™ */
+/* ==================== */
+/* This is where global CSS theme variables, as well as other global defaults are defined */
+
+:root {
+    /* Medium blue for buttons/links */
+    --primary-color: #40798c;
+    /* Light teal for secondary actions */
+    --secondary-color: #70a9a1;
+    /* Warm accent color */
+    --tertiary-color: #eec584;
+    /* Darkest color */
+    --quaternary-color: #0b2027;
+
+    /* Dark but not pure black */
+    --background-primary: #1a1a1a;
+    /* Lighter dark for sections */
+    --background-secondary: #2d2d2d;
+    /* Even lighter dark cards/elements */
+    --background-tertiary: #353535;
+
+    --sidenav-normal: var(--primary-color);
+    --sidenav-selected: var(--tertiary-color);
+
+    /* Light text on dark background */
+    --text-primary: #e9ecef;
+    /* Dimmer text for secondary content */
+    --text-secondary: #adb5bd;
+
+    --border-color: #495057;
+    --default-shadow: rgba(0, 0, 0, 0.5);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+    /* Fallback font */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Open Sans Variable', sans-serif;
+    line-height: 1.5;
+}
+
+body {
+    /* Prevent horizontal scroll */
+    overflow-x: hidden;
+
+    background-color: var(--background-primary);
+    color: var(--text-primary);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+ul,
+ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+button,
+input,
+textarea,
+select {
+    font-family: inherit;
+    font-size: inherit;
+    border: none;
+    background: none;
+    outline: none;
+}
+
+button {
+    cursor: pointer;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+#app {
+    isolation: isolate;
+}
