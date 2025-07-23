@@ -9,6 +9,14 @@ import (
 
 type ByteSize int64
 
+var (
+	ErrCharsAfterUnit = errors.New("characters after the unit are not allowed")
+	ErrMultipleUnits  = errors.New("multiple units found in string")
+	ErrUnknownUnit    = errors.New("unknown unit")
+	ErrEmptyString    = errors.New("empty string")
+	ErrInvalidFormat  = errors.New("invalid format")
+)
+
 const (
 	UnitB int64 = 1
 	UnitK int64 = 1024
@@ -30,25 +38,30 @@ func isDigit(r rune) bool {
 }
 
 func Parse(s string) (ByteSize, error) {
+	if s == "" {
+		return 0, ErrEmptyString
+	}
+
 	num := int64(0)
 	multiplier := int64(1)
 	foundUnit := false
+
 	for _, r := range s {
 		if isDigit(r) {
 			if foundUnit {
-				return 0, errors.New("characters after the unit are not allowed")
+				return 0, fmt.Errorf("%w in: %s", ErrCharsAfterUnit, s)
 			}
 
 			digit := int64(r - '0')
 			num = num*10 + digit
 		} else {
 			if foundUnit {
-				return 0, fmt.Errorf("multiple units found in string: %s", s)
+				return 0, fmt.Errorf("%w in: %s", ErrMultipleUnits, s)
 			}
 
 			unit, exists := unitRuneMap[r]
 			if !exists {
-				return 0, fmt.Errorf("unknown unit: %c", r)
+				return 0, fmt.Errorf("%w: %c in: %s", ErrUnknownUnit, r, s)
 			}
 
 			multiplier = unit
@@ -77,13 +90,13 @@ func ParseUnchecked(s string) ByteSize {
 	return result
 }
 
-func (b ByteSize) ToString(unitRune rune) string {
+func (b ByteSize) ToString(unitRune rune) (string, error) {
 	unit, exists := unitRuneMap[unitRune]
 	if !exists {
-		return fmt.Sprintf("unknown unit: %c", unitRune)
+		return "", fmt.Errorf("%w in: %c", ErrUnknownUnit, unitRune)
 	}
 	size := int64(b) / unit
-	return fmt.Sprintf("%d%c", size, unitRune)
+	return fmt.Sprintf("%d%c", size, unitRune), nil
 }
 
 func (b ByteSize) FindLargestFittingUnit() rune {
@@ -108,7 +121,8 @@ func (b ByteSize) FindLargestFittingUnit() rune {
 
 func (b ByteSize) String() string {
 	unitRune := b.FindLargestFittingUnit()
-	return b.ToString(unitRune)
+	result, _ := b.ToString(unitRune)
+	return result
 }
 
 func (b ByteSize) MarshalJSON() ([]byte, error) {

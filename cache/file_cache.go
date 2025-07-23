@@ -141,8 +141,8 @@ func (c *FileCache[ObjectData]) cleanExpiredEntries() {
 		}
 
 		if err := c.ensureRemove(key); err != nil {
-			slog.Info("Failed to remove expired cache entry for key", "key", key.Hex, "error", err)
 			lock.Unlock()
+			slog.Info("Failed to remove expired cache entry for key", "key", key.Hex, "error", err)
 			continue
 		}
 		lock.Unlock()
@@ -191,12 +191,14 @@ func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
 			// We only want to return critical errors, not if the file doesn't exist
 			return nil
 		}
-		return fmt.Errorf("failed to stat file '%s': %v", path, err)
+		slog.Error("Failed to stat cache file", "path", path, "error", err)
+		return fmt.Errorf("%w: failed to stat file '%s'", ErrCacheFileStat, path)
 	}
 
 	if err := os.Remove(path); err != nil {
 		// We checked earlier that the file exists, so if we get an error here, it is unexpected.
-		return fmt.Errorf("failed to remove file '%s': %v", path, err)
+		slog.Error("Failed to remove cache file", "path", path, "error", err)
+		return fmt.Errorf("%w: failed to remove file '%s'", ErrCacheFileRemove, path)
 	}
 
 	slog.Info("Removed file", "path", path)
@@ -213,7 +215,8 @@ func (c *FileCache[ObjectData]) ensureRemove(key CacheKey) error {
 	filePath := filepath.Join(c.rootDir.Path, key.Hex)
 
 	if fileErr := c.ensureRemoveFile(filePath); fileErr != nil {
-		return fmt.Errorf("failed to remove cached file '%s': %v", filePath, fileErr)
+		slog.Error("Failed to remove cached file", "key", key.Hex, "error", fileErr)
+		return fmt.Errorf("%w: failed to remove cached file '%s'", fileErr, filePath)
 	}
 
 	delete(c.entries, key)  // Remove the entry from the map
@@ -238,7 +241,8 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	dataFile, err := os.Open(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
-		return nil, fmt.Errorf("failed to read cached data file '%s': %v", fileName, err)
+		slog.Error("Failed to open cached data file", "key", key.Hex, "error", err)
+		return nil, fmt.Errorf("%w: failed to open cached data file '%s'", ErrCacheFileRead, fileName)
 	}
 	// We don't close dataFile here since we are returning it in the Entry.
 
@@ -267,19 +271,22 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	file, err := os.Create(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
-		return nil, fmt.Errorf("failed to create cache file '%s': %v", fileName, err)
+		slog.Error("Failed to create cache file", "key", key.Hex, "error", err)
+		return nil, fmt.Errorf("%w: failed to create cache file '%s'", ErrCacheFileCreate, fileName)
 	}
 	// We don't close file here since we are returning it in the Entry.
 
 	fileSize, err := io.Copy(file, data)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
-		return nil, fmt.Errorf("failed to write cache file '%s': %v", fileName, err)
+		slog.Error("Failed to write cache file", "key", key.Hex, "error", err)
+		return nil, fmt.Errorf("%w: failed to write cache file '%s'", ErrCacheFileWrite, fileName)
 	}
 
 	if fileSize == 0 {
 		metrics.Global.Cache.CacheErrors.Increment()
-		return nil, fmt.Errorf("wrote 0 bytes to cache file '%s', treating as error", fileName)
+		slog.Error("Cache file is empty", "key", key.Hex, "file_size", fileSize)
+		return nil, fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
 	}
 
 	meta := &EntryMetadata[ObjectData]{
@@ -324,7 +331,8 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*Entr
 	meta, exists := c.entries[key]
 	if !exists {
 		metrics.Global.Cache.CacheErrors.Increment()
-		return fmt.Errorf("cache entry for key '%s' does not exist", key.Hex)
+		slog.Error("Failed to update metadata for cache entry", "key", key.Hex, "error", ErrCacheEntryNotFound)
+		return fmt.Errorf("%w: cache entry for key '%s' does not exist", ErrCacheEntryNotFound, key.Hex)
 	}
 
 	modifier(meta)

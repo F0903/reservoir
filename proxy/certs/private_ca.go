@@ -18,6 +18,11 @@ import (
 	"time"
 )
 
+var (
+	ErrFailedToEncodeCert = errors.New("failed to encode certificate to PEM")
+	ErrFailedToEncodeKey  = errors.New("failed to encode key to PEM")
+)
+
 type PrivateCA struct {
 	key   crypto.PrivateKey
 	cert  *x509.Certificate
@@ -80,7 +85,7 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 	}
 	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if pemCert == nil {
-		return nil, nil, errors.New("failed to encode certificate to PEM")
+		return nil, nil, ErrFailedToEncodeCert
 	}
 
 	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
@@ -89,7 +94,7 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 	}
 	pemKey := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 	if pemKey == nil {
-		return nil, nil, errors.New("failed to encode key to PEM")
+		return nil, nil, ErrFailedToEncodeKey
 	}
 
 	return pemCert, pemKey, nil
