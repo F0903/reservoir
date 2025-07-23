@@ -1,11 +1,18 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
+)
+
+var (
+	ErrInvalidTargetHost = errors.New("invalid target host")
+	ErrURLParseFailed    = errors.New("URL parse failed")
+	ErrSendRequestFailed = errors.New("error sending request to target")
 )
 
 func removeHopByHopHeaders(header http.Header) {
@@ -28,7 +35,8 @@ func addrToUrl(addr string, httpsDefault bool) (*url.URL, error) {
 	}
 	u, err := url.Parse(addr)
 	if err != nil {
-		return nil, err
+		slog.Error("Failed to parse URL", "addr", addr, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrURLParseFailed, err)
 	}
 	return u, nil
 }
@@ -37,7 +45,8 @@ func changeRequestToTarget(req *http.Request, httpsDefault bool) error {
 	targetHost := req.Host
 	targetUrl, err := addrToUrl(targetHost, httpsDefault)
 	if err != nil {
-		return fmt.Errorf("invalid target host '%s': %v", targetHost, err)
+		slog.Error("Invalid target host", "host", targetHost, "error", err)
+		return fmt.Errorf("%w: %v", ErrInvalidTargetHost, err)
 	}
 
 	targetUrl.Path = req.URL.Path
@@ -59,7 +68,8 @@ func sendRequestToTarget(req *http.Request, httpsDefault bool) (*http.Response, 
 	slog.Debug("Sending request", "url", req.URL, "method", req.Method)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error sending request to target (%v): %w", req.URL, err)
+		slog.Error("Error sending request to target", "url", req.URL, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrSendRequestFailed, err)
 	}
 	slog.Debug("Sent request to target", "url", req.URL, "status", resp.Status)
 

@@ -19,8 +19,17 @@ import (
 )
 
 var (
-	ErrFailedToEncodeCert = errors.New("failed to encode certificate to PEM")
-	ErrFailedToEncodeKey  = errors.New("failed to encode key to PEM")
+	ErrFailedToEncodeCert     = errors.New("failed to encode certificate to PEM")
+	ErrFailedToEncodeKey      = errors.New("failed to encode key to PEM")
+	ErrFailedToLoadCA         = errors.New("failed to load CA certificate and key")
+	ErrNotCACertificate       = errors.New("loaded certificate is not a CA certificate")
+	ErrFailedToGenerateKey    = errors.New("failed to generate private key")
+	ErrFailedToGenerateSerial = errors.New("failed to generate serial number")
+	ErrFailedToCreateCert     = errors.New("failed to create certificate")
+	ErrFailedToMarshalKey     = errors.New("failed to marshal private key")
+	ErrInvalidHostPort        = errors.New("invalid host:port format")
+	ErrFailedToCreateTLSCert  = errors.New("failed to create TLS certificate for host")
+	ErrFailedToCreateX509Pair = errors.New("failed to create X509 key pair for cert")
 )
 
 type PrivateCA struct {
@@ -32,11 +41,13 @@ type PrivateCA struct {
 func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
 	caCert, caKey, err := loadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load CA certificate and key: %v", err)
+		slog.Error("Failed to load CA certificate and key", "cert_file", certFile, "key_file", keyFile, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrFailedToLoadCA, err)
 	}
 
 	if !caCert.IsCA {
-		return nil, fmt.Errorf("loaded certificate is not a CA certificate")
+		slog.Error("Loaded certificate is not a CA certificate", "cert_file", certFile)
+		return nil, ErrNotCACertificate
 	}
 
 	slog.Info("Loaded CA certificate", "common_name", caCert.Subject.CommonName)
@@ -54,15 +65,16 @@ func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
 // https://github.com/eliben/code-for-blog/blob/main/2022/go-and-proxies/connect-mitm-proxy.go
 func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte, priv []byte, err error) {
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate private key: %v", err)
+		slog.Error("Failed to generate private key", "error", err)
+		return nil, nil, fmt.Errorf("%w: %v", ErrFailedToGenerateKey, err)
 	}
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate serial number: %v", err)
+		slog.Error("Failed to generate serial number", "error", err)
+		return nil, nil, fmt.Errorf("%w: %v", ErrFailedToGenerateSerial, err)
 	}
 
 	template := x509.Certificate{
@@ -81,19 +93,23 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, ca.cert, &privateKey.PublicKey, ca.key)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create certificate: %v", err)
+		slog.Error("Failed to create certificate", "error", err)
+		return nil, nil, fmt.Errorf("%w: %v", ErrFailedToCreateCert, err)
 	}
 	pemCert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	if pemCert == nil {
+		slog.Error("Failed to encode certificate to PEM")
 		return nil, nil, ErrFailedToEncodeCert
 	}
 
 	privBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal private key: %v", err)
+		slog.Error("Failed to marshal private key", "error", err)
+		return nil, nil, fmt.Errorf("%w: %v", ErrFailedToMarshalKey, err)
 	}
 	pemKey := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privBytes})
 	if pemKey == nil {
+		slog.Error("Failed to encode key to PEM")
 		return nil, nil, ErrFailedToEncodeKey
 	}
 
@@ -103,8 +119,8 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 	host, _, err := net.SplitHostPort(host)
 	if err != nil {
-		err := fmt.Errorf("invalid host:port format %v: %v", host, err)
-		return nil, err
+		slog.Error("Invalid host:port format", "host", host, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrInvalidHostPort, err)
 	}
 
 	if cert, ok := ca.certs.Get(host); ok {
@@ -123,14 +139,14 @@ func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 	// Create a fake TLS certificate for the target host, signed by our CA.
 	pemCert, pemKey, err := ca.createCert([]string{host}, 240)
 	if err != nil {
-		err := fmt.Errorf("failed to create TLS certificate for %v: %v", host, err)
-		return nil, err
+		slog.Error("Failed to create TLS certificate for host", "host", host, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrFailedToCreateTLSCert, err)
 	}
 
 	tlsCert, err := tls.X509KeyPair(pemCert, pemKey)
 	if err != nil {
-		err := fmt.Errorf("failed to create X509 key pair for cert %v: %v", tlsCert, err)
-		return nil, err
+		slog.Error("Failed to create X509 key pair for cert", "host", host, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrFailedToCreateX509Pair, err)
 	}
 
 	slog.Info("Created TLS certificate", "host", host, "expires", tlsCert.Leaf.NotAfter)

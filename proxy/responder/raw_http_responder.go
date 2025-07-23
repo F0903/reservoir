@@ -45,6 +45,10 @@ func (c *RawHTTPResponder) SetHeader(header http.Header) {
 	c.response.Header = header
 }
 
+func (c *RawHTTPResponder) GetHeader() http.Header {
+	return c.response.Header
+}
+
 func (c *RawHTTPResponder) writeResponse() error {
 	// If Content-Length is unknown, we must either use chunked encoding or close the connection.
 	if c.response.ContentLength < 0 {
@@ -62,27 +66,37 @@ func (c *RawHTTPResponder) writeResponse() error {
 }
 
 func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
+	resp := c.response
+
 	var read int
-	c.response.Body = io.NopCloser(countingreader.New(body, &read))
-	c.response.StatusCode = status
+	resp.Body = io.NopCloser(countingreader.New(body, &read))
+	resp.StatusCode = status
 	c.parseAndSetContentLength()
 
 	return int64(read), c.writeResponse()
 }
 
 func (c *RawHTTPResponder) WriteEmpty(status int) error {
-	c.response.Body = http.NoBody
-	c.response.StatusCode = status
+	resp := c.response
+	resp.Body = http.NoBody
+	resp.StatusCode = status
 
-	header := c.response.Header
-	header.Set("Content-Length", "0") // Explicitly set Content-Length to 0 for empty responses
-	c.response.ContentLength = 0
+	h := resp.Header
+	h.Set("Content-Length", "0") // Explicitly set Content-Length to 0 for empty responses
+	resp.ContentLength = 0
 
 	return c.writeResponse()
 }
 
-func (c *RawHTTPResponder) Error(message string, errorCode int) {
-	c.response.StatusCode = errorCode
-	c.response.Body = io.NopCloser(strings.NewReader(message))
-	c.response.ContentLength = int64(len(message))
+func (c *RawHTTPResponder) WriteError(message string, errorCode int) error {
+	resp := c.response
+	resp.StatusCode = errorCode
+	resp.Body = io.NopCloser(strings.NewReader(message))
+	resp.ContentLength = int64(len(message))
+
+	h := resp.Header
+	h.Set("Content-Type", "text/plain; charset=utf-8")
+	h.Set("X-Content-Type-Options", "nosniff")
+
+	return c.writeResponse()
 }

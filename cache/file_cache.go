@@ -19,6 +19,15 @@ import (
 	"time"
 )
 
+var (
+	ErrCacheFileCreate = errors.New("cache file create failed")
+	ErrCacheFileWrite  = errors.New("cache file write failed")
+	ErrCacheFileRead   = errors.New("cache file read failed")
+	ErrCacheFileRemove = errors.New("cache file remove failed")
+	ErrCacheFileEmpty  = errors.New("cache file empty")
+	ErrCacheFileStat   = errors.New("cache file stat failed")
+)
+
 type FileCache[ObjectData any] struct {
 	rootDir  assertedpath.AssertedPath
 	locks    *syncmap.SyncMap[string, *sync.RWMutex]

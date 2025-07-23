@@ -4,8 +4,15 @@ import (
 	"apt_cacher_go/webserver/api/apitypes"
 	"apt_cacher_go/webserver/api/endpoints/config"
 	"apt_cacher_go/webserver/api/endpoints/metrics"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+)
+
+var (
+	ErrEndpointNoMethod   = errors.New("endpoint has no method defined")
+	ErrEndpointNoFunction = errors.New("endpoint has no function defined")
 )
 
 type API struct {
@@ -28,21 +35,24 @@ func New() *API {
 }
 
 func (api *API) RegisterHandlers(mux *http.ServeMux) error {
-
 	for _, endpoint := range api.endpoints {
 		for _, method := range endpoint.EndpointMethods() {
 			if method.Method == "" {
-				return fmt.Errorf("endpoint %s has no method defined", endpoint.Path())
+				slog.Error("Endpoint has no method defined", "endpoint_path", endpoint.Path())
+				return fmt.Errorf("%w: endpoint '%s'", ErrEndpointNoMethod, endpoint.Path())
 			}
 
 			if method.Func == nil {
-				return fmt.Errorf("endpoint %s has no function defined for method %s", endpoint.Path(), method.Method)
+				slog.Error("Endpoint has no function defined", "endpoint_path", endpoint.Path(), "method", method.Method)
+				return fmt.Errorf("%w: endpoint '%s' method '%s'", ErrEndpointNoFunction, endpoint.Path(), method.Method)
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
 			mux.HandleFunc(pattern, method.Func)
+			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())
 		}
 	}
 
+	slog.Info("Successfully registered all API handlers", "endpoint_count", len(api.endpoints))
 	return nil
 }

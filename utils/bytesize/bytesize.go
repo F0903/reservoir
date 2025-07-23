@@ -93,7 +93,7 @@ func ParseUnchecked(s string) ByteSize {
 func (b ByteSize) ToString(unitRune rune) (string, error) {
 	unit, exists := unitRuneMap[unitRune]
 	if !exists {
-		return "", fmt.Errorf("%w in: %c", ErrUnknownUnit, unitRune)
+		return "", fmt.Errorf("%w: %c", ErrUnknownUnit, unitRune)
 	}
 	size := int64(b) / unit
 	return fmt.Sprintf("%d%c", size, unitRune), nil

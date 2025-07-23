@@ -18,6 +18,19 @@ import (
 	"time"
 )
 
+var (
+	ErrCacheGetFailed       = errors.New("error getting cache for key")
+	ErrSendRequestUpstream  = errors.New("error sending request to upstream target")
+	ErrNoCachedResponse304  = errors.New("received 304 Not Modified but no cached response found")
+	ErrUpdateCacheMetadata  = errors.New("error updating cache metadata")
+	ErrCacheResponseFailed  = errors.New("error caching response")
+	ErrHijackNotSupported   = errors.New("hijacking not supported for target host")
+	ErrHijackFailed         = errors.New("hijack failed")
+	ErrTLSCertFailed        = errors.New("error getting TLS certificate")
+	ErrClientResponseFailed = errors.New("failed to write HTTP OK response to client")
+	ErrReadRequestFailed    = errors.New("error reading request from client")
+)
+
 type cachedRequestInfo struct {
 	ETag         string
 	LastModified time.Time
@@ -93,9 +106,9 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 	cached, err := p.cache.Get(key)
 	if err != nil && !errors.Is(err, cache.ErrorCacheMiss) {
-		err := fmt.Errorf("error getting cache for key %v: %v", key, err)
-		r.Error("error retrieving from cache", http.StatusInternalServerError)
-		return err
+		slog.Error("Error getting cache for key", "key", key, "error", err)
+		r.WriteError("error retrieving from cache", http.StatusInternalServerError)
+		return fmt.Errorf("%w: %v", ErrCacheGetFailed, err)
 	}
 
 	if cached != nil {
@@ -120,18 +133,17 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 	slog.Info("Sending request to upstream", "url", req.URL)
 	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps)
 	if err != nil {
-		slog.Error("Error sending request to upstream target", "error", err)
-		err := fmt.Errorf("error sending request to target (%v): %v", req.URL, err)
-		r.Error("error sending request to upstream target", http.StatusBadGateway)
-		return err
+		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err)
+		r.WriteError("error sending request to upstream target", http.StatusBadGateway)
+		return fmt.Errorf("%w: %v", ErrSendRequestUpstream, err)
 	}
 	defer resp.Body.Close() // Ensure we close the response body when done
 
 	if resp.StatusCode == http.StatusNotModified {
 		if cached == nil {
-			err := fmt.Errorf("received 304 Not Modified but no cached response found for '%v' with key '%v'\nRequest headers might be malformed.\nRequest headers: %v", req.URL, key, req.Header)
-			r.Error("malformed state", http.StatusInternalServerError)
-			return err
+			slog.Error("Received 304 Not Modified but no cached response found", "url", req.URL, "key", key, "headers", req.Header)
+			r.WriteError("malformed state", http.StatusInternalServerError)
+			return ErrNoCachedResponse304
 		}
 
 		err := p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
@@ -140,9 +152,9 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 			meta.Expires = time.Now().Add(maxAge)
 		})
 		if err != nil {
-			err := fmt.Errorf("error updating cache metadata for '%v' with key '%v': %v", req.URL, key, err)
-			r.Error("error updating cache metadata", http.StatusInternalServerError)
-			return err
+			slog.Error("Error updating cache metadata", "url", req.URL, "key", key, "error", err)
+			r.WriteError("error updating cache metadata", http.StatusInternalServerError)
+			return fmt.Errorf("%w: %v", ErrUpdateCacheMetadata, err)
 		}
 
 		slog.Info("Origin server returned 304 Not Modified, serving cached response", "url", req.URL, "key", key)
@@ -171,9 +183,9 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 			Header:       resp.Header,
 		})
 		if err != nil {
-			err := fmt.Errorf("error caching response for '%v' with key '%v': %v", req.URL, key, err)
-			r.Error("error caching response", http.StatusInternalServerError)
-			return err
+			slog.Error("Error caching response", "url", req.URL, "key", key, "error", err)
+			r.WriteError("error caching response", http.StatusInternalServerError)
+			return fmt.Errorf("%w: %v", ErrCacheResponseFailed, err)
 		}
 		defer entry.Data.Close() // Ensure we close the cached data when done
 
@@ -200,15 +212,15 @@ func hijackConnection(w http.ResponseWriter) (net.Conn, error) {
 	// "Hijack" the client connection to get a TCP (or TLS) socket we can read and write arbitrary data to/from.
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		err := fmt.Errorf("hijacking not supported for target host. Hijacking only works with servers that support HTTP 1.x")
-		return nil, err
+		slog.Error("Could not hijack connection for provided ResponseWriter", "host", w.Header().Get("Host"), "writer_type", fmt.Sprintf("%T", w))
+		return nil, ErrHijackNotSupported
 	}
 
 	// Hijack the connection to get the underlying net.Conn.
 	clientConn, _, err := hj.Hijack()
 	if err != nil {
-		err := fmt.Errorf("hijack failed: %v", err)
-		return nil, err
+		slog.Error("Failed to hijack connection", "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrHijackFailed, err)
 	}
 
 	return clientConn, nil
@@ -231,15 +243,17 @@ func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq 
 	tlsCert, err := p.ca.GetCertForHost(proxyReq.Host)
 	if err != nil {
 		// can't use http.Error after hijacking, so we write directly
-		intermediateResponder.Error("Error getting TLS certificate", http.StatusInternalServerError)
-		return err
+		slog.Error("Error getting TLS certificate", "host", proxyReq.Host, "error", err)
+		intermediateResponder.WriteError("Error getting TLS certificate", http.StatusInternalServerError)
+		return fmt.Errorf("%w: %v", ErrTLSCertFailed, err)
 	}
 
 	// Send an HTTP OK response back to the client; this initiates the CONNECT
 	// tunnel. From this point on the client will assume it's connected directly
 	// to the target.
 	if err := intermediateResponder.WriteEmpty(http.StatusOK); err != nil {
-		return fmt.Errorf("failed to write HTTP OK response to client: %v", err)
+		slog.Error("Failed to write HTTP OK response to client", "error", err)
+		return fmt.Errorf("%w: %v", ErrClientResponseFailed, err)
 	}
 	slog.Debug("Sent HTTP 200 OK response to client, established CONNECT tunnel")
 
@@ -264,7 +278,8 @@ func (p *cachingMitmProxyHandler) handleCONNECT(w http.ResponseWriter, proxyReq 
 		if errors.Is(err, io.EOF) {
 			break
 		} else if err != nil {
-			return fmt.Errorf("error reading request from client (%v): %w", proxyReq.RemoteAddr, err)
+			slog.Error("Error reading request from client", "remote_addr", proxyReq.RemoteAddr, "error", err)
+			return fmt.Errorf("%w: %v ", ErrReadRequestFailed, err)
 		}
 
 		p.processHTTPRequest(responder, req)

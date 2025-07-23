@@ -9,12 +9,6 @@ import (
 var (
 	ErrorCacheMiss        = errors.New("cache miss")
 	ErrCacheEntryNotFound = errors.New("cache entry not found")
-	ErrCacheFileCreate    = errors.New("cache file create failed")
-	ErrCacheFileWrite     = errors.New("cache file write failed")
-	ErrCacheFileRead      = errors.New("cache file read failed")
-	ErrCacheFileRemove    = errors.New("cache file remove failed")
-	ErrCacheFileEmpty     = errors.New("cache file empty")
-	ErrCacheFileStat      = errors.New("cache file stat failed")
 )
 
 type Cache[ObjectData any] interface {

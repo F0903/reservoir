@@ -5,6 +5,7 @@ import (
 	"apt_cacher_go/utils/bytesize"
 	"apt_cacher_go/utils/duration"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,6 +15,15 @@ import (
 //TODO: add file watcher to reload config on changes
 
 const configVersion = 1
+
+var (
+	ErrConfigFileOpen        = errors.New("config file open failed")
+	ErrConfigFileWrite       = errors.New("config file write failed")
+	ErrConfigFileRead        = errors.New("config file read failed")
+	ErrConfigVersionMismatch = errors.New("config version mismatch")
+	ErrConfigInvalidFormat   = errors.New("config invalid format")
+	ErrConfigPersist         = errors.New("config persist failed")
+)
 
 var configPath = assertedpath.Assert("var/config.json")
 
@@ -52,22 +62,27 @@ func Default() *Config {
 func (c *Config) Persist() error {
 	f, err := os.Create(configPath.Path)
 	if err != nil {
-		return fmt.Errorf("failed to open config file for writing: %v", err)
+		slog.Error("Failed to create config file", "path", configPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, configPath.Path)
 	}
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ") // Pretty print the JSON output
 	if err := enc.Encode(c); err != nil {
-		return fmt.Errorf("failed to write config to file: %v", err)
+		slog.Error("Failed to encode config to JSON", "path", configPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to write config to file '%s'", ErrConfigFileWrite, configPath.Path)
 	}
+
+	slog.Info("Successfully persisted config", "path", configPath.Path)
 	return nil
 }
 
 func Load(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		slog.Error("Failed to open config file", "path", path, "error", err)
+		return nil, fmt.Errorf("%w: failed to open config file '%s'", ErrConfigFileRead, path)
 	}
 	defer f.Close()
 
@@ -76,13 +91,16 @@ func Load(path string) (*Config, error) {
 
 	var cfg Config
 	if err := decoder.Decode(&cfg); err != nil {
-		return nil, err
+		slog.Error("Failed to decode config JSON", "path", path, "error", err)
+		return nil, fmt.Errorf("%w: failed to decode config from '%s'", ErrConfigInvalidFormat, path)
 	}
 
 	if cfg.ConfigVersion != configVersion {
-		return nil, fmt.Errorf("config version mismatch: expected %d, got %d", configVersion, cfg.ConfigVersion)
+		slog.Error("Config version mismatch", "path", path, "expected", configVersion, "got", cfg.ConfigVersion)
+		return nil, fmt.Errorf("%w: expected %d, got %d", ErrConfigVersionMismatch, configVersion, cfg.ConfigVersion)
 	}
 
+	slog.Info("Successfully loaded config", "path", path)
 	return &cfg, nil
 }
 
@@ -92,8 +110,10 @@ func LoadOrDefault(path string) (*Config, error) {
 		slog.Warn("Failed to load config, using defaults", "path", path, "error", err)
 		cfg = Default()
 		if err := cfg.Persist(); err != nil {
-			return nil, fmt.Errorf("failed to persist default config: %v", err)
+			slog.Error("Failed to persist default config", "error", err)
+			return nil, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)
 		}
+		slog.Info("Created default config file", "path", path)
 	}
 	return cfg, nil
 }
