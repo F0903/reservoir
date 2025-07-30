@@ -8,6 +8,7 @@ import (
 	"os"
 	"reservoir/utils/bytesize"
 	"reservoir/utils/duration"
+	"reservoir/utils/overwritable"
 	"time"
 )
 
@@ -23,18 +24,22 @@ var (
 )
 
 type Config struct {
-	ConfigVersion           int               `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
-	AlwaysCache             bool              `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
-	MaxCacheSize            bytesize.ByteSize `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
-	DefaultCacheMaxAge      duration.Duration `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
-	ForceDefaultCacheMaxAge bool              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
-	CacheCleanupInterval    duration.Duration `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
-	UpstreamDefaultHttps    bool              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	ConfigVersion           int                             `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
+	DashboardEnabled        overwritable.Overwritable[bool] `json:"dashboard_enabled"`           // If true, the dashboard will be enabled.
+	ApiEnabled              overwritable.Overwritable[bool] `json:"api_enabled"`                 // If true, the API will be enabled. This will always be enabled if the dashboard is enabled.
+	AlwaysCache             bool                            `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
+	MaxCacheSize            bytesize.ByteSize               `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
+	DefaultCacheMaxAge      duration.Duration               `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
+	ForceDefaultCacheMaxAge bool                            `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheCleanupInterval    duration.Duration               `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
+	UpstreamDefaultHttps    bool                            `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 }
 
 func newDefault() Config {
 	return Config{
 		ConfigVersion:           configVersion,
+		DashboardEnabled:        overwritable.New(true),
+		ApiEnabled:              overwritable.New(true),
 		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		MaxCacheSize:            bytesize.ParseUnchecked("10G"),
 		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),

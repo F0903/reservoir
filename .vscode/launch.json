@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Go with Defaults",
+      "name": "Debug Proxy with Defaults",
       "type": "go",
       "request": "launch",
       "mode": "debug",
@@ -17,6 +17,25 @@
         "ssl/ca.crt",
         "--ca-key",
         "ssl/ca.key"
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-frontend"
+    },
+    {
+      // Used for starting the frontend in dev mode seperately.
+      "name": "Debug Proxy with Dashboard disabled",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "main.go",
+      "args": [
+        "--listen",
+        "localhost:9999",
+        "--ca-cert",
+        "ssl/ca.crt",
+        "--ca-key",
+        "ssl/ca.key",
+        "--no-dashboard"
       ],
       "console": "integratedTerminal",
       "preLaunchTask": "build-frontend"

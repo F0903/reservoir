@@ -87,7 +87,7 @@ func (cd *cacheDirective) getExpiresOrDefault() time.Time {
 			}
 		}
 		if cd.expires.IsSome() {
-			return *cd.expires.ForceUnwrap()
+			return cd.expires.ForceUnwrap()
 		}
 	}
 

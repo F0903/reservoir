@@ -29,18 +29,25 @@ func (o Optional[T]) IsNone() bool {
 	return o.value == nil
 }
 
-func (o Optional[T]) Unwrap() (*T, error) {
+func (o Optional[T]) Unwrap() (T, error) {
 	if o.value == nil {
-		return nil, ErrorUnwrapNone
+		return *new(T), ErrorUnwrapNone
 	}
-	return o.value, nil
+	return *o.value, nil
 }
 
-func (o Optional[T]) ForceUnwrap() *T {
+func (o Optional[T]) UnwrapOr(defaultValue T) T {
+	if o.value == nil {
+		return defaultValue
+	}
+	return *o.value
+}
+
+func (o Optional[T]) ForceUnwrap() T {
 	if o.value == nil {
 		panic(ErrorUnwrapNone)
 	}
-	return o.value
+	return *o.value
 }
 
 func (o Optional[T]) MarshalJSON() ([]byte, error) {

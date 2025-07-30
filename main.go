@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"reservoir/config"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
@@ -32,16 +33,30 @@ func startProxy(address, caCertFile, caKeyFile, cacheDir string, errChan chan er
 }
 
 func startWebServer(address string, errChan chan error, ctx context.Context) error {
-	webserver := webserver.New()
-
-	dashboard := dashboard.New()
-	if err := webserver.Register(dashboard); err != nil {
-		return fmt.Errorf("failed to register dashboard: %v", err)
+	config := config.Get()
+	if !config.DashboardEnabled.Get() && !config.ApiEnabled.Get() {
+		slog.Info("Webserver is disabled by configuration, skipping startup")
+		return nil
 	}
 
-	api := api.New()
-	if err := webserver.Register(api); err != nil {
-		return fmt.Errorf("failed to register API: %v", err)
+	webserver := webserver.New()
+
+	if config.DashboardEnabled.Get() {
+		dashboard := dashboard.New()
+		if err := webserver.Register(dashboard); err != nil {
+			return fmt.Errorf("failed to register dashboard: %v", err)
+		}
+	} else {
+		slog.Info("Dashboard is disabled by configuration, skipping registration")
+	}
+
+	if config.ApiEnabled.Get() || config.DashboardEnabled.Get() {
+		api := api.New()
+		if err := webserver.Register(api); err != nil {
+			return fmt.Errorf("failed to register API: %v", err)
+		}
+	} else {
+		slog.Info("API is disabled by configuration, skipping registration")
 	}
 
 	slog.Info("Starting webserver", "address", address)
@@ -55,7 +70,22 @@ func main() {
 	caKeyFile := flag.String("ca-key", "ssl/ca.key", "Path to CA private key file")
 	cacheDir := flag.String("cache-dir", "var/cache/", "Path to cache directory")
 	webserverAddress := flag.String("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on")
+	noDashboard := flag.Bool("no-dashboard", false, "Disable the dashboard")
+	noApi := flag.Bool("no-api", false, "Disable the API")
 	flag.Parse()
+
+	if *noDashboard || *noApi {
+		slog.Info("Updating global config based on command line flags", "dashboard_disabled", *noDashboard, "api_disabled", *noApi)
+		config.Update(func(cfg *config.Config) {
+			if *noDashboard {
+				cfg.DashboardEnabled.Overwrite(false)
+			}
+
+			if *noApi {
+				cfg.ApiEnabled.Overwrite(false)
+			}
+		})
+	}
 
 	// Channel to handle OS signals for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
