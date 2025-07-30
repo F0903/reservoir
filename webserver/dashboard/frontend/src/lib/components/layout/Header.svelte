@@ -4,11 +4,12 @@
 
 <style>
     header {
-        background-color: var(--quaternary-color);
+        background-color: var(--primary-600);
         padding: 1rem;
     }
 
-    header h1 {
-        color: var(--primary-color);
+    h1 {
+        color: var(--tertiary-400);
+        user-select: none;
     }
 </style>

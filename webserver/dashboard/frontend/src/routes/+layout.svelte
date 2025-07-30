@@ -21,11 +21,7 @@
         </SideNav>
     </div>
     <div class="main-area">
-        <BackdropBox
-            --box-backdrop-color="var(--quaternary-color)"
-            --box-border-radius="25px 0px 0px 0px"
-            --box-shadow="5px 5px 15px 2px var(--default-shadow)"
-        >
+        <BackdropBox --box-border-radius="25px 0px 0px 0px">
             <div class="page-container">
                 {@render children()}
             </div>

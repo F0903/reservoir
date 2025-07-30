@@ -58,6 +58,6 @@
 
         padding: 1.5rem;
         border-radius: 15px;
-        background-color: var(--background-secondary);
+        background-color: var(--primary-400);
     }
 </style>

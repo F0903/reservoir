@@ -23,14 +23,14 @@
         left: 0;
         width: var(--box-width, 100%);
         height: var(--box-height, 100%);
-        background-color: var(--box-backdrop-color, var(--background-secondary));
+        background-color: var(--box-backdrop-color, var(--primary-600));
     }
 
     .box {
         width: var(--box-width, 100%);
         height: var(--box-height, 100%);
         border-radius: var(--box-border-radius);
-        background-color: var(--box-background-color, var(--background-primary));
-        box-shadow: var(--box-shadow, none);
+        background-color: var(--box-background-color, var(--primary-500));
+        box-shadow: var(--box-shadow, var(--default-shadow));
     }
 </style>

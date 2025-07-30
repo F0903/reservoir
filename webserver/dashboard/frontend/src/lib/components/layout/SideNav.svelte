@@ -8,7 +8,7 @@
 
 <style>
     .side-nav {
-        background-color: var(--quaternary-color);
+        background-color: var(--primary-600);
         padding: 1rem;
 
         height: 100%;

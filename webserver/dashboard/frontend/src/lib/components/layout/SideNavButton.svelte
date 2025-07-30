@@ -6,9 +6,7 @@
     let { url, children = undefined } = $props();
 
     const isCurrent = $derived(page.url.pathname === url);
-    const backgroundColor = $derived(
-        isCurrent ? "var(--sidenav-selected)" : "var(--sidenav-normal)",
-    );
+    const backgroundColor = $derived(isCurrent ? "var(--tertiary-400)" : "var(--secondary-400)");
 
     async function onClick() {
         await goto(url);

@@ -7,7 +7,7 @@
 </button>
 
 <style>
-    .btn:enabled:hover {
+    .btn:hover {
         filter: brightness(0.9);
     }
 
@@ -22,7 +22,7 @@
         border-radius: 15px;
 
         cursor: pointer;
-        background-color: var(--btn-background-color, var(--primary-color));
+        background-color: var(--btn-background-color, var(--tertiary-400));
 
         color: var(--btn-text-color, var(--text-primary));
         font-size: 1rem;
