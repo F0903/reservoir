@@ -37,8 +37,7 @@
         "ssl/ca.key",
         "--no-dashboard"
       ],
-      "console": "integratedTerminal",
-      "preLaunchTask": "build-frontend"
+      "console": "integratedTerminal"
     }
   ]
 }

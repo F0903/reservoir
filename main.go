@@ -34,14 +34,14 @@ func startProxy(address, caCertFile, caKeyFile, cacheDir string, errChan chan er
 
 func startWebServer(address string, errChan chan error, ctx context.Context) error {
 	config := config.Get()
-	if !config.DashboardEnabled.Get() && !config.ApiEnabled.Get() {
+	if !config.DashboardEnabled.Read() && !config.ApiEnabled.Read() {
 		slog.Info("Webserver is disabled by configuration, skipping startup")
 		return nil
 	}
 
 	webserver := webserver.New()
 
-	if config.DashboardEnabled.Get() {
+	if config.DashboardEnabled.Read() {
 		dashboard := dashboard.New()
 		if err := webserver.Register(dashboard); err != nil {
 			return fmt.Errorf("failed to register dashboard: %v", err)
@@ -50,7 +50,7 @@ func startWebServer(address string, errChan chan error, ctx context.Context) err
 		slog.Info("Dashboard is disabled by configuration, skipping registration")
 	}
 
-	if config.ApiEnabled.Get() || config.DashboardEnabled.Get() {
+	if config.ApiEnabled.Read() || config.DashboardEnabled.Read() {
 		api := api.New()
 		if err := webserver.Register(api); err != nil {
 			return fmt.Errorf("failed to register API: %v", err)

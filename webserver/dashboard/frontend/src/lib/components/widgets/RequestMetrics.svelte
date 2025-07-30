@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getRequestMetrics, RequestMetrics } from "$lib/api/metrics/request-metrics";
+    import { getRequestMetrics, RequestMetrics } from "$lib/api/objects/metrics/request-metrics";
     import Widget from "./Widget.svelte";
 
     let metrics: RequestMetrics | null = $state(null);

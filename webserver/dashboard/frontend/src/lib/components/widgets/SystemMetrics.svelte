@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getTimingMetrics, TimingMetrics } from "$lib/api/metrics/timing-metrics";
+    import { getTimingMetrics, TimingMetrics } from "$lib/api/objects/metrics/timing-metrics";
     import { formatTimeSinceDate } from "$lib/utils/dates";
     import Widget from "./Widget.svelte";
 

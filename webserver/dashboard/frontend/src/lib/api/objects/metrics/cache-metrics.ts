@@ -1,4 +1,4 @@
-import { apiGet, type JSONResponse } from "../api-object";
+import { apiGet, type JSONResponse } from "../../api-object";
 
 export class CacheMetrics {
     readonly cacheHits: number;

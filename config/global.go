@@ -56,3 +56,16 @@ func Update(f func(*Config)) error {
 	slog.Info("Global config updated successfully", "new_config", new, "old_config", old)
 	return nil
 }
+
+func UpdatePartialFromJSON(updates map[string]any) error {
+	slog.Debug("Updating global config with partial JSON", "updates", updates)
+
+	if updates == nil {
+		slog.Error("UpdatePartialFromJSON called with nil updates")
+		return nil
+	}
+
+	return Update(func(cfg *Config) {
+		setPropsFromMap(cfg, updates)
+	})
+}

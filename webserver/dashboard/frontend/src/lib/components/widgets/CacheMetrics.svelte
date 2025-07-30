@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { CacheMetrics, getCacheMetrics } from "$lib/api/metrics/cache-metrics";
+    import { CacheMetrics, getCacheMetrics } from "$lib/api/objects/metrics/cache-metrics";
     import Widget from "./Widget.svelte";
 
     let metrics: CacheMetrics | null = $state(null);

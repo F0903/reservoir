@@ -1,4 +1,4 @@
-import { apiGet, type JSONResponse } from "../api-object";
+import { apiGet, type JSONResponse } from "../../api-object";
 import { CacheMetrics } from "./cache-metrics";
 import { RequestMetrics } from "./request-metrics";
 import { TimingMetrics } from "./timing-metrics";

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 	"reservoir/utils/bytesize"
 	"reservoir/utils/duration"
-	"reservoir/utils/overwritable"
 	"time"
 )
 
@@ -24,28 +24,28 @@ var (
 )
 
 type Config struct {
-	ConfigVersion           int                             `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
-	DashboardEnabled        overwritable.Overwritable[bool] `json:"dashboard_enabled"`           // If true, the dashboard will be enabled.
-	ApiEnabled              overwritable.Overwritable[bool] `json:"api_enabled"`                 // If true, the API will be enabled. This will always be enabled if the dashboard is enabled.
-	AlwaysCache             bool                            `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
-	MaxCacheSize            bytesize.ByteSize               `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
-	DefaultCacheMaxAge      duration.Duration               `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
-	ForceDefaultCacheMaxAge bool                            `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
-	CacheCleanupInterval    duration.Duration               `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
-	UpstreamDefaultHttps    bool                            `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	ConfigVersion           ConfigProp[int]               `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
+	DashboardEnabled        ConfigProp[bool]              `json:"dashboard_enabled"`           // If true, the dashboard will be enabled.
+	ApiEnabled              ConfigProp[bool]              `json:"api_enabled"`                 // If true, the API will be enabled. This will always be enabled if the dashboard is enabled.
+	AlwaysCache             ConfigProp[bool]              `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
+	MaxCacheSize            ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
+	DefaultCacheMaxAge      ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
+	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
+	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 }
 
 func newDefault() Config {
 	return Config{
-		ConfigVersion:           configVersion,
-		DashboardEnabled:        overwritable.New(true),
-		ApiEnabled:              overwritable.New(true),
-		AlwaysCache:             true, // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		MaxCacheSize:            bytesize.ParseUnchecked("10G"),
-		DefaultCacheMaxAge:      duration.Duration(1 * time.Hour),
-		ForceDefaultCacheMaxAge: true, // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		CacheCleanupInterval:    duration.Duration(90 * time.Minute),
-		UpstreamDefaultHttps:    true,
+		ConfigVersion:           NewConfigProp(configVersion),
+		DashboardEnabled:        NewConfigProp(true),
+		ApiEnabled:              NewConfigProp(true),
+		AlwaysCache:             NewConfigProp(true), // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		MaxCacheSize:            NewConfigProp(bytesize.ParseUnchecked("10G")),
+		DefaultCacheMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
+		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
+		UpstreamDefaultHttps:    NewConfigProp(true),
 	}
 }
 
@@ -70,7 +70,7 @@ func (c Config) persist() error {
 }
 
 func (c Config) verify() error {
-	if c.ConfigVersion != configVersion {
+	if c.ConfigVersion.Read() != configVersion {
 		return ErrConfigVersionMismatch
 	}
 	return nil
@@ -114,4 +114,65 @@ func loadOrDefault(path string) (Config, error) {
 		slog.Info("Created default config file", "path", path)
 	}
 	return cfg, nil
+}
+
+// Dynamically sets the properties of the Config struct based on the provided map.
+// This allows for partial updates to the config without needing to know the exact structure of the Config struct.
+func setPropsFromMap(cfg *Config, updates map[string]any) {
+	t := reflect.TypeOf(*cfg)
+	v := reflect.ValueOf(cfg).Elem()
+
+	// This could definitely be optimized, but for the current usage, this should be more than sufficient.
+	for key, value := range updates {
+		slog.Debug("Processing update", "key", key, "value", value)
+
+		for i := 0; i < t.NumField(); i++ {
+			fieldT := t.Field(i)
+
+			fieldJsonName, ok := fieldT.Tag.Lookup("json")
+			if !ok || fieldJsonName != key {
+				slog.Debug("Skipping field, was not match", "field", fieldT.Name, "json_name", fieldJsonName)
+				continue
+			}
+			fieldV := v.Field(i)
+
+			slog.Debug("Found matching field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+
+			if !fieldV.CanSet() {
+				slog.Error("Cannot set field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+				continue
+			}
+
+			if !fieldV.CanAddr() {
+				slog.Error("Cannot get address of field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+				continue
+			}
+			fieldVAddr := fieldV.Addr()
+
+			var valueBytes []byte
+			switch v := value.(type) {
+			case string:
+				// If the value is a string, we need to add quotes around it to parse it correctly.
+				valueBytes = fmt.Appendf(valueBytes, "\"%s\"", v)
+			default:
+				valueBytes = fmt.Appendf(valueBytes, "%v", v)
+			}
+
+			unmarshalJson := fieldVAddr.MethodByName("UnmarshalJSON")
+			if unmarshalJson.IsZero() {
+				slog.Error("UnmarshalJSON method was not found!", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+				continue
+			}
+			returns := unmarshalJson.Call([]reflect.Value{reflect.ValueOf(valueBytes)})
+			result := returns[0]
+			if !result.IsNil() {
+				err := result.Interface().(error)
+				slog.Error("UnmarshalJSON failed", "field", fieldT.Name, "error", err)
+				continue
+			}
+
+			slog.Debug("Field updated successfully", "field", fieldT.Name, "type", fieldT.Type, "new_value", value)
+			break // We found the field, no need to continue
+		}
+	}
 }
