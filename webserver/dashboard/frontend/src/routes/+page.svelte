@@ -1,27 +1,22 @@
 <script>
+    import FlexGrid from "$lib/components/layout/FlexGrid.svelte";
     import CacheMetrics from "$lib/components/widgets/CacheMetrics.svelte";
     import RequestMetrics from "$lib/components/widgets/RequestMetrics.svelte";
     import SystemMetrics from "$lib/components/widgets/SystemMetrics.svelte";
 </script>
 
 <main class="dashboard">
-    <div class="widgets">
+    <FlexGrid>
         <SystemMetrics />
         <RequestMetrics />
         <CacheMetrics />
-    </div>
+    </FlexGrid>
+    <div class="widgets"></div>
 </main>
 
 <style>
     .dashboard {
         padding: 1.5rem;
-    }
-
-    .widgets {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-        gap: 1.5rem;
-        align-items: start;
     }
 
     @media (max-width: 768px) {

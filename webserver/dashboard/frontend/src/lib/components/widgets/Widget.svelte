@@ -47,9 +47,11 @@
 
 <style>
     .title {
+        margin-bottom: 1rem;
+
         font-size: 1.5rem;
         font-weight: 600;
-        margin-bottom: 0.5rem;
+        text-align: center;
     }
 
     .widget {
@@ -57,6 +59,7 @@
         height: fit-content;
 
         padding: 1.5rem;
+        padding-top: 1rem;
         border-radius: 15px;
         background-color: var(--primary-400);
     }

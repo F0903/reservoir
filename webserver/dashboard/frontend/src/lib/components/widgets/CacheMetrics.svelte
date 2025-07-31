@@ -1,5 +1,6 @@
 <script lang="ts">
     import { CacheMetrics, getCacheMetrics } from "$lib/api/objects/metrics/cache-metrics";
+    import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./Widget.svelte";
 
     let metrics: CacheMetrics | null = $state(null);
@@ -19,7 +20,7 @@
     {#if metrics === null && error === null}
         <p>Loading...</p>
     {:else if error}
-        <p class="error"><strong>Error fetching metrics:</strong> {error.message}</p>
+        <ErrorBox><p>{error.message}</p></ErrorBox>
     {:else if metrics}
         <div class="metrics">
             <p><strong>Cache Hits:</strong> {metrics.cacheHits}</p>

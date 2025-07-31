@@ -1,5 +1,7 @@
 <script lang="ts">
     import { getRequestMetrics, RequestMetrics } from "$lib/api/objects/metrics/request-metrics";
+    import Chart from "$lib/charts/Chart.svelte";
+    import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./Widget.svelte";
 
     let metrics: RequestMetrics | null = $state(null);
@@ -19,13 +21,23 @@
     {#if metrics === null && error === null}
         <p>Loading...</p>
     {:else if error}
-        <p class="error"><strong>Error fetching metrics:</strong> {error.message}</p>
+        <ErrorBox><p>{error.message}</p></ErrorBox>
     {:else if metrics}
-        <div class="metrics">
-            <p><strong>HTTP Proxy Requests:</strong> {metrics.httpProxyRequests}</p>
-            <p><strong>HTTPS Proxy Requests:</strong> {metrics.httpsProxyRequests}</p>
-            <p><strong>Bytes Served:</strong> {metrics.bytesServed}</p>
-        </div>
+        <Chart
+            type="pie"
+            data={{
+                labels: ["HTTP Proxy Requests", "HTTPS Proxy Requests", "Bytes Served"],
+                datasets: [
+                    {
+                        data: [
+                            metrics.httpProxyRequests,
+                            metrics.httpsProxyRequests,
+                            metrics.bytesServed,
+                        ],
+                    },
+                ],
+            }}
+        ></Chart>
     {:else}
         <p>Loading metrics...</p>
     {/if}
