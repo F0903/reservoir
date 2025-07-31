@@ -24,6 +24,7 @@ func NewRawHTTPResponder(writer io.Writer) *RawHTTPResponder {
 			Proto:      "HTTP/1.1",
 			ProtoMajor: 1,
 			ProtoMinor: 1,
+			Header:     make(http.Header),
 		},
 	}
 }
