@@ -1,8 +1,10 @@
+import { doDebug } from "./conditional";
+
 export const log = {
     debug: (...data: unknown[]) => {
-        if (import.meta.env.DEV) {
+        doDebug(() => {
             console.log(...data);
-        }
+        });
     },
     error: (...data: unknown[]) => {
         console.error(...data);

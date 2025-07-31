@@ -3,6 +3,7 @@
     import { onDestroy, onMount } from "svelte";
     import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
     import { customChartColors } from "$lib/utils/chart-colors";
+    import { deepMerge } from "$lib/utils/deep-merge";
 
     // Register the custom color plugin
     Chart.register(customChartColors);
@@ -23,27 +24,63 @@
             duration: 1000,
             easing: "easeInOutQuart",
         },
+        color: "hsla(210, 21%, 93%, 1)",
         plugins: {
             customChartColors: {
                 enabled: true,
             },
             legend: {
                 labels: {
-                    textAlign: "left",
-                    color: "hsla(210, 21%, 93%, 1)", // Your text color
+                    textAlign: "center",
+                    color: "hsla(210, 21%, 93%, 1)",
+                    padding: 10,
+                    usePointStyle: true,
+                    pointStyle: "rectRounded",
+                    font: {
+                        size: 14,
+                    },
+                },
+                position: "bottom",
+            },
+        },
+    };
+
+    const defaultBarOptions: ChartConfiguration["options"] = {
+        scales: {
+            x: {
+                stacked: true,
+                grid: {
+                    display: true,
+                    color: "hsla(210, 21%, 93%, 0.1)", // Lighter grid lines
+                },
+                ticks: {
+                    color: "hsla(210, 21%, 93%, .75)",
+                },
+            },
+            y: {
+                stacked: true,
+                grid: {
+                    display: true,
+                    color: "hsla(210, 21%, 93%, 0.1)", // Lighter grid lines
+                },
+                ticks: {
+                    color: "hsla(210, 21%, 93%, .75)",
                 },
             },
         },
     };
 
     onMount(() => {
+        let processedOptions = defaultOptions;
+        if (type === "bar") {
+            processedOptions = deepMerge(processedOptions, defaultBarOptions);
+        }
+        processedOptions = deepMerge(processedOptions, options || {});
+
         chart = new Chart(canvas, {
             type: type,
             data,
-            options: {
-                ...defaultOptions,
-                ...options,
-            },
+            options: processedOptions,
         });
     });
 

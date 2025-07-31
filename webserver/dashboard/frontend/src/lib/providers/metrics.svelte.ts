@@ -1,5 +1,6 @@
 import type { FetchFn } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics";
+import { doBrowser } from "$lib/utils/conditional";
 import { log } from "$lib/utils/logger";
 
 export class MetricsProvider {
@@ -12,11 +13,15 @@ export class MetricsProvider {
         error: null,
     });
 
-    constructor(fetchFn: FetchFn = fetch) {
+    static async createAndRefresh(fetchFn: FetchFn = fetch): Promise<MetricsProvider> {
+        const provider = new MetricsProvider(fetchFn);
+        await provider.refreshMetrics();
+        return provider;
+    }
+
+    private constructor(fetchFn: FetchFn = fetch) {
         this.fetchFn = fetchFn;
         this.metricsRefreshId = setInterval(() => this.refreshMetrics(), 10000);
-
-        this.refreshMetrics();
     }
 
     private stopRefresh() {
@@ -25,7 +30,7 @@ export class MetricsProvider {
         clearInterval(this.metricsRefreshId);
     }
 
-    private async refreshMetrics() {
+    async refreshMetrics() {
         log.debug("Refreshing metrics...");
         this.state.error = null;
 
@@ -36,6 +41,9 @@ export class MetricsProvider {
             this.state.error = error;
         }
 
-        log.debug("Metrics refreshed:", this.data);
+        log.debug("Metrics refreshed");
+        doBrowser(() => {
+            log.debug("Metrics data: ", this.data);
+        });
     }
 }

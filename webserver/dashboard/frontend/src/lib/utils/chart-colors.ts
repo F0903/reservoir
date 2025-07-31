@@ -6,10 +6,10 @@ import { DoughnutController, PolarAreaController } from "chart.js";
 Chart.register(DoughnutController, PolarAreaController);
 
 const COLORS = [
-    "hsla(188, 34%, 53%, 1)",
-    "hsla(188, 34%, 43%, 1)",
-    "hsla(22, 70%, 64%, 1)",
-    "hsla(22, 70%, 44%, 1)",
+    "hsla(188, 34%, 43%)",
+    "hsla(188, 34%, 30%)",
+    "hsla(22, 70%, 44%)",
+    "hsla(22, 70%, 64%)",
 ];
 
 function getBorderColor(i: number) {
