@@ -1,20 +1,21 @@
-import { apiGet, type JSONResponse } from "../../api-object";
+import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { apiGet, type FetchFn } from "../../api-object";
 import { CacheMetrics } from "./cache-metrics";
 import { RequestMetrics } from "./request-metrics";
 import { TimingMetrics } from "./timing-metrics";
 
-class Metrics {
+export class Metrics {
     readonly cache: CacheMetrics;
-    readonly request: RequestMetrics;
+    readonly requests: RequestMetrics;
     readonly timing: TimingMetrics;
 
     constructor(json: JSONResponse) {
-        this.cache = new CacheMetrics(json["cache"] as JSONResponse);
-        this.request = new RequestMetrics(json["request"] as JSONResponse);
-        this.timing = new TimingMetrics(json["timing"] as JSONResponse);
+        this.cache = new CacheMetrics(readJsonPropOrDefault("cache", json, {}));
+        this.requests = new RequestMetrics(readJsonPropOrDefault("requests", json, {}));
+        this.timing = new TimingMetrics(readJsonPropOrDefault("timing", json, {}));
     }
 }
 
-export async function getAllMetrics(): Promise<Metrics> {
-    return apiGet("/metrics", Metrics);
+export async function getAllMetrics(fetchFn: FetchFn = fetch): Promise<Metrics> {
+    return apiGet("/metrics", Metrics, fetchFn);
 }

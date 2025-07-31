@@ -38,6 +38,23 @@
         "--no-dashboard"
       ],
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug Dashboard",
+      "cwd": "${workspaceFolder}/webserver/dashboard/frontend",
+      "type": "node-terminal",
+      "command": "pnpm run dev",
+      "request": "launch"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Proxy + Dashboard",
+      "configurations": [
+        "Debug Proxy with Dashboard disabled",
+        "Debug Dashboard"
+      ],
+      "stopAll": true
     }
   ]
 }

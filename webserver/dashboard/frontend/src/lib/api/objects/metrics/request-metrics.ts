@@ -1,4 +1,5 @@
-import { apiGet, type JSONResponse } from "../../api-object";
+import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { apiGet, type FetchFn } from "../../api-object";
 
 export class RequestMetrics {
     readonly httpProxyRequests: number;
@@ -6,12 +7,12 @@ export class RequestMetrics {
     readonly bytesServed: number;
 
     constructor(json: JSONResponse) {
-        this.httpProxyRequests = json["http_proxy_requests"] as number;
-        this.httpsProxyRequests = json["https_proxy_requests"] as number;
-        this.bytesServed = json["bytes_served"] as number;
+        this.httpProxyRequests = readJsonPropOrDefault("http_proxy_requests", json, 0);
+        this.httpsProxyRequests = readJsonPropOrDefault("https_proxy_requests", json, 0);
+        this.bytesServed = readJsonPropOrDefault("bytes_served", json, 0);
     }
 }
 
-export async function getRequestMetrics(): Promise<RequestMetrics> {
-    return apiGet("/metrics/requests", RequestMetrics);
+export async function getRequestMetrics(fetchFn: FetchFn = fetch): Promise<RequestMetrics> {
+    return apiGet("/metrics/requests", RequestMetrics, fetchFn);
 }

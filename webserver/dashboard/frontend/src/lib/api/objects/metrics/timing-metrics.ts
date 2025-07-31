@@ -1,13 +1,14 @@
-import { apiGet, type JSONResponse } from "../../api-object";
+import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { apiGet, type FetchFn } from "../../api-object";
 
 export class TimingMetrics {
     readonly startTime: Date;
 
-    constructor(_json: JSONResponse) {
-        this.startTime = new Date(_json["start_time"] as string);
+    constructor(json: JSONResponse) {
+        this.startTime = new Date(readJsonPropOrDefault("start_time", json, ""));
     }
 }
 
-export async function getTimingMetrics(): Promise<TimingMetrics> {
-    return apiGet("/metrics/timing", TimingMetrics);
+export async function getTimingMetrics(fetchFn: FetchFn = fetch): Promise<TimingMetrics> {
+    return apiGet("/metrics/timing", TimingMetrics, fetchFn);
 }

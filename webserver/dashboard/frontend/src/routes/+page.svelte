@@ -1,15 +1,15 @@
 <script>
     import FlexGrid from "$lib/components/layout/FlexGrid.svelte";
-    import CacheMetrics from "$lib/components/widgets/CacheMetrics.svelte";
-    import RequestMetrics from "$lib/components/widgets/RequestMetrics.svelte";
-    import SystemMetrics from "$lib/components/widgets/SystemMetrics.svelte";
+    import TotalRequests from "$lib/components/widgets/TotalRequests.svelte";
+    import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
+
+    let { data } = $props();
 </script>
 
 <main class="dashboard">
     <FlexGrid>
-        <SystemMetrics />
-        <RequestMetrics />
-        <CacheMetrics />
+        <SystemInfo metrics={data.metrics} />
+        <TotalRequests metrics={data.metrics} />
     </FlexGrid>
     <div class="widgets"></div>
 </main>
