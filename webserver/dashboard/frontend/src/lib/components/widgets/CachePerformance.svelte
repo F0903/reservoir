@@ -1,10 +1,11 @@
 <script lang="ts">
     import Chart from "$lib/charts/Chart.svelte";
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
+    import { getContext } from "svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
 
-    let { metrics }: { metrics: MetricsProvider } = $props();
+    let metrics = getContext("metrics") as MetricsProvider;
 </script>
 
 <Widget title="Cache Performance">

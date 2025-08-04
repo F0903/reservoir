@@ -1,11 +1,12 @@
 <script lang="ts">
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { formatBytes } from "$lib/utils/format";
+    import { getContext } from "svelte";
     import Card from "../ui/Card.svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
 
-    let { metrics }: { metrics: MetricsProvider } = $props();
+    let metrics = getContext("metrics") as MetricsProvider;
 </script>
 
 <Widget title="Data Transfer">
@@ -61,7 +62,7 @@
     }
 
     .primary-metric-value {
-        font-size: 2.5rem;
+        font-size: 2rem;
         font-weight: bold;
         color: var(--tertiary-400);
         margin-bottom: 0.5rem;

@@ -1,3 +1,4 @@
+import { browser } from "$app/environment";
 import type { FetchFn } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics";
 import { doIfBrowser } from "$lib/utils/conditional";
@@ -15,10 +16,10 @@ export class MetricsProvider {
     });
 
     // Create a new MetricsProvider instance and immediately refresh metrics
-    static async createAndRefresh(fetchFn: FetchFn = fetch): Promise<MetricsProvider> {
+    static createAndRefresh(fetchFn: FetchFn = fetch): MetricsProvider {
         const provider = new MetricsProvider(fetchFn);
-        await provider.refreshMetrics();
         provider.startRefresh();
+        provider.refreshMetrics(); // Do not wait for it to complete, just start it and move on
         return provider;
     }
 
@@ -29,6 +30,8 @@ export class MetricsProvider {
 
     // Start the metrics refresh interval
     startRefresh() {
+        if (!browser) return; // Do not run this in SSR
+
         if (this.metricsRefreshId !== null) return;
 
         log.debug("Starting metrics refresh interval");
@@ -37,6 +40,8 @@ export class MetricsProvider {
 
     // Stop the metrics refresh interval
     stopRefresh() {
+        if (!browser) return; // Do not run this in SSR
+
         if (this.metricsRefreshId === null) return;
 
         log.debug("Stopping metrics refresh interval");
@@ -45,6 +50,8 @@ export class MetricsProvider {
     }
 
     async refreshMetrics() {
+        if (!browser) return; // Do not run this in SSR
+
         log.debug("Refreshing metrics...");
         this.state.error = null;
 

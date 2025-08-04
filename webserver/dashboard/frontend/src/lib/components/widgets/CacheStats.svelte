@@ -1,12 +1,12 @@
 <script lang="ts">
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { formatBytes } from "$lib/utils/format";
-    import Card from "../ui/Card.svelte";
+    import { getContext } from "svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
 
-    let { metrics }: { metrics: MetricsProvider } = $props();
+    let metrics = getContext("metrics") as MetricsProvider;
 </script>
 
 <Widget title="Cache Statistics">
@@ -48,6 +48,4 @@
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
         gap: 1rem;
     }
-
-
 </style>

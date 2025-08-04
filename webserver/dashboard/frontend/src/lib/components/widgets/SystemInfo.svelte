@@ -1,11 +1,11 @@
 <script lang="ts">
     import { formatTimeSinceDate } from "$lib/utils/dates";
     import ErrorBox from "../ui/ErrorBox.svelte";
-    import Widget from "./base/Widget.svelte";
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import PolledWidget from "./base/PolledWidget.svelte";
+    import { getContext } from "svelte";
 
-    let { metrics }: { metrics: MetricsProvider } = $props();
+    let metrics = getContext("metrics") as MetricsProvider;
 
     let currentUptime: string = $state("");
 

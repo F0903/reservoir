@@ -6,8 +6,12 @@
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
     import { LayoutDashboard, Settings } from "@lucide/svelte";
+    import { MetricsProvider } from "$lib/providers/metrics.svelte";
+    import { onMount, setContext } from "svelte";
 
     let { children } = $props();
+
+    setContext("metrics", MetricsProvider.createAndRefresh(fetch));
 </script>
 
 <div class="layout-grid">
