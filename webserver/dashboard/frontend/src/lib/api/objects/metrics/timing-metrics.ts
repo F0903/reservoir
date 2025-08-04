@@ -1,11 +1,11 @@
-import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { readPropOrDefault, type JSONResponse } from "$lib/utils/json";
 import { apiGet, type FetchFn } from "../../api-object";
 
 export class TimingMetrics {
     readonly startTime: Date;
 
     constructor(json: JSONResponse) {
-        this.startTime = new Date(readJsonPropOrDefault("start_time", json, ""));
+        this.startTime = new Date(readPropOrDefault("start_time", json, ""));
     }
 }
 

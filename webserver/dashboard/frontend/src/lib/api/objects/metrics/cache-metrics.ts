@@ -1,4 +1,4 @@
-import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { readPropOrDefault, type JSONResponse } from "$lib/utils/json";
 import { apiGet, type FetchFn } from "../../api-object";
 
 export class CacheMetrics {
@@ -12,14 +12,14 @@ export class CacheMetrics {
     readonly cacheEvictions: number;
 
     constructor(json: JSONResponse) {
-        this.cacheHits = readJsonPropOrDefault("cache_hits", json, 0);
-        this.cacheMisses = readJsonPropOrDefault("cache_misses", json, 0);
-        this.cacheErrors = readJsonPropOrDefault("cache_errors", json, 0);
-        this.cacheEntries = readJsonPropOrDefault("cache_entries", json, 0);
-        this.bytesCached = readJsonPropOrDefault("bytes_cached", json, 0);
-        this.cleanupRuns = readJsonPropOrDefault("cleanup_runs", json, 0);
-        this.bytesCleaned = readJsonPropOrDefault("bytes_cleaned", json, 0);
-        this.cacheEvictions = readJsonPropOrDefault("cache_evictions", json, 0);
+        this.cacheHits = readPropOrDefault("cache_hits", json, 0);
+        this.cacheMisses = readPropOrDefault("cache_misses", json, 0);
+        this.cacheErrors = readPropOrDefault("cache_errors", json, 0);
+        this.cacheEntries = readPropOrDefault("cache_entries", json, 0);
+        this.bytesCached = readPropOrDefault("bytes_cached", json, 0);
+        this.cleanupRuns = readPropOrDefault("cleanup_runs", json, 0);
+        this.bytesCleaned = readPropOrDefault("bytes_cleaned", json, 0);
+        this.cacheEvictions = readPropOrDefault("cache_evictions", json, 0);
     }
 }
 

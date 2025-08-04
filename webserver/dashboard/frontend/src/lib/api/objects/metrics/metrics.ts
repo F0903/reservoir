@@ -1,4 +1,4 @@
-import { readJsonPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { readPropOrDefault, type JSONResponse } from "$lib/utils/json";
 import { apiGet, type FetchFn } from "../../api-object";
 import { CacheMetrics } from "./cache-metrics";
 import { RequestMetrics } from "./request-metrics";
@@ -10,9 +10,9 @@ export class Metrics {
     readonly timing: TimingMetrics;
 
     constructor(json: JSONResponse) {
-        this.cache = new CacheMetrics(readJsonPropOrDefault("cache", json, {}));
-        this.requests = new RequestMetrics(readJsonPropOrDefault("requests", json, {}));
-        this.timing = new TimingMetrics(readJsonPropOrDefault("timing", json, {}));
+        this.cache = new CacheMetrics(readPropOrDefault("cache", json, {}));
+        this.requests = new RequestMetrics(readPropOrDefault("requests", json, {}));
+        this.timing = new TimingMetrics(readPropOrDefault("timing", json, {}));
     }
 }
 

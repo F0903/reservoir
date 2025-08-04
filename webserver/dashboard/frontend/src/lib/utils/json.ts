@@ -4,7 +4,7 @@ export interface JSONResponse {
     [key: string]: unknown;
 }
 
-export function readJsonPropOrDefault<T>(name: string, json: JSONResponse, defaultValue: T): T {
+export function readPropOrDefault<T>(name: string, json: JSONResponse, defaultValue: T): T {
     if (!json || !(name in json)) {
         log.debug(`Property '${name}' not found in JSON response, returning default value.`);
         return defaultValue;
