@@ -1,10 +1,11 @@
 import type { FetchFn } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics";
-import { doBrowser } from "$lib/utils/conditional";
+import { doIfBrowser } from "$lib/utils/conditional";
 import { log } from "$lib/utils/logger";
 
 export class MetricsProvider {
-    private metricsRefreshId: number;
+    private refreshInterval: number;
+    private metricsRefreshId: number | null = null;
     private readonly fetchFn: FetchFn;
 
     data: Metrics = $state(new Metrics({}));
@@ -13,21 +14,34 @@ export class MetricsProvider {
         error: null,
     });
 
+    // Create a new MetricsProvider instance and immediately refresh metrics
     static async createAndRefresh(fetchFn: FetchFn = fetch): Promise<MetricsProvider> {
         const provider = new MetricsProvider(fetchFn);
         await provider.refreshMetrics();
+        provider.startRefresh();
         return provider;
     }
 
-    private constructor(fetchFn: FetchFn = fetch) {
+    private constructor(fetchFn: FetchFn = fetch, refreshInterval: number = 10000) {
         this.fetchFn = fetchFn;
-        this.metricsRefreshId = setInterval(() => this.refreshMetrics(), 10000);
+        this.refreshInterval = refreshInterval;
     }
 
-    private stopRefresh() {
+    // Start the metrics refresh interval
+    startRefresh() {
+        if (this.metricsRefreshId !== null) return;
+
+        log.debug("Starting metrics refresh interval");
+        this.metricsRefreshId = setInterval(() => this.refreshMetrics(), this.refreshInterval);
+    }
+
+    // Stop the metrics refresh interval
+    stopRefresh() {
         if (this.metricsRefreshId === null) return;
 
+        log.debug("Stopping metrics refresh interval");
         clearInterval(this.metricsRefreshId);
+        this.metricsRefreshId = null;
     }
 
     async refreshMetrics() {
@@ -42,7 +56,7 @@ export class MetricsProvider {
         }
 
         log.debug("Metrics refreshed");
-        doBrowser(() => {
+        doIfBrowser(() => {
             log.debug("Metrics data: ", this.data);
         });
     }

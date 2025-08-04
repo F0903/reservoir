@@ -1,8 +1,8 @@
-import { doDebug } from "./conditional";
+import { doIfDebug } from "./conditional";
 
 export const log = {
     debug: (...data: unknown[]) => {
-        doDebug(() => {
+        doIfDebug(() => {
             console.log(...data);
         });
     },
