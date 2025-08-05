@@ -1,6 +1,7 @@
 <script>
     import "../global.css";
     import "@fontsource-variable/open-sans";
+    import "@fontsource-variable/chivo-mono";
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
