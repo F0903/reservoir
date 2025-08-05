@@ -3,11 +3,15 @@ import type { FetchFn } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics";
 import { doIfBrowser } from "$lib/utils/conditional";
 import { log } from "$lib/utils/logger";
+import { getContext } from "svelte";
+import type { SettingsProvider } from "./settings.svelte";
+import { get, type Unsubscriber } from "svelte/store";
 
 export class MetricsProvider {
-    private refreshInterval: number;
+    private settings: SettingsProvider;
     private metricsRefreshId: number | null = null;
     private readonly fetchFn: FetchFn;
+    private updateIntervalUnsub: Unsubscriber | null = null;
 
     data: Metrics = $state(new Metrics({}));
     state: { initializing: boolean; error: unknown | null } = $state({
@@ -17,29 +21,42 @@ export class MetricsProvider {
 
     // Create a new MetricsProvider instance and immediately refresh metrics
     static createAndRefresh(fetchFn: FetchFn = fetch): MetricsProvider {
-        const provider = new MetricsProvider(fetchFn);
+        const settings = getContext("settings") as SettingsProvider;
+
+        const provider = new MetricsProvider(fetchFn, settings);
         provider.startRefresh();
         provider.refreshMetrics(); // Do not wait for it to complete, just start it and move on
         return provider;
     }
 
-    private constructor(fetchFn: FetchFn = fetch, refreshInterval: number = 10000) {
+    private constructor(fetchFn: FetchFn = fetch, settings: SettingsProvider) {
         this.fetchFn = fetchFn;
-        this.refreshInterval = refreshInterval;
+        this.settings = settings;
     }
 
     // Start the metrics refresh interval
-    startRefresh() {
+    startRefresh = () => {
         if (!browser) return; // Do not run this in SSR
 
         if (this.metricsRefreshId !== null) return;
 
         log.debug("Starting metrics refresh interval");
-        this.metricsRefreshId = setInterval(() => this.refreshMetrics(), this.refreshInterval);
-    }
+        this.metricsRefreshId = setInterval(
+            () => this.refreshMetrics(),
+            get(this.settings.dashboardConfig.updateInterval),
+        );
+
+        this.updateIntervalUnsub = this.settings.dashboardConfig.updateInterval.subscribe(
+            (interval) => {
+                log.debug("Updating metrics refresh interval to", interval);
+                this.stopRefresh();
+                this.metricsRefreshId = setInterval(() => this.refreshMetrics(), interval);
+            },
+        );
+    };
 
     // Stop the metrics refresh interval
-    stopRefresh() {
+    stopRefresh = () => {
         if (!browser) return; // Do not run this in SSR
 
         if (this.metricsRefreshId === null) return;
@@ -47,9 +64,14 @@ export class MetricsProvider {
         log.debug("Stopping metrics refresh interval");
         clearInterval(this.metricsRefreshId);
         this.metricsRefreshId = null;
-    }
 
-    async refreshMetrics() {
+        if (this.updateIntervalUnsub) {
+            this.updateIntervalUnsub();
+            this.updateIntervalUnsub = null;
+        }
+    };
+
+    refreshMetrics = async () => {
         if (!browser) return; // Do not run this in SSR
 
         log.debug("Refreshing metrics...");
@@ -66,5 +88,5 @@ export class MetricsProvider {
         doIfBrowser(() => {
             log.debug("Metrics data: ", this.data);
         });
-    }
+    };
 }

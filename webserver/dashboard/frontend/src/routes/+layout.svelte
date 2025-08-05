@@ -8,11 +8,15 @@
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
     import { LayoutDashboard, Settings } from "@lucide/svelte";
     import { MetricsProvider } from "$lib/providers/metrics.svelte";
-    import { onMount, setContext } from "svelte";
+    import { setContext } from "svelte";
+    import { SettingsProvider } from "$lib/providers/settings.svelte";
+    import { ToastProvider } from "$lib/providers/toast.svelte";
 
     let { children } = $props();
 
+    setContext("settings", new SettingsProvider()); // Must be the first context set
     setContext("metrics", MetricsProvider.createAndRefresh(fetch));
+    setContext("toast", new ToastProvider());
 </script>
 
 <div class="layout-grid">

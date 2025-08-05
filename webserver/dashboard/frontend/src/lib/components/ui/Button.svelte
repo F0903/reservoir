@@ -26,6 +26,7 @@
 
         color: var(--btn-text-color, var(--text-primary));
         font-size: 1rem;
+        font-weight: var(--btn-font-weight, inherit);
         text-align: center;
 
         transition-property: filter, scale;

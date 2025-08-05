@@ -1,9 +1,7 @@
-import type { JSONResponse } from "$lib/utils/json";
-
 export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promise<Response>;
 
 export interface APIObjectType<T> {
-    new (_json: JSONResponse): T;
+    new (_json: Record<string, unknown>): T;
 }
 
 export async function apiGet<T>(

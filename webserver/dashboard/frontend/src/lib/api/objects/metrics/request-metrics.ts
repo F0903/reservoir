@@ -1,4 +1,4 @@
-import { readPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { readPropOrDefault } from "$lib/utils/values";
 import { apiGet, type FetchFn } from "../../api-object";
 
 export class RequestMetrics {
@@ -6,7 +6,7 @@ export class RequestMetrics {
     readonly httpsProxyRequests: number;
     readonly bytesServed: number;
 
-    constructor(json: JSONResponse) {
+    constructor(json: Record<string, unknown>) {
         this.httpProxyRequests = readPropOrDefault("http_proxy_requests", json, 0);
         this.httpsProxyRequests = readPropOrDefault("https_proxy_requests", json, 0);
         this.bytesServed = readPropOrDefault("bytes_served", json, 0);

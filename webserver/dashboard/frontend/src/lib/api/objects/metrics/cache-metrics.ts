@@ -1,4 +1,4 @@
-import { readPropOrDefault, type JSONResponse } from "$lib/utils/json";
+import { readPropOrDefault } from "$lib/utils/values";
 import { apiGet, type FetchFn } from "../../api-object";
 
 export class CacheMetrics {
@@ -11,7 +11,7 @@ export class CacheMetrics {
     readonly bytesCleaned: number;
     readonly cacheEvictions: number;
 
-    constructor(json: JSONResponse) {
+    constructor(json: Record<string, unknown>) {
         this.cacheHits = readPropOrDefault("cache_hits", json, 0);
         this.cacheMisses = readPropOrDefault("cache_misses", json, 0);
         this.cacheErrors = readPropOrDefault("cache_errors", json, 0);
