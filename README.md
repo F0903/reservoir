@@ -44,6 +44,8 @@ The way to do this will vary depending on your OS. If you run a Linux distro it 
 
 On Windows the easiest way to do this is with [Chocolatey](https://chocolatey.org/install#individual) by running `choco install make`. Alternatively you can [install it manually here](https://gnuwin32.sourceforge.net/packages/make.htm).
 
+You will of course also need to have [Go installed](https://go.dev/dl/).
+
 Then you just have to build the project with **make** by running `make` in the project directory.
 
 This will automatically build both the frontend and the proxy executable.
