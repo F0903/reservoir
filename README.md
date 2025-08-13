@@ -33,15 +33,22 @@ openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "
 
 ### Running the Proxy
 
-First you have to build the executable with make by running the following command in the project directory:
+Before getting started, you will need to install a few dependencies:
 
-```sh
-make build
-```
+#### Installing dependencies
+
+First off you will need to have [**Node** installed](https://nodejs.org/en/download) and **pnpm** enabled *(run the command `corepack enable pnpm`)*.
+
+Then you need to have **GNU make** installed.
+The way to do this will vary depending on your OS. If you run a Linux distro it will be easy to install via your package manager (it might even be preinstalled).
+
+On Windows the easiest way to do this is with [Chocolatey](https://chocolatey.org/install#individual) by running `choco install make`. Alternatively you can [install it manually here](https://gnuwin32.sourceforge.net/packages/make.htm).
+
+Then you just have to build the project with **make** by running `make` in the project directory.
 
 This will automatically build both the frontend and the proxy executable.
 
-Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it.
+Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it, which is recommended.
 
 ### Note When Updating
 
