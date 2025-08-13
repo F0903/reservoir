@@ -3,7 +3,7 @@
 
 # Build the entire project
 build: build-frontend
-	go build -o reservoir.exe
+	go build
 
 # Build the Svelte frontend
 build-frontend:
