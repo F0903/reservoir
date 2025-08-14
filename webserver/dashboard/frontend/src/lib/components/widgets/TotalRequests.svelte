@@ -1,11 +1,13 @@
 <script lang="ts">
-    import Chart from "$lib/charts/Chart.svelte";
+    import Chart from "$lib/components/ui/Chart.svelte";
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { getContext } from "svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
 
     let metrics = getContext("metrics") as MetricsProvider;
+
+    let chart: Chart | undefined = $state();
 </script>
 
 <Widget title="Requests">
@@ -15,6 +17,7 @@
         <ErrorBox><p>{metrics.state.error}</p></ErrorBox>
     {:else}
         <Chart
+            bind:this={chart}
             type="doughnut"
             data={{
                 labels: ["HTTP Proxy Requests", "HTTPS Proxy Requests"],

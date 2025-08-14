@@ -14,7 +14,8 @@
             return;
         }
 
-        currentUptime = formatTimeSinceDate(metrics.data.timing.startTime);
+        const startTime = metrics.data.timing.startTime;
+        currentUptime = formatTimeSinceDate(startTime);
     }
 </script>
 

@@ -1,12 +1,15 @@
 <script lang="ts">
-    import Chart from "$lib/charts/Chart.svelte";
+    import Chart from "$lib/components/ui/Chart.svelte";
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { getContext } from "svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
+    import { log } from "$lib/utils/logger";
 
     let metrics = getContext("metrics") as MetricsProvider;
+
+    let chart: Chart | undefined = $state();
 
     let totalCacheRequests = $derived(
         metrics.data.cache.cacheHits + metrics.data.cache.cacheMisses,
@@ -14,6 +17,27 @@
     let hitRate = $derived(
         totalCacheRequests > 0 ? (metrics.data.cache.cacheHits / totalCacheRequests) * 100 : 0,
     );
+
+    let chartData = $derived({
+        labels: ["Cache Operations"],
+        datasets: [
+            {
+                label: "Hits",
+                data: [metrics.data.cache.cacheHits],
+                backgroundColor: "var(--secondary-400)",
+            },
+            {
+                label: "Misses",
+                data: [metrics.data.cache.cacheMisses],
+                backgroundColor: "var(--tertiary-400)",
+            },
+            {
+                label: "Errors",
+                data: [metrics.data.cache.cacheErrors],
+                backgroundColor: "var(--primary-200)",
+            },
+        ],
+    });
 </script>
 
 <Widget title="Cache Efficiency">
@@ -34,27 +58,9 @@
 
             <div class="efficiency-chart">
                 <Chart
+                    bind:this={chart}
                     type="bar"
-                    data={{
-                        labels: ["Cache Operations"],
-                        datasets: [
-                            {
-                                label: "Hits",
-                                data: [metrics.data.cache.cacheHits],
-                                backgroundColor: "var(--secondary-400)",
-                            },
-                            {
-                                label: "Misses",
-                                data: [metrics.data.cache.cacheMisses],
-                                backgroundColor: "var(--tertiary-400)",
-                            },
-                            {
-                                label: "Errors",
-                                data: [metrics.data.cache.cacheErrors],
-                                backgroundColor: "var(--primary-200)",
-                            },
-                        ],
-                    }}
+                    data={chartData}
                     options={{
                         scales: {
                             x: { stacked: true },

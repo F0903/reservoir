@@ -20,3 +20,7 @@ export function formatPercentage(value: number, total: number, decimals = 1): st
     if (total === 0) return "0%";
     return ((value / total) * 100).toFixed(decimals) + "%";
 }
+
+export function snakeCaseToCamelCase(s: string): string {
+    return s.replace(/_+([a-z0-9])/gi, (_m, c: string) => c.toUpperCase());
+}

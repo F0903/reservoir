@@ -1,7 +1,6 @@
 import { browser } from "$app/environment";
-import type { FetchFn } from "$lib/api/api-object";
-import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics";
-import { doIfBrowser } from "$lib/utils/conditional";
+import { type FetchFn, RawAPIObject } from "$lib/api/api-object";
+import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
 import { log } from "$lib/utils/logger";
 import { getContext } from "svelte";
 import type { SettingsProvider } from "./settings.svelte";
@@ -13,7 +12,7 @@ export class MetricsProvider {
     private readonly fetchFn: FetchFn;
     private updateIntervalUnsub: Unsubscriber | null = null;
 
-    data: Metrics = $state(new Metrics({}));
+    data: Metrics = new Metrics({});
     state: { initializing: boolean; error: unknown | null } = $state({
         initializing: true,
         error: null,
@@ -78,15 +77,14 @@ export class MetricsProvider {
         this.state.error = null;
 
         try {
-            this.data = await getAllMetrics(this.fetchFn);
+            const newData = await getAllMetrics(RawAPIObject, this.fetchFn);
+            this.data.updateFrom(newData as Record<string, unknown>);
             this.state.initializing = false;
         } catch (error) {
             this.state.error = error;
         }
 
         log.debug("Metrics refreshed");
-        doIfBrowser(() => {
-            log.debug("Metrics data: ", this.data);
-        });
+        log.debug("Metrics data: ", this.data);
     };
 }

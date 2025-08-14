@@ -1,5 +1,5 @@
 <script lang="ts">
-    import Chart from "$lib/charts/Chart.svelte";
+    import Chart from "$lib/components/ui/Chart.svelte";
     import type { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { getContext } from "svelte";
     import ErrorBox from "../ui/ErrorBox.svelte";

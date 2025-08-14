@@ -1,5 +1,5 @@
 import { get, type Writable } from "svelte/store";
-import { getPropAssert } from "./values";
+import { getPropAssert } from "./objects";
 
 export function isStore<T>(value: unknown): value is Writable<T> {
     return (

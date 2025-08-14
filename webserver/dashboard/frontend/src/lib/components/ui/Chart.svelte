@@ -3,14 +3,15 @@
     import { onDestroy, onMount } from "svelte";
     import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
     import { customChartColors } from "$lib/utils/chart-colors";
-    import { deepMerge } from "$lib/utils/deep-merge";
+    import { deepMerge } from "$lib/utils/objects";
+    import { log } from "$lib/utils/logger";
 
     // Register the custom color plugin
     Chart.register(customChartColors);
 
     let {
         type,
-        data,
+        data = $bindable(),
         options = {},
     }: { type: ChartType; data: ChartData; options?: ChartConfiguration["options"] } = $props();
 
@@ -87,11 +88,27 @@
     onDestroy(() => {
         chart?.destroy();
     });
+
+    $effect(() => {
+        if (data) {
+            log.debug(`Chart data changed, updating chart... (type=${type})`, data);
+            chart.data = data;
+            chart.update();
+        }
+    });
 </script>
 
-<canvas bind:this={canvas} class="chart"></canvas>
+<div class="chart-container">
+    <canvas bind:this={canvas} class="chart"></canvas>
+</div>
 
 <style>
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
     .chart {
         background-color: var(--primary-300); /* Gunmetal background */
         border-radius: 8px; /* Optional: rounded corners */

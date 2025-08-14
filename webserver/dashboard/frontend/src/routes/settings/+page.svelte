@@ -15,7 +15,7 @@
             settingName: "updateInterval",
             settingObject: settings.dashboardConfig,
             label: "Dashboard Update Interval",
-            pattern: "\\d+",
+            pattern: "\\d+", // Only digits
             onChange: onChange,
             min: 500,
             tooltip:

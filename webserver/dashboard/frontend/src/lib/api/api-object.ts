@@ -1,12 +1,21 @@
 export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promise<Response>;
 
-export interface APIObjectType<T> {
+export interface APIObjectConstructor<T> {
     new (_json: Record<string, unknown>): T;
+}
+
+// Represents a raw JSON API object.
+export class RawAPIObject {
+    [key: string]: unknown;
+
+    constructor(json: Record<string, unknown>) {
+        Object.assign(this, json);
+    }
 }
 
 export async function apiGet<T>(
     endpoint: string,
-    type: APIObjectType<T>,
+    type: APIObjectConstructor<T>,
     fetchFn: FetchFn = fetch,
 ): Promise<T> {
     const fullEndpoint = `/api${endpoint}`;
