@@ -12,7 +12,7 @@
         background-color: var(--error-background-color);
         color: var(--error-text-color);
         border: 1px solid var(--error-border-color);
-        padding: 0.75rem;
+        padding: 1rem;
         border-radius: 8px;
         font-size: 0.9rem;
     }

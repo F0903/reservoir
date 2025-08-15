@@ -5,6 +5,7 @@ import { log } from "$lib/utils/logger";
 import { getContext } from "svelte";
 import type { SettingsProvider } from "./settings.svelte";
 import { get, type Unsubscriber } from "svelte/store";
+import type { LoadableState } from "$lib/utils/loadable";
 
 export class MetricsProvider {
     private settings: SettingsProvider;
@@ -12,10 +13,10 @@ export class MetricsProvider {
     private readonly fetchFn: FetchFn;
     private updateIntervalUnsub: Unsubscriber | null = null;
 
-    data: Metrics = new Metrics({});
-    state: { initializing: boolean; error: unknown | null } = $state({
-        initializing: true,
-        error: null,
+    readonly data: Metrics = new Metrics({});
+    private state: LoadableState = $state({
+        tag: "loading",
+        errorMsg: null,
     });
 
     // Create a new MetricsProvider instance and immediately refresh metrics
@@ -31,6 +32,10 @@ export class MetricsProvider {
     private constructor(fetchFn: FetchFn = fetch, settings: SettingsProvider) {
         this.fetchFn = fetchFn;
         this.settings = settings;
+    }
+
+    getLoadableState(): LoadableState {
+        return this.state;
     }
 
     // Start the metrics refresh interval
@@ -74,14 +79,13 @@ export class MetricsProvider {
         if (!browser) return; // Do not run this in SSR
 
         log.debug("Refreshing metrics...");
-        this.state.error = null;
 
         try {
             const newData = await getAllMetrics(RawAPIObject, this.fetchFn);
             this.data.updateFrom(newData as Record<string, unknown>);
-            this.state.initializing = false;
+            this.state = { tag: "ok", errorMsg: null };
         } catch (error) {
-            this.state.error = error;
+            this.state = { tag: "error", errorMsg: error as string };
         }
 
         log.debug("Metrics refreshed");

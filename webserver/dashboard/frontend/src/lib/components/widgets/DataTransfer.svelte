@@ -3,18 +3,14 @@
     import { formatBytes } from "$lib/utils/format";
     import { getContext } from "svelte";
     import Card from "../ui/Card.svelte";
-    import ErrorBox from "../ui/ErrorBox.svelte";
     import Widget from "./base/Widget.svelte";
+    import Loadable from "../ui/Loadable.svelte";
 
     let metrics = getContext("metrics") as MetricsProvider;
 </script>
 
 <Widget title="Data Transfer">
-    {#if metrics.state.initializing}
-        <p>Loading...</p>
-    {:else if metrics.state.error}
-        <ErrorBox><p>{metrics.state.error}</p></ErrorBox>
-    {:else}
+    <Loadable loadable={metrics}>
         <Card --card-background="var(--primary-600)" --card-padding="1rem">
             <div class="primary-metric">
                 <div class="primary-metric-value">
@@ -48,7 +44,7 @@
                 {/if}
             </div>
         </Card>
-    {/if}
+    </Loadable>
 </Widget>
 
 <style>

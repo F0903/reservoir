@@ -55,6 +55,7 @@
         /* Create a flex row to contain the columns */
         display: flex;
         flex-direction: row;
+        justify-content: center;
         gap: var(--widget-grid-gap, 1rem);
         flex-wrap: wrap;
 
@@ -65,6 +66,7 @@
     :global(.grid .grid-column) {
         display: flex;
         flex-direction: column;
+        align-items: center;
         gap: var(--widget-grid-gap, 1rem);
     }
 </style>
