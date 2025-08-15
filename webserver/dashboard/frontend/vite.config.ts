@@ -7,7 +7,7 @@ export default defineConfig({
         port: 5173, // Use default Vite port to avoid conflict with Go API
         proxy: {
             "/api": {
-                target: "http://localhost:8080", // Your Go API server
+                target: "http://localhost:8080", // The proxy API
                 changeOrigin: true,
                 secure: false,
             },
