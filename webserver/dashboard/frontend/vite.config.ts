@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
     server: {
+        open: true,
         port: 5173, // Use default Vite port to avoid conflict with Go API
         proxy: {
             "/api": {
