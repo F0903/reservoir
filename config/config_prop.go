@@ -14,7 +14,7 @@ func NewConfigProp[T any](value T) ConfigProp[T] {
 	return ConfigProp[T]{value: overwritable.New(value)}
 }
 
-func (p *ConfigProp[T]) Read() T {
+func (p ConfigProp[T]) Read() T {
 	return p.value.Get()
 }
 

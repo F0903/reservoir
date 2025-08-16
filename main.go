@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"reservoir/config"
+	"reservoir/logging"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
@@ -65,6 +66,8 @@ func startWebServer(address string, errChan chan error, ctx context.Context) err
 }
 
 func main() {
+	logging.Init()
+
 	address := flag.String("listen", ":9999", "The address and port that the proxy will listen on")
 	caCertFile := flag.String("ca-cert", "ssl/ca.crt", "Path to CA certificate file")
 	caKeyFile := flag.String("ca-key", "ssl/ca.key", "Path to CA private key file")

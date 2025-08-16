@@ -33,6 +33,8 @@ type Config struct {
 	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
 	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
 	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	LogLevel                ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
+	LogPath                 ConfigProp[string]            `json:"log_path"`                    // The path to the log file.
 }
 
 func newDefault() Config {
@@ -46,6 +48,8 @@ func newDefault() Config {
 		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
 		UpstreamDefaultHttps:    NewConfigProp(true),
+		LogLevel:                NewConfigProp(slog.LevelInfo),
+		LogPath:                 NewConfigProp("var/proxy.log"),
 	}
 }
 

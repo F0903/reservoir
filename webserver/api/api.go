@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/endpoints/config"
+	"reservoir/webserver/api/endpoints/logs"
 	"reservoir/webserver/api/endpoints/metrics"
 )
 
@@ -30,6 +31,7 @@ func New() *API {
 			&metrics.RequestsMetricsEndpoint{},
 			&metrics.TimingMetricsEndpoint{},
 			&config.ConfigEndpoint{},
+			&logs.LogsEndpoint{},
 		},
 	}
 }

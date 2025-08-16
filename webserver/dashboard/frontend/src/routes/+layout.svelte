@@ -6,7 +6,7 @@
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
-    import { LayoutDashboard, Settings } from "@lucide/svelte";
+    import { LayoutDashboard, Logs, Settings } from "@lucide/svelte";
     import { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { setContext } from "svelte";
     import { SettingsProvider } from "$lib/providers/settings.svelte";
@@ -27,6 +27,7 @@
         <SideNav>
             <SideNavButton url="/"><LayoutDashboard />Dashboard</SideNavButton>
             <SideNavButton url="/settings"><Settings />Settings</SideNavButton>
+            <SideNavButton url="/logs"><Logs />Logs</SideNavButton>
         </SideNav>
     </div>
     <div class="main-area">

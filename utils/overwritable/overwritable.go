@@ -20,7 +20,7 @@ func New[T any](value T) Overwritable[T] {
 }
 
 // Returns the overwritten value if it exists, otherwise returns the original value.
-func (o *Overwritable[T]) Get() T {
+func (o Overwritable[T]) Get() T {
 	return o.overwritten.UnwrapOr(o.value)
 }
 
