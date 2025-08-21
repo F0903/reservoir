@@ -247,7 +247,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
 		slog.Info("Cache miss", "key", key.Hex)
-		return nil, ErrorCacheMiss
+		return nil, ErrCacheMiss
 	}
 
 	dataFile, err := os.Open(fileName)

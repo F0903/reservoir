@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const configVersion = 1
+const configVersion = 2
 
 var (
 	ErrConfigFileOpen        = errors.New("config file open failed")
@@ -34,7 +34,7 @@ type Config struct {
 	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
 	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 	LogLevel                ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
-	LogPath                 ConfigProp[string]            `json:"log_path"`                    // The path to the log file.
+	LogFile                 ConfigProp[string]            `json:"log_file"`                    // The path to the log file. If empty, logging will only be done to stdout.
 }
 
 func newDefault() Config {
@@ -49,7 +49,7 @@ func newDefault() Config {
 		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
 		UpstreamDefaultHttps:    NewConfigProp(true),
 		LogLevel:                NewConfigProp(slog.LevelInfo),
-		LogPath:                 NewConfigProp("var/proxy.log"),
+		LogFile:                 NewConfigProp("var/proxy.log"),
 	}
 }
 

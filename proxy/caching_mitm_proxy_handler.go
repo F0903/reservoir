@@ -109,7 +109,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 	key := cache.MakeFromRequest(req)
 
 	cached, err := p.cache.Get(key)
-	if err != nil && !errors.Is(err, cache.ErrorCacheMiss) {
+	if err != nil && !errors.Is(err, cache.ErrCacheMiss) {
 		slog.Error("Error getting cache for key", "key", key, "error", err)
 		r.WriteError("error retrieving from cache", http.StatusInternalServerError)
 		return fmt.Errorf("%w: %v", ErrCacheGetFailed, err)

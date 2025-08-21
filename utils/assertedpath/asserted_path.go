@@ -20,22 +20,39 @@ func createDirs(path string) error {
 	return nil
 }
 
-func assertPath(path string) {
+func assertPath(path string) error {
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		return // Path already exists, no need to create it
+		return nil // Path already exists, no need to create it
 	}
 
 	if err := createDirs(path); err != nil {
-		slog.Error("Failed to create directories", "path", path, "error", err)
-		panic(err)
+		return fmt.Errorf("failed to assert path '%s': %v", path, err)
 	}
+	return nil
 }
 
+// Asserts the existence of a directory at the specified path, creating it if necessary.
+// If the directory cannot be created, it will panic.
 func Assert(path string) AssertedPath {
-	assertPath(path)
+	if err := assertPath(path); err != nil {
+		panic(err)
+	}
+
 	return AssertedPath{
 		Path: path,
 	}
+}
+
+// Asserts the existence of a directory at the specified path, creating it if necessary.
+// As opposed to Assert, this function returns an error instead of panicking.
+func TryAssert(path string) (AssertedPath, error) {
+	if err := assertPath(path); err != nil {
+		return AssertedPath{}, err
+	}
+
+	return AssertedPath{
+		Path: path,
+	}, nil
 }
 
 func (ap AssertedPath) EnsureCleared() AssertedPath {

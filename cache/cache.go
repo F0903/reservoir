@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrorCacheMiss        = errors.New("cache miss")
+	ErrCacheMiss          = errors.New("cache miss")
 	ErrCacheEntryNotFound = errors.New("cache entry not found")
 )
 

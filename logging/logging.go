@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,24 +10,78 @@ import (
 	"reservoir/utils/assertedpath"
 )
 
-var logPath = assertedpath.Assert(config.Get().LogPath.Read())
+var (
+	ErrNoLogFile = errors.New("no log file configured")
+)
 
-func OpenLogFile() *os.File {
-	f, err := os.OpenFile(logPath.Path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-	if err != nil {
-		panic(fmt.Errorf("failed to open log file: %v", err))
+func OpenLogFile(readonly bool) (*os.File, error) {
+	config := config.Get()
+
+	logFilePath := config.LogFile.Read()
+	if logFilePath == "" {
+		return nil, ErrNoLogFile
 	}
 
-	return f
+	assertedPath, err := assertedpath.TryAssert(logFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var perms os.FileMode
+	var flags int
+
+	if readonly {
+		flags = os.O_RDONLY
+		perms = 0444
+	} else {
+		flags = os.O_RDWR | os.O_APPEND | os.O_CREATE
+		perms = 0644
+	}
+
+	logFile, err := os.OpenFile(assertedPath.Path, flags, perms)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	return logFile, nil
+}
+
+func initLogFileWriter(writers *[]io.Writer) {
+	slog.Info("Initializing log file writer...")
+
+	logFile, err := OpenLogFile(false)
+	if err != nil {
+		if errors.Is(err, ErrNoLogFile) {
+			slog.Info("No log file configured, skipping log file writer initialization")
+			return
+		}
+		panic(fmt.Errorf("failed to open log file: %v", err))
+	}
+	// Don't close File since we are handing it to slog
+
+	*writers = append(*writers, logFile)
+	slog.Info("Log file writer added successfully", "path", logFile.Name())
 }
 
 func Init() {
 	config := config.Get()
 
-	logFile := OpenLogFile()
-	mw := io.MultiWriter(os.Stdout, logFile)
+	slog.Info("Initializing logging...")
+
+	slog.Info("Setting up log writers...")
+	slog.Info("Added Stdout writer")
+	var writers []io.Writer = []io.Writer{
+		os.Stdout,
+	}
+	initLogFileWriter(&writers)
+
+	logLevel := config.LogLevel.Read()
+
+	slog.Info("Setting up slog handler...")
+	mw := io.MultiWriter(writers...)
 	handler := slog.NewTextHandler(mw, &slog.HandlerOptions{
-		Level: config.LogLevel.Read(),
+		Level: logLevel,
 	})
 	slog.SetDefault(slog.New(handler))
+	slog.Info("Slog handler and multi-writer set up successfully", "log_level", logLevel)
 }

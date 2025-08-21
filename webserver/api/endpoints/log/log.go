@@ -1,6 +1,8 @@
-package logs
+package log
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"reservoir/logging"
@@ -10,7 +12,7 @@ import (
 type LogsEndpoint struct{}
 
 func (m *LogsEndpoint) Path() string {
-	return "/logs"
+	return "/log"
 }
 
 func (m *LogsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
@@ -23,7 +25,17 @@ func (m *LogsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *LogsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
-	logFile := logging.OpenLogFile()
+	logFile, err := logging.OpenLogFile(true)
+	if err != nil {
+		if errors.Is(err, logging.ErrNoLogFile) {
+			slog.Warn("tried to call /log but no log file is configured")
+			http.Error(w, "no log file configured", http.StatusNotFound)
+			return
+		}
+		slog.Error("failed to open log file", "error", err)
+		http.Error(w, "failed to open log file", http.StatusInternalServerError)
+		return
+	}
 	defer logFile.Close()
 
 	logFileStat, err := logFile.Stat()
@@ -36,3 +48,5 @@ func (m *LogsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeContent(w, r, filename, logFileStat.ModTime(), logFile)
 }
+
+//TODO: Add SSE streaming endpoint for "tailing" the log
