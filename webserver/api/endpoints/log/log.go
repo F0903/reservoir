@@ -9,13 +9,13 @@ import (
 	"reservoir/webserver/api/apitypes"
 )
 
-type LogsEndpoint struct{}
+type LogEndpoint struct{}
 
-func (m *LogsEndpoint) Path() string {
+func (m *LogEndpoint) Path() string {
 	return "/log"
 }
 
-func (m *LogsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
+func (m *LogEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
 			Method: "GET",
@@ -24,7 +24,7 @@ func (m *LogsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *LogsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
+func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 	logFile, err := logging.OpenLogFile(true)
 	if err != nil {
 		if errors.Is(err, logging.ErrNoLogFile) {
@@ -48,5 +48,3 @@ func (m *LogsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeContent(w, r, filename, logFileStat.ModTime(), logFile)
 }
-
-//TODO: Add SSE streaming endpoint for "tailing" the log

@@ -1,0 +1,15 @@
+meta {
+  name: Get Log
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{url}}/api/log
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
