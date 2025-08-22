@@ -5,7 +5,7 @@ export interface APIObjectConstructor<T> {
 }
 
 // Represents a raw JSON API object.
-export class RawAPIObject {
+export class APIJsonObject {
     [key: string]: unknown;
 
     constructor(json: Record<string, unknown>) {
@@ -13,11 +13,7 @@ export class RawAPIObject {
     }
 }
 
-export async function apiGet<T>(
-    endpoint: string,
-    type: APIObjectConstructor<T>,
-    fetchFn: FetchFn = fetch,
-): Promise<T> {
+async function getAssert(endpoint: string, fetchFn: FetchFn = fetch): Promise<Response> {
     const fullEndpoint = `/api${endpoint}`;
 
     // We use window.location.origin since the frontend is served embedded from
@@ -30,7 +26,28 @@ export async function apiGet<T>(
         throw new Error(`Failed to fetch from '${url}'`);
     }
 
-    const json = await response.json();
+    return response;
+}
+
+export async function apiGetTextStream(
+    endpoint: string,
+    fetchFn: FetchFn = fetch,
+): Promise<ReadableStream<string>> {
+    const resp = await getAssert(endpoint, fetchFn);
+    if (!resp.body) {
+        throw new Error(`Body was empty when fetching text stream from '${endpoint}'`);
+    }
+
+    return resp.body.pipeThrough(new TextDecoderStream());
+}
+
+export async function apiGet<T>(
+    endpoint: string,
+    type: APIObjectConstructor<T>,
+    fetchFn: FetchFn = fetch,
+): Promise<T> {
+    const resp = await getAssert(endpoint, fetchFn);
+    const json = await resp.json();
 
     return new type(json) as T;
 }

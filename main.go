@@ -14,6 +14,7 @@ import (
 	"reservoir/webserver"
 	"reservoir/webserver/api"
 	"reservoir/webserver/dashboard"
+	"strconv"
 	"syscall"
 )
 
@@ -75,10 +76,11 @@ func main() {
 	webserverAddress := flag.String("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on")
 	noDashboard := flag.Bool("no-dashboard", false, "Disable the dashboard")
 	noApi := flag.Bool("no-api", false, "Disable the API")
+	logLevel := flag.String("log-level", "", "Set the logging level (DEBUG, INFO, WARN, ERROR)")
 	flag.Parse()
 
 	if *noDashboard || *noApi {
-		slog.Info("Updating global config based on command line flags", "dashboard_disabled", *noDashboard, "api_disabled", *noApi)
+		slog.Info("Updating global config based on command line flags", "no_dashboard", *noDashboard, "no_api", *noApi)
 		config.Update(func(cfg *config.Config) {
 			if *noDashboard {
 				cfg.DashboardEnabled.Overwrite(false)
@@ -87,6 +89,17 @@ func main() {
 			if *noApi {
 				cfg.ApiEnabled.Overwrite(false)
 			}
+		})
+	}
+
+	if *logLevel != "" {
+		slog.Info("Updating global config based on command line flags", "log_level", *logLevel)
+		config.Update(func(cfg *config.Config) {
+			var level slog.Level
+			quoted := strconv.Quote(*logLevel)
+			level.UnmarshalJSON([]byte(quoted))
+			cfg.LogLevel.Overwrite(level)
+			logging.SetLogLevel(level)
 		})
 	}
 

@@ -16,7 +16,9 @@
         "--ca-cert",
         "ssl/ca.crt",
         "--ca-key",
-        "ssl/ca.key"
+        "ssl/ca.key",
+        "--log-level",
+        "DEBUG"
       ],
       "console": "integratedTerminal",
       "preLaunchTask": "build-frontend"
@@ -35,7 +37,9 @@
         "ssl/ca.crt",
         "--ca-key",
         "ssl/ca.key",
-        "--no-dashboard"
+        "--no-dashboard",
+        "--log-level",
+        "DEBUG"
       ],
       "console": "integratedTerminal"
     },

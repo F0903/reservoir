@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { type FetchFn, RawAPIObject } from "$lib/api/api-object";
+import { type FetchFn, APIJsonObject } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
 import { log } from "$lib/utils/logger";
 import { getContext } from "svelte";
@@ -81,7 +81,7 @@ export class MetricsProvider {
         log.debug("Refreshing metrics...");
 
         try {
-            const newData = await getAllMetrics(RawAPIObject, this.fetchFn);
+            const newData = await getAllMetrics(APIJsonObject, this.fetchFn);
             this.data.updateFrom(newData as Record<string, unknown>);
             this.state = { tag: "ok", errorMsg: null };
         } catch (error) {

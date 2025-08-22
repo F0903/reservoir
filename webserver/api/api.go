@@ -32,6 +32,7 @@ func New() *API {
 			&metrics.TimingMetricsEndpoint{},
 			&config.ConfigEndpoint{},
 			&log.LogEndpoint{},
+			&log.LogStreamEndpoint{},
 		},
 	}
 }

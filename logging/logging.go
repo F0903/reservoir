@@ -14,6 +14,8 @@ var (
 	ErrNoLogFile = errors.New("no log file configured")
 )
 
+var logLevel slog.LevelVar
+
 func OpenLogFile(readonly bool) (*os.File, error) {
 	config := config.Get()
 
@@ -63,6 +65,10 @@ func initLogFileWriter(writers *[]io.Writer) {
 	slog.Info("Log file writer added successfully", "path", logFile.Name())
 }
 
+func SetLogLevel(level slog.Level) {
+	logLevel.Set(level)
+}
+
 func Init() {
 	config := config.Get()
 
@@ -75,13 +81,15 @@ func Init() {
 	}
 	initLogFileWriter(&writers)
 
-	logLevel := config.LogLevel.Read()
+	level := config.LogLevel.Read()
+	slog.Info("Setting log level", "log-level", level)
+	logLevel.Set(level)
 
 	slog.Info("Setting up slog handler...")
 	mw := io.MultiWriter(writers...)
 	handler := slog.NewTextHandler(mw, &slog.HandlerOptions{
-		Level: logLevel,
+		Level: &logLevel,
 	})
 	slog.SetDefault(slog.New(handler))
-	slog.Info("Slog handler and multi-writer set up successfully", "log_level", logLevel)
+	slog.Info("Slog handler and multi-writer set up successfully", "log-level", level)
 }

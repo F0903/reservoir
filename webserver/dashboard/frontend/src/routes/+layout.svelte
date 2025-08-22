@@ -27,7 +27,7 @@
         <SideNav>
             <SideNavButton url="/"><LayoutDashboard />Dashboard</SideNavButton>
             <SideNavButton url="/settings"><Settings />Settings</SideNavButton>
-            <SideNavButton url="/logs"><Logs />Logs</SideNavButton>
+            <SideNavButton url="/log"><Logs />Log</SideNavButton>
         </SideNav>
     </div>
     <div class="main-area">
