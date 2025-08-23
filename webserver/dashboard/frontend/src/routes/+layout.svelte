@@ -53,18 +53,29 @@
 
     .header-area {
         grid-area: header;
+        min-height: 0;
+        min-width: 0;
+        width: 100%;
     }
 
     .sidenav-area {
         grid-area: sidenav;
+        min-height: 0;
+        min-width: 0;
+        height: 100%;
     }
 
     .main-area {
         grid-area: main;
+        min-height: 0;
+        min-width: 0;
+        height: 100%;
     }
 
     .page-container {
-        overflow-y: auto;
         padding: 2rem;
+
+        overflow-y: auto;
+        height: 100%;
     }
 </style>

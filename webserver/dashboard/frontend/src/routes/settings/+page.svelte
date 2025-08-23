@@ -1,4 +1,5 @@
 <script lang="ts">
+    import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import SettingInput from "$lib/components/ui/settings/SettingInput.svelte";
     import TextInput from "$lib/components/ui/TextInput.svelte";
     import type { SettingsProvider } from "$lib/providers/settings.svelte";
@@ -60,16 +61,7 @@
     }
 </script>
 
-<h1 class="page-title">Settings</h1>
+<PageTitle>Settings</PageTitle>
 {#each inputs as input, i}
     <SettingInput bind:this={inputComponents[i]} {...input} />
 {/each}
-
-<style>
-    .page-title {
-        font-size: 1.75rem;
-        font-weight: bold;
-        color: var(--secondary-500);
-        margin-bottom: 1rem;
-    }
-</style>
