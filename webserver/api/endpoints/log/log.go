@@ -25,7 +25,7 @@ func (m *LogEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request) {
-	logFile, err := logging.OpenLogFile(true)
+	logFile, err := logging.OpenLogFileRead()
 	if err != nil {
 		if errors.Is(err, logging.ErrNoLogFile) {
 			slog.Warn("tried to call /log but no log file is configured")

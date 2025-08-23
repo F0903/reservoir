@@ -10,6 +10,8 @@ import (
 	"reservoir/config"
 	"reservoir/logging/early"
 	"reservoir/utils/assertedpath"
+
+	"github.com/DeRuina/timberjack"
 )
 
 var (
@@ -18,7 +20,7 @@ var (
 
 var logLevel slog.LevelVar
 
-func OpenLogFile(readonly bool) (*os.File, error) {
+func OpenLogFileRead() (*os.File, error) {
 	config := config.Get()
 
 	logFilePath := config.LogFile.Read()
@@ -31,18 +33,7 @@ func OpenLogFile(readonly bool) (*os.File, error) {
 		return nil, err
 	}
 
-	var perms os.FileMode
-	var flags int
-
-	if readonly {
-		flags = os.O_RDONLY
-		perms = 0444
-	} else {
-		flags = os.O_RDWR | os.O_APPEND | os.O_CREATE
-		perms = 0644
-	}
-
-	logFile, err := os.OpenFile(assertedPath.Path, flags, perms)
+	logFile, err := os.OpenFile(assertedPath.Path, os.O_RDONLY, 0444)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -50,23 +41,30 @@ func OpenLogFile(readonly bool) (*os.File, error) {
 	return logFile, nil
 }
 
-// Initializes and appends a log file writer to the provided writers slice and returns it.
-func appendLogFileWriter(writers *[]io.Writer) *os.File {
+// Initializes and appends a log file writer to the provided writers slice if configured and returns it.
+// If file logging is disabled in config, this will return nil.
+func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
 	slog.Info("Initializing log file writer...")
 
-	logFile, err := OpenLogFile(false)
-	if err != nil {
-		if errors.Is(err, ErrNoLogFile) {
-			slog.Info("No log file configured, skipping log file writer initialization")
-			return nil
-		}
-		panic(fmt.Errorf("failed to open log file: %v", err))
-	}
-	// Don't close File since we are handing it to slog
+	logFilePath := cfg.LogFile.Read()
 
-	*writers = append(*writers, logFile)
-	slog.Info("Added log file writer", "path", logFile.Name())
-	return logFile
+	if logFilePath == "" {
+		slog.Info("Log file logging is disabled, skipping log file writer initialization")
+		return nil
+	}
+
+	tj := &timberjack.Logger{
+		Filename:   logFilePath,
+		MaxSize:    500,
+		MaxBackups: 3,
+		Compress:   true,
+		LocalTime:  true,
+	}
+
+	*writers = append(*writers, tj)
+	slog.Info("Added log file writer", "path", logFilePath)
+
+	return tj
 }
 
 func SetLogLevel(level slog.Level) {
@@ -85,7 +83,7 @@ func Init() {
 		slog.Info("Added Stdout writer")
 	}
 
-	logFile := appendLogFileWriter(&writers)
+	logFile := appendLogFileWriter(&config, &writers)
 
 	level := config.LogLevel.Read()
 	slog.Info("Setting log level", "log-level", level)
