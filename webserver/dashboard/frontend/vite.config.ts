@@ -13,6 +13,9 @@ export default defineConfig({
                 secure: false,
             },
         },
+        watch: {
+            ignored: ["/var/", "/ssl/", "/build/", "/.svelte-kit/"],
+        },
     },
     plugins: [sveltekit(), devtoolsJson()],
 });

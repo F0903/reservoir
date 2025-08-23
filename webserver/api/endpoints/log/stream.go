@@ -8,11 +8,20 @@ import (
 	"net/http"
 	"os"
 	"reservoir/config"
+	"reservoir/utils"
 	"reservoir/webserver/api/apitypes"
+	"reservoir/webserver/streaming"
 	"time"
 )
 
 type LogStreamEndpoint struct{}
+
+type logStreamStore struct {
+	partial       []byte // carry incomplete line between reads
+	currentOffset int64  // current read offset in the log file
+	logPath       string
+	logFile       *os.File
+}
 
 func (m *LogStreamEndpoint) Path() string {
 	return "/log/stream"
@@ -27,15 +36,72 @@ func (m *LogStreamEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
+func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte) error, store *logStreamStore) {
+	logStat, err := os.Stat(store.logPath)
+	if err != nil {
+		// transient error; try again on next tick
+		slog.Error("failed to stat log file in SSE stream", "error", err)
+		return
+	}
+
+	logSize := logStat.Size()
+
+	// Rotation/truncate: size shrank -> reopen, reset
+	if logSize < store.currentOffset {
+		slog.Debug("log file rotated or truncated", "log_file", store.logPath)
+
+		store.logFile.Close() // Close old one before opening new.
+		store.logFile, store.currentOffset, err = utils.OpenWithSize(store.logPath)
+		if err != nil {
+			return
+		}
+		defer store.logFile.Close()
+
+		store.partial = nil
+	}
+
+	if logSize == store.currentOffset {
+		slog.Debug("no new data in log file", "log_file", store.logPath)
+		return
+	}
+
+	// Cap burst reads to 1MB per tick to avoid huge allocations
+	writeNum := min(logSize-store.currentOffset, 1<<20)
+
+	buf := make([]byte, writeNum)
+	readCount, err := store.logFile.ReadAt(buf, store.currentOffset)
+	if err != nil && !errors.Is(err, io.EOF) {
+		slog.Error("failed to read log file in SSE stream", "error", err)
+		return
+	}
+
+	store.currentOffset += int64(readCount)
+	chunk := append(store.partial, buf[:readCount]...)
+
+	// Split by newline; keep tail as partial if not terminated
+	lines := bytes.Split(chunk, []byte{'\n'})
+	if len(lines) == 0 {
+		slog.Debug("no complete lines read, skipping", "log_file", store.logPath)
+		return
+	}
+
+	store.partial = nil
+	// If last segment isn’t newline-terminated, keep it as partial
+	last := lines[len(lines)-1]
+	if readCount == 0 || (len(last) > 0 && chunk[len(chunk)-1] != '\n') {
+		store.partial = last
+		lines = lines[:len(lines)-1]
+	}
+
+	for _, line := range lines {
+		if err := writeStream(line); err != nil {
+			return
+		}
+	}
+}
+
 func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request) {
-	//TODO: refactor and seperate generic SSE logic
-
 	header := w.Header()
-	header.Set("Content-Type", "text/event-stream")
-	header.Set("Cache-Control", "no-cache")
-	header.Set("Connection", "keep-alive")
-
-	slog.Debug("starting SSE stream")
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -51,133 +117,19 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	openStat := func() (*os.File, int64, error) {
-		f, err := os.Open(logFilePath)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		st, err := f.Stat()
-		if err != nil {
-			f.Close()
-			return nil, 0, err
-		}
-
-		return f, st.Size(), nil
-	}
-
-	f, offset, err := openStat()
+	f, offset, err := utils.OpenWithSize(logFilePath)
 	if err != nil {
 		http.Error(w, "failed to open log file", http.StatusInternalServerError)
 		return
 	}
 	defer f.Close()
 
-	ticker := time.NewTicker(300 * time.Millisecond)
-	defer ticker.Stop()
-
-	heartbeat := time.NewTicker(15 * time.Second)
-	defer heartbeat.Stop()
-
-	var partial []byte // carry incomplete line between reads
-
-	writeLine := func(line []byte) error {
-		// SSE frame: data:<line>\n\n
-
-		// Avoid CR in Windows \r\n
-		line = bytes.TrimRight(line, "\r\n")
-		if len(line) == 0 {
-			return nil
-		}
-
-		if _, err := w.Write([]byte("data: ")); err != nil {
-			return err
-		}
-		if _, err := w.Write(line); err != nil {
-			return err
-		}
-		if _, err := w.Write([]byte("\n\n")); err != nil {
-			return err
-		}
-
-		flusher.Flush()
-		return nil
+	store := logStreamStore{
+		partial:       nil,
+		currentOffset: offset,
+		logPath:       logFilePath,
+		logFile:       f,
 	}
-
-	for {
-		select {
-		case <-r.Context().Done():
-			slog.Debug("SSE stream done")
-			return
-
-		case <-heartbeat.C:
-			// SSE heartbeat (comment format)
-			_, _ = w.Write([]byte(": ping\n\n"))
-			flusher.Flush()
-			slog.Debug("sent SSE stream heartbeat")
-
-		case <-ticker.C:
-			slog.Debug("running SSE tick")
-
-			logStat, err := os.Stat(logFilePath)
-			if err != nil {
-				// transient error; try again on next tick
-				slog.Error("failed to stat log file in SSE stream", "error", err)
-				continue
-			}
-
-			logSize := logStat.Size()
-
-			// Rotation/truncate: size shrank -> reopen, reset
-			if logSize < offset {
-				slog.Debug("log file rotated or truncated", "log_file", logFilePath)
-
-				f.Close()
-				f, offset, err = openStat()
-				if err != nil {
-					continue
-				}
-				partial = nil
-			}
-
-			if logSize == offset {
-				slog.Debug("no new data in log file", "log_file", logFilePath)
-				continue // no new data
-			}
-
-			// Cap burst reads to 1MB per tick to avoid huge allocations
-			writeNum := min(logSize-offset, 1<<20)
-
-			buf := make([]byte, writeNum)
-			readCount, err := f.ReadAt(buf, offset)
-			if err != nil && !errors.Is(err, io.EOF) {
-				slog.Error("failed to read log file in SSE stream", "error", err)
-				continue
-			}
-
-			offset += int64(readCount)
-			chunk := append(partial, buf[:readCount]...)
-
-			// Split by newline; keep tail as partial if not terminated
-			lines := bytes.Split(chunk, []byte{'\n'})
-			if len(lines) == 0 {
-				slog.Debug("no complete lines read, skipping", "log_file", logFilePath)
-				continue
-			}
-
-			partial = nil
-			// If last segment isn’t newline-terminated, keep it as partial
-			last := lines[len(lines)-1]
-			if readCount == 0 || (len(last) > 0 && chunk[len(chunk)-1] != '\n') {
-				partial = last
-				lines = lines[:len(lines)-1]
-			}
-
-			for _, line := range lines {
-				if err := writeLine(line); err != nil {
-					return
-				}
-			}
-		}
-	}
+	sse := streaming.NewSseStream(header, w, flusher, 1*time.Second, 500*time.Millisecond, r.Context(), m, store)
+	defer sse.Close()
 }

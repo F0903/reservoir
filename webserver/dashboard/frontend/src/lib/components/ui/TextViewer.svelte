@@ -12,8 +12,8 @@
 
     export function appendText(newText: string) {
         text.textContent += newText;
+        viewer.scrollTop = viewer.scrollHeight;
 
-        console.log(viewer.scrollTop, viewer.clientHeight, viewer.scrollHeight - scrollMargin);
         if (viewer.scrollTop + viewer.clientHeight >= viewer.scrollHeight - scrollMargin) {
             viewer.scrollTop = viewer.scrollHeight;
         }
