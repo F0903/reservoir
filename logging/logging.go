@@ -1,12 +1,14 @@
 package logging
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"reservoir/config"
+	"reservoir/logging/early"
 	"reservoir/utils/assertedpath"
 )
 
@@ -48,21 +50,23 @@ func OpenLogFile(readonly bool) (*os.File, error) {
 	return logFile, nil
 }
 
-func initLogFileWriter(writers *[]io.Writer) {
+// Initializes and appends a log file writer to the provided writers slice and returns it.
+func appendLogFileWriter(writers *[]io.Writer) *os.File {
 	slog.Info("Initializing log file writer...")
 
 	logFile, err := OpenLogFile(false)
 	if err != nil {
 		if errors.Is(err, ErrNoLogFile) {
 			slog.Info("No log file configured, skipping log file writer initialization")
-			return
+			return nil
 		}
 		panic(fmt.Errorf("failed to open log file: %v", err))
 	}
 	// Don't close File since we are handing it to slog
 
 	*writers = append(*writers, logFile)
-	slog.Info("Log file writer added successfully", "path", logFile.Name())
+	slog.Info("Added log file writer", "path", logFile.Name())
+	return logFile
 }
 
 func SetLogLevel(level slog.Level) {
@@ -75,11 +79,13 @@ func Init() {
 	slog.Info("Initializing logging...")
 
 	slog.Info("Setting up log writers...")
-	slog.Info("Added Stdout writer")
-	var writers []io.Writer = []io.Writer{
-		os.Stdout,
+	var writers []io.Writer = []io.Writer{}
+	if config.LogToStdio.Read() {
+		writers = append(writers, os.Stdout)
+		slog.Info("Added Stdout writer")
 	}
-	initLogFileWriter(&writers)
+
+	logFile := appendLogFileWriter(&writers)
 
 	level := config.LogLevel.Read()
 	slog.Info("Setting log level", "log-level", level)
@@ -91,5 +97,10 @@ func Init() {
 		Level: &logLevel,
 	})
 	slog.SetDefault(slog.New(handler))
+
+	// Write any buffered log entries to the log file
+	early.EarlyBuffer.WriteTo(logFile)
+	early.EarlyBuffer = &bytes.Buffer{} // Reset buffer to "free" memory
+
 	slog.Info("Slog handler and multi-writer set up successfully", "log-level", level)
 }
