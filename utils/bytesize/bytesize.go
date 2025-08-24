@@ -78,7 +78,23 @@ func (b ByteSize) Convert(unit int64) int64 {
 }
 
 func (b ByteSize) Bytes() int64 {
-	return int64(b)
+	return b.Convert(UnitB)
+}
+
+func (b ByteSize) KiloBytes() int64 {
+	return b.Convert(UnitK)
+}
+
+func (b ByteSize) MegaBytes() int64 {
+	return b.Convert(UnitM)
+}
+
+func (b ByteSize) GigaBytes() int64 {
+	return b.Convert(UnitG)
+}
+
+func (b ByteSize) TeraBytes() int64 {
+	return b.Convert(UnitT)
 }
 
 func ParseUnchecked(s string) ByteSize {

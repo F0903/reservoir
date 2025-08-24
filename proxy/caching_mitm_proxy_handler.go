@@ -43,10 +43,16 @@ type cachingMitmProxyHandler struct {
 }
 
 func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*cachingMitmProxyHandler, error) {
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
+
+	var cacheCleanupInterval time.Duration
+	cfgLock.Read(func(c *config.Config) {
+		cacheCleanupInterval = c.CacheCleanupInterval.Read().Cast()
+	})
+
 	return &cachingMitmProxyHandler{
 		ca:    ca,
-		cache: cache.NewFileCache[cachedRequestInfo](cacheDir, config.CacheCleanupInterval.Read().Cast(), ctx),
+		cache: cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, ctx),
 	}, nil
 }
 
@@ -65,8 +71,14 @@ func (p *cachingMitmProxyHandler) ServeHTTP(w http.ResponseWriter, proxyReq *htt
 }
 
 func shouldResponseBeCached(resp *http.Response, upstreamDirective *cacheDirective) bool {
-	config := config.Get()
-	if config.AlwaysCache.Read() {
+	cfgLock := config.Global.Immutable()
+
+	var alwaysCache bool
+	cfgLock.Read(func(c *config.Config) {
+		alwaysCache = c.AlwaysCache.Read()
+	})
+
+	if alwaysCache {
 		return true
 	}
 
@@ -95,7 +107,14 @@ func sendResponse(r responder.Responder, resp io.Reader, header http.Header, req
 func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req *http.Request) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
+
+	var defaultCacheMaxAge time.Duration
+	var upstreamDefaultHttps bool
+	cfgLock.Read(func(c *config.Config) {
+		defaultCacheMaxAge = c.DefaultCacheMaxAge.Read().Cast()
+		upstreamDefaultHttps = c.UpstreamDefaultHttps.Read()
+	})
 
 	clientDirective := parseCacheDirective(req.Header)
 	// The way we handle handle caching should already line up with the client's expectations, so we can remove these headers.
@@ -135,7 +154,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 	}
 
 	slog.Info("Sending request to upstream", "url", req.URL)
-	resp, err := sendRequestToTarget(req, config.UpstreamDefaultHttps.Read())
+	resp, err := sendRequestToTarget(req, upstreamDefaultHttps)
 	if err != nil {
 		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err)
 		r.WriteError("error sending request to upstream target", http.StatusBadGateway)
@@ -152,7 +171,7 @@ func (p *cachingMitmProxyHandler) processHTTPRequest(r responder.Responder, req 
 
 		err := p.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 			// Update the metadata to reflect that the cached response is still valid.
-			maxAge := config.DefaultCacheMaxAge.Read().Cast()
+			maxAge := defaultCacheMaxAge
 			meta.Expires = time.Now().Add(maxAge)
 		})
 		if err != nil {

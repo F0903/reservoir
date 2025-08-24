@@ -77,9 +77,16 @@ func (cd *cacheDirective) shouldCache() bool {
 }
 
 func (cd *cacheDirective) getExpiresOrDefault() time.Time {
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
 
-	if !config.ForceDefaultCacheMaxAge.Read() {
+	var forceDefaultCacheMaxAge bool
+	var defaultCacheMaxAge time.Duration
+	cfgLock.Read(func(c *config.Config) {
+		forceDefaultCacheMaxAge = c.ForceDefaultCacheMaxAge.Read()
+		defaultCacheMaxAge = c.DefaultCacheMaxAge.Read().Cast()
+	})
+
+	if !forceDefaultCacheMaxAge {
 		if cd.cacheControl.IsSome() {
 			cc := cd.cacheControl.ForceUnwrap()
 			if cc.maxAge > 0 {
@@ -91,8 +98,7 @@ func (cd *cacheDirective) getExpiresOrDefault() time.Time {
 		}
 	}
 
-	defaultMaxAge := config.DefaultCacheMaxAge.Read().Cast()
-	return time.Now().Add(defaultMaxAge)
+	return time.Now().Add(defaultCacheMaxAge)
 }
 
 func parseCacheControl(ccHeader string) (*cacheControl, error) {

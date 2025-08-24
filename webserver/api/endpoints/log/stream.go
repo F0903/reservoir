@@ -110,8 +110,13 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := config.Get()
-	logFilePath := cfg.LogFile.Read()
+	cfgLock := config.Global.Immutable()
+
+	var logFilePath string
+	cfgLock.Read(func(c *config.Config) {
+		logFilePath = c.LogFile.Read()
+	})
+
 	if logFilePath == "" {
 		http.Error(w, "no log file configured", http.StatusNotFound)
 		return

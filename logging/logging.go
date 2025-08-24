@@ -21,12 +21,12 @@ var (
 var logLevel slog.LevelVar
 
 func OpenLogFileRead() (*os.File, error) {
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
 
-	logFilePath := config.LogFile.Read()
-	if logFilePath == "" {
-		return nil, ErrNoLogFile
-	}
+	var logFilePath string
+	cfgLock.Read(func(c *config.Config) {
+		logFilePath = c.LogFile.Read()
+	})
 
 	assertedPath, err := assertedpath.TryAssert(logFilePath)
 	if err != nil {
@@ -43,10 +43,21 @@ func OpenLogFileRead() (*os.File, error) {
 
 // Initializes and appends a log file writer to the provided writers slice if configured and returns it.
 // If file logging is disabled in config, this will return nil.
-func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
+func appendLogFileWriter(writers *[]io.Writer) io.Writer {
 	slog.Info("Initializing log file writer...")
 
-	logFilePath := cfg.LogFile.Read()
+	cfgLock := config.Global.Immutable()
+
+	var logFilePath string
+	var logFileMaxSize int
+	var logFileMaxBackups int
+	var logFileCompress bool
+	cfgLock.Read(func(c *config.Config) {
+		logFilePath = c.LogFile.Read()
+		logFileMaxSize = int(c.LogFileMaxSize.Read().MegaBytes())
+		logFileMaxBackups = c.LogFileMaxBackups.Read()
+		logFileCompress = c.LogFileCompress.Read()
+	})
 
 	if logFilePath == "" {
 		slog.Info("Log file logging is disabled, skipping log file writer initialization")
@@ -55,14 +66,14 @@ func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
 
 	tj := &timberjack.Logger{
 		Filename:   logFilePath,
-		MaxSize:    500,
-		MaxBackups: 3,
-		Compress:   true,
+		MaxSize:    logFileMaxSize,
+		MaxBackups: logFileMaxBackups,
+		Compress:   logFileCompress,
 		LocalTime:  true,
 	}
 
 	*writers = append(*writers, tj)
-	slog.Info("Added log file writer", "path", logFilePath)
+	slog.Info("Added log file writer", "path", logFilePath, "max_size", logFileMaxSize, "max_backups", logFileMaxBackups, "compress", logFileCompress)
 
 	return tj
 }
@@ -72,22 +83,30 @@ func SetLogLevel(level slog.Level) {
 }
 
 func Init() {
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
+
+	var logToStdOut bool
+	cfgLock.Read(func(c *config.Config) {
+		logToStdOut = c.LogToStdout.Read()
+
+		// Subscribe to log level changes
+		c.LogLevel.OnChange(func(newLevel slog.Level) {
+			slog.Info("Log level changed by configuration", "new_level", newLevel)
+			logLevel.Set(newLevel)
+		})
+		logLevel.Set(c.LogLevel.Read())
+	})
 
 	slog.Info("Initializing logging...")
 
 	slog.Info("Setting up log writers...")
 	var writers []io.Writer = []io.Writer{}
-	if config.LogToStdio.Read() {
+	if logToStdOut {
 		writers = append(writers, os.Stdout)
 		slog.Info("Added Stdout writer")
 	}
 
-	logFile := appendLogFileWriter(&config, &writers)
-
-	level := config.LogLevel.Read()
-	slog.Info("Setting log level", "log-level", level)
-	logLevel.Set(level)
+	appendLogFileWriter(&writers)
 
 	slog.Info("Setting up slog handler...")
 	mw := io.MultiWriter(writers...)
@@ -96,9 +115,9 @@ func Init() {
 	})
 	slog.SetDefault(slog.New(handler))
 
-	// Write any buffered log entries to the log file
-	early.EarlyBuffer.WriteTo(logFile)
+	// Write any early buffered log entries.
+	early.EarlyBuffer.WriteTo(mw)
 	early.EarlyBuffer = &bytes.Buffer{} // Reset buffer to "free" memory
 
-	slog.Info("Slog handler and multi-writer set up successfully", "log-level", level)
+	slog.Info("Slog handler and multi-writer set up successfully", "log-level", logLevel.String())
 }

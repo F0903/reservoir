@@ -53,9 +53,13 @@ func (c *FileCache[ObjectData]) getLock(key CacheKey) *sync.RWMutex {
 }
 
 func (c *FileCache[ObjectData]) ensureCacheSize() {
-	config := config.Get()
+	cfgLock := config.Global.Immutable()
 
-	maxCacheSize := config.MaxCacheSize.Read().Bytes()
+	var maxCacheSize int64
+	cfgLock.Read(func(c *config.Config) {
+		maxCacheSize = c.MaxCacheSize.Read().Bytes()
+	})
+
 	if c.byteSize < maxCacheSize {
 		return
 	}

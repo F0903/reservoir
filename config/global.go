@@ -14,46 +14,43 @@ var (
 
 var configPath = assertedpath.Assert("var/config.json")
 
-var global *writesynced.WriteSynced[Config] = func() *writesynced.WriteSynced[Config] {
+var Global *writesynced.WriteSynced[Config] = func() *writesynced.WriteSynced[Config] {
 	cfg, err := loadOrDefault(configPath.Path)
 	if err != nil {
 		slog.Error("Failed to load global config", "error", err)
 		panic(err)
 	}
-	return writesynced.New(cfg)
+	return writesynced.New(*cfg)
 }()
 
-// Returns a copy of the current global config
-func Get() Config {
-	return global.Get()
-}
-
-// Update applies the provided function to the global config, verifies it, and persists it.
+// UpdateAndVerify applies the provided function to the global config, verifies it, and persists it.
 // If verification or persistence fails, it reverts to the old config.
-func Update(f func(*Config)) error {
+func UpdateAndVerify(f func(*Config)) error {
 	if f == nil {
 		slog.Error("Update function is nil, skipping config update")
 		return nil
 	}
 
-	old := global.Get()
-	new := global.UpdateAndGet(func(global_config *Config) {
-		f(global_config)
-	})
+	cfgLock := Global.Mutable()
+	cfg := cfgLock.Get()
+	defer cfgLock.UnGet()
 
-	if err := new.verify(); err != nil {
+	old := *cfg
+	f(cfg)
+
+	if err := cfg.verify(); err != nil {
 		slog.Error("Updated global config failed verification", "error", err)
-		global.Set(old) // Revert to old config on error
+		cfg = &old // Revert to old config on error
 		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	if err := new.persist(); err != nil {
+	if err := cfg.persist(); err != nil {
 		slog.Error("Failed to persist updated global config", "error", err)
-		global.Set(old) // Revert to old config on error
+		cfg = &old // Revert to old config on error
 		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	slog.Info("Global config updated successfully", "new_config", new, "old_config", old)
+	slog.Info("Global config updated successfully", "new_config", cfg, "old_config", old)
 	return nil
 }
 
@@ -65,7 +62,7 @@ func UpdatePartialFromJSON(updates map[string]any) error {
 		return nil
 	}
 
-	return Update(func(cfg *Config) {
+	return UpdateAndVerify(func(cfg *Config) {
 		setPropsFromMap(cfg, updates)
 	})
 }

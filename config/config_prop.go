@@ -3,11 +3,13 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"reservoir/utils/event"
 	"reservoir/utils/overwritable"
 )
 
 type ConfigProp[T any] struct {
-	value overwritable.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
+	value    overwritable.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
+	onChange event.Event[T]
 }
 
 func NewConfigProp[T any](value T) ConfigProp[T] {
@@ -26,12 +28,18 @@ func (p *ConfigProp[T]) Update(f func(*T)) {
 	p.Update(f)
 }
 
+func (p *ConfigProp[T]) OnChange(fn event.EventFn[T]) event.Unsubscribe {
+	return p.onChange.Subscribe(fn)
+}
+
 func (p *ConfigProp[T]) Overwrite(value T) {
 	p.value.Overwrite(value)
+	p.onChange.Fire(value)
 }
 
 func (p *ConfigProp[T]) Set(value T) {
 	p.value.Set(value)
+	p.onChange.Fire(value)
 }
 
 func (p *ConfigProp[T]) String() string {

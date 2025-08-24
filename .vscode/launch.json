@@ -11,14 +11,9 @@
       "mode": "debug",
       "program": "main.go",
       "args": [
-        "--listen",
-        "localhost:9999",
-        "--ca-cert",
-        "ssl/ca.crt",
-        "--ca-key",
-        "ssl/ca.key",
         "--log-level",
-        "DEBUG"
+        "DEBUG",
+        "--log-to-stdout"
       ],
       "console": "integratedTerminal",
       "preLaunchTask": "build-frontend"
@@ -31,15 +26,10 @@
       "mode": "debug",
       "program": "main.go",
       "args": [
-        "--listen",
-        "localhost:9999",
-        "--ca-cert",
-        "ssl/ca.crt",
-        "--ca-key",
-        "ssl/ca.key",
         "--no-dashboard",
         "--log-level",
-        "DEBUG"
+        "DEBUG",
+        "--log-to-stdout"
       ],
       "console": "integratedTerminal"
     },
