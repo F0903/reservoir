@@ -54,7 +54,7 @@ func newDefault() *Config {
 		ProxyListen:             NewConfigProp(":9999"),
 		CaCert:                  NewConfigProp("ssl/ca.crt"),
 		CaKey:                   NewConfigProp("ssl/ca.key"),
-		WebserverListen:         NewConfigProp(":8080"),
+		WebserverListen:         NewConfigProp("localhost:8080"),
 		DashboardEnabled:        NewConfigProp(true),
 		ApiEnabled:              NewConfigProp(true),
 		CacheDir:                NewConfigProp("var/cache/"),
