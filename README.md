@@ -54,19 +54,39 @@ Then simply copy the resulting executable to whereever you wish, and run as norm
 
 ### Note When Updating
 
-When updating it is recommended to delete the local var/ folder, as changes to the config or metadata format could cause unexpected behaviour.
+When updating it is recommended to delete the local ``var/cache/`` folder and ``var/config.json``, as changes to the config or metadata format could cause unexpected behaviour.
 
 ## Proxy Configuration
 
-Configuration currently takes place via command-line arguments.
+Configuration can be done either via the generated configuration file, or the command-line arguments.
 
-The arguments currently available are the following:
+If a setting is both specified in the configuration file and as a command-line argument, the command-line argument will take precedence.
+
+### Configuration File
+
+The configuration file is a JSON file that contains all the settings for the proxy.
+You can edit this file manually in ``var/config.json`` to change the configuration. If the ``var/`` folder or config does not exist, run the proxy once, and it will be created automatically.
+Some settings can also be changed in the Dashboard.
+
+### Command-Line Arguments
+
+You can always display info about the command-line arguments by running the proxy with the `--help` flag. Otherwise, you can refer to the following list.
+
+The command-line arguments currently available are the following:
 
 - **listen** (0.0.0.0:9999) - The address and port that the proxy will listen on.
 - **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
 - **cache-dir** (var/cache) - The path where the cache should be stored.
 - **webserver-listen** (localhost:8080) - The address and port that the webserver (dashboard and API) will listen on.
+- **no-dashboard** (false) - Disable the embedded dashboard.
+- **no-api** (false) - Disable the API.
+- **log-level** (info) - Set the logging level (DEBUG, INFO, WARN, ERROR).
+- **log-file** (var/proxy.log) - The path to the log file. If no path is specified, no file logging will be done. (will also disable dashboard log-viewer)
+- **log-file-max-size** (500M) - The maximum size of the log file before it is rotated.
+- **log-file-max-backups** (3) - The maximum number of old log files to keep.
+- **log-file-compress** (true) - Enable compression for rotated log files.
+- **log-to-stdout** (false) - Enable logging to stdout.
 
 ## Example: Using curl with the Proxy
 

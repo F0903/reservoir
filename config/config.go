@@ -216,8 +216,8 @@ func (c *Config) OverrideFromFlags() {
 	})
 	fl.AddString("log-file", "", "Set the log file path").OnSet(func(val flags.FlagValue) { c.LogFile.Overwrite(val.AsString()) })
 	fl.AddString("log-file-max-size", "", "Set the log file max size").OnSet(func(val flags.FlagValue) { c.LogFileMaxSize.Overwrite(val.AsBytesize()) })
-	fl.AddInt("log-file-max-backups", 0, "Set the log file max backups").OnSet(func(val flags.FlagValue) { c.LogFileMaxBackups.Overwrite(val.AsInt()) })
-	fl.AddBool("log-file-compress", false, "Set the log file compress").OnSet(func(val flags.FlagValue) { c.LogFileCompress.Overwrite(val.AsBool()) })
+	fl.AddInt("log-file-max-backups", 3, "Set the log file max backups").OnSet(func(val flags.FlagValue) { c.LogFileMaxBackups.Overwrite(val.AsInt()) })
+	fl.AddBool("log-file-compress", true, "Set the log file compress").OnSet(func(val flags.FlagValue) { c.LogFileCompress.Overwrite(val.AsBool()) })
 	fl.AddBool("log-to-stdout", false, "Enable logging to stdout").OnSet(func(val flags.FlagValue) { c.LogToStdout.Overwrite(val.AsBool()) })
 	fl.Parse()
 }
