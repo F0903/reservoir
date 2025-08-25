@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const configVersion = 5
+const configVersion = 6
 
 var (
 	ErrConfigFileOpen        = errors.New("config file open failed")
@@ -31,8 +31,8 @@ type Config struct {
 	CaCert                  ConfigProp[string]            `json:"ca_cert"`                     // Path to CA certificate file.
 	CaKey                   ConfigProp[string]            `json:"ca_key"`                      // Path to CA private key file.
 	WebserverListen         ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
-	DashboardEnabled        ConfigProp[bool]              `json:"dashboard_enabled"`           // If true, the dashboard will be enabled.
-	ApiEnabled              ConfigProp[bool]              `json:"api_enabled"`                 // If true, the API will be enabled. This will always be enabled if the dashboard is enabled.
+	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
+	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
 	CacheDir                ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored.
 	AlwaysCache             ConfigProp[bool]              `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
 	MaxCacheSize            ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
@@ -55,8 +55,8 @@ func newDefault() *Config {
 		CaCert:                  NewConfigProp("ssl/ca.crt"),
 		CaKey:                   NewConfigProp("ssl/ca.key"),
 		WebserverListen:         NewConfigProp("localhost:8080"),
-		DashboardEnabled:        NewConfigProp(true),
-		ApiEnabled:              NewConfigProp(true),
+		DashboardDisabled:       NewConfigProp(false),
+		ApiDisabled:             NewConfigProp(false),
 		CacheDir:                NewConfigProp("var/cache/"),
 		AlwaysCache:             NewConfigProp(true), // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		MaxCacheSize:            NewConfigProp(bytesize.ParseUnchecked("10G")),
@@ -94,6 +94,7 @@ func (c *Config) persist() error {
 }
 
 func (c *Config) verify() error {
+	// Could perhaps add more validation in the future.
 	if c.ConfigVersion.Read() != configVersion {
 		return ErrConfigVersionMismatch
 	}
@@ -173,13 +174,10 @@ func setPropsFromMap(cfg *Config, updates map[string]any) {
 			}
 			fieldVAddr := fieldV.Addr()
 
-			var valueBytes []byte
-			switch v := value.(type) {
-			case string:
-				// If the value is a string, we need to add quotes around it to parse it correctly.
-				valueBytes = fmt.Appendf(valueBytes, "\"%s\"", v)
-			default:
-				valueBytes = fmt.Appendf(valueBytes, "%v", v)
+			valueBytes, err := json.Marshal(value)
+			if err != nil {
+				slog.Error("Failed to marshal value to JSON", "field", fieldT.Name, "error", err)
+				continue
 			}
 
 			unmarshalJson := fieldVAddr.MethodByName("UnmarshalJSON")
@@ -208,8 +206,8 @@ func (c *Config) OverrideFromFlags() {
 	fl.AddString("ca-key", "ssl/ca.key", "Path to CA private key file").OnSet(func(val flags.FlagValue) { c.CaKey.Overwrite(val.AsString()) })
 	fl.AddString("cache-dir", "var/cache/", "Path to cache directory").OnSet(func(val flags.FlagValue) { c.CacheDir.Overwrite(val.AsString()) })
 	fl.AddString("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on").OnSet(func(val flags.FlagValue) { c.WebserverListen.Overwrite(val.AsString()) })
-	fl.AddBool("no-dashboard", false, "Disable the dashboard").OnSet(func(val flags.FlagValue) { c.DashboardEnabled.Overwrite(val.AsBool()) })
-	fl.AddBool("no-api", false, "Disable the API").OnSet(func(val flags.FlagValue) { c.ApiEnabled.Overwrite(val.AsBool()) })
+	fl.AddBool("no-dashboard", false, "Disable the dashboard. The API must also be enabled if the dashboard is enabled.").OnSet(func(val flags.FlagValue) { c.DashboardDisabled.Overwrite(val.AsBool()) })
+	fl.AddBool("no-api", false, "Disable the API").OnSet(func(val flags.FlagValue) { c.ApiDisabled.Overwrite(val.AsBool()) })
 	fl.AddString("log-level", "", "Set the logging level (DEBUG, INFO, WARN, ERROR)").OnSet(func(val flags.FlagValue) {
 		level := utils.StringToLogLevel(val.AsString())
 		c.LogLevel.Overwrite(level)

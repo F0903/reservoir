@@ -46,37 +46,41 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 	cfgLock := config.Global.Immutable()
 
 	var webserverListen string
-	var dashboardEnabled bool
-	var apiEnabled bool
+	var dashboardDisabled bool
+	var apiDisabled bool
 	cfgLock.Read(func(c *config.Config) {
 		webserverListen = c.WebserverListen.Read()
-		dashboardEnabled = c.DashboardEnabled.Read()
-		apiEnabled = c.ApiEnabled.Read()
+		dashboardDisabled = c.DashboardDisabled.Read()
+		apiDisabled = c.ApiDisabled.Read()
 	})
 
-	if !dashboardEnabled && !apiEnabled {
+	if apiDisabled && !dashboardDisabled {
+		panic("API cannot be disabled while dashboard is enabled")
+	}
+
+	if dashboardDisabled && apiDisabled {
 		slog.Info("Webserver is disabled by configuration, skipping startup")
 		return nil
 	}
 
 	webserver := webserver.New()
 
-	if dashboardEnabled {
+	if dashboardDisabled {
+		slog.Info("Dashboard is disabled by configuration, skipping registration")
+	} else {
 		dashboard := dashboard.New()
 		if err := webserver.Register(dashboard); err != nil {
 			return fmt.Errorf("failed to register dashboard: %v", err)
 		}
-	} else {
-		slog.Info("Dashboard is disabled by configuration, skipping registration")
 	}
 
-	if apiEnabled || dashboardEnabled {
+	if apiDisabled {
+		slog.Info("API is disabled by configuration, skipping registration")
+	} else {
 		api := api.New()
 		if err := webserver.Register(api); err != nil {
 			return fmt.Errorf("failed to register API: %v", err)
 		}
-	} else {
-		slog.Info("API is disabled by configuration, skipping registration")
 	}
 
 	slog.Info("Starting webserver", "address", webserverListen)

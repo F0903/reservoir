@@ -91,8 +91,8 @@ func Init() {
 
 		// Subscribe to log level changes
 		c.LogLevel.OnChange(func(newLevel slog.Level) {
-			slog.Info("Log level changed by configuration", "new_level", newLevel)
 			logLevel.Set(newLevel)
+			slog.Info("Log level changed by configuration", "new_level", newLevel)
 		})
 		logLevel.Set(c.LogLevel.Read())
 	})
