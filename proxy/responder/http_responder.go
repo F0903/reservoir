@@ -18,11 +18,14 @@ func NewHTTPResponder(w http.ResponseWriter) *HTTPResponder {
 	}
 }
 
-func (c *HTTPResponder) SetHeader(header http.Header) {
-	respHeader := c.writer.Header()
-	for key, values := range header {
+func (c *HTTPResponder) SetHeader(name string, value string) {
+	c.writer.Header().Set(name, value)
+}
+
+func (c *HTTPResponder) SetHeaders(headers http.Header) {
+	for key, values := range headers {
 		for _, value := range values {
-			respHeader.Add(key, value)
+			c.SetHeader(key, value)
 		}
 	}
 }

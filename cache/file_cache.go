@@ -78,7 +78,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 
 	for key, meta := range c.entries {
 		timeSinceAccess := now.Sub(meta.LastAccess).Milliseconds()
-		sizeWeight := meta.FileSize.Convert(bytesize.UnitM)
+		sizeWeight := meta.FileSize / bytesize.UnitM
 
 		// Calculate eviction priority (highest = evict first)
 		// Factors: age since last access + file size weight
@@ -309,7 +309,7 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 		TimeWritten: time.Now(),
 		LastAccess:  time.Now(),
 		Expires:     expires,
-		FileSize:    bytesize.ByteSize(fileSize),
+		FileSize:    fileSize,
 		Object:      objectData,
 	}
 	c.entries[key] = meta
@@ -328,6 +328,7 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	return &Entry[ObjectData]{
 		Data:     file,
 		Metadata: meta,
+		Stale:    false,
 	}, nil
 }
 

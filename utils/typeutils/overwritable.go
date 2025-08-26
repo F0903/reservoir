@@ -1,21 +1,20 @@
-package overwritable
+package typeutils
 
 import (
 	"encoding/json"
-	"reservoir/utils/optional"
 )
 
 // A generic type that can be overwritten with a new value, but retains the original value.
 // This is useful for configurations or settings that can be temporarily changed, but should persist as the original value.
 type Overwritable[T any] struct {
 	value       T
-	overwritten optional.Optional[T]
+	overwritten Optional[T]
 }
 
-func New[T any](value T) Overwritable[T] {
+func NewOverwritable[T any](value T) Overwritable[T] {
 	return Overwritable[T]{
 		value:       value,
-		overwritten: optional.None[T](),
+		overwritten: None[T](),
 	}
 }
 
@@ -36,7 +35,7 @@ func (o *Overwritable[T]) Set(value T) {
 }
 
 func (o *Overwritable[T]) Overwrite(value T) {
-	o.overwritten = optional.Some(&value)
+	o.overwritten = Some(&value)
 }
 
 func (o *Overwritable[T]) IsOverwritten() bool {
@@ -54,7 +53,7 @@ func (o *Overwritable[T]) ApplyOverwrite() {
 }
 
 func (o *Overwritable[T]) ClearOverwrite() {
-	o.overwritten = optional.None[T]()
+	o.overwritten = None[T]()
 }
 
 func (o Overwritable[T]) MarshalJSON() ([]byte, error) {

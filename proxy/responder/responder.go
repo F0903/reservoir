@@ -6,11 +6,11 @@ import (
 )
 
 type Responder interface {
-	// Sets the HTTP headers for the response.
-	SetHeader(header http.Header)
+	// Set a single HTTP header for the response.
+	SetHeader(name string, value string)
 
-	// Retrieves the HTTP headers for the response.
-	GetHeader() http.Header
+	// Set multiple HTTP headers for the response.
+	SetHeaders(headers http.Header)
 
 	// Writes the response with the given status code and body.
 	Write(status int, body io.Reader) (written int64, err error)

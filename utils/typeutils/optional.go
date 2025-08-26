@@ -1,4 +1,4 @@
-package optional
+package typeutils
 
 import (
 	"encoding/json"

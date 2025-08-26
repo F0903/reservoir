@@ -42,11 +42,19 @@ func (c *RawHTTPResponder) parseAndSetContentLength() error {
 	return nil
 }
 
-func (c *RawHTTPResponder) SetHeader(header http.Header) {
-	c.response.Header = header
+func (c *RawHTTPResponder) SetHeader(name string, value string) {
+	c.response.Header.Set(name, value)
 }
 
-func (c *RawHTTPResponder) GetHeader() http.Header {
+func (c *RawHTTPResponder) SetHeaders(headers http.Header) {
+	for key, values := range headers {
+		for _, value := range values {
+			c.SetHeader(key, value)
+		}
+	}
+}
+
+func (c *RawHTTPResponder) GetHeaders() http.Header {
 	return c.response.Header
 }
 

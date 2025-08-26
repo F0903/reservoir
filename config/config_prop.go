@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"reservoir/utils/event"
-	"reservoir/utils/overwritable"
+	"reservoir/utils/typeutils"
 )
 
 type ConfigProp[T any] struct {
-	value    overwritable.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
+	value    typeutils.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
 	onChange event.Event[T]
 }
 
 func NewConfigProp[T any](value T) ConfigProp[T] {
-	return ConfigProp[T]{value: overwritable.New(value)}
+	return ConfigProp[T]{value: typeutils.NewOverwritable(value)}
 }
 
 func (p ConfigProp[T]) Read() T {
