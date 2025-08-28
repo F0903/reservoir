@@ -278,7 +278,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
+func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) error {
 	lock := c.getLock(key)
 	lock.Lock()
 	defer lock.Unlock()
@@ -288,7 +288,7 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Failed to create cache file", "key", key.Hex, "error", err)
-		return nil, fmt.Errorf("%w: failed to create cache file '%s'", ErrCacheFileCreate, fileName)
+		return fmt.Errorf("%w: failed to create cache file '%s'", ErrCacheFileCreate, fileName)
 	}
 	// We don't close file here since we are returning it in the Entry.
 
@@ -296,13 +296,13 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Failed to write cache file", "key", key.Hex, "error", err)
-		return nil, fmt.Errorf("%w: failed to write cache file '%s'", ErrCacheFileWrite, fileName)
+		return fmt.Errorf("%w: failed to write cache file '%s'", ErrCacheFileWrite, fileName)
 	}
 
 	if fileSize == 0 {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Cache file is empty", "key", key.Hex, "file_size", fileSize)
-		return nil, fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
+		return fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
 	}
 
 	meta := &EntryMetadata[ObjectData]{
@@ -320,16 +320,9 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	slog.Info("Successfully cached data", "key", key.Hex, "size", fileSize)
 
 	// Check if cache size exceeded limit and evict if necessary
-	c.ensureCacheSize()
+	go c.ensureCacheSize()
 
-	// Reset file stream to the beginning
-	file.Seek(0, io.SeekStart)
-
-	return &Entry[ObjectData]{
-		Data:     file,
-		Metadata: meta,
-		Stale:    false,
-	}, nil
+	return nil
 }
 
 func (c *FileCache[ObjectData]) Delete(key CacheKey) error {
@@ -359,4 +352,27 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*Entr
 
 	slog.Info("Successfully updated metadata", "key", key.Hex)
 	return nil
+}
+
+func (c *FileCache[ObjectData]) GetMetadata(key CacheKey) (meta EntryMetadata[ObjectData], stale bool, err error) {
+	lock := c.getLock(key)
+	lock.RLock()
+	defer lock.RUnlock()
+
+	metaPtr, exists := c.entries[key]
+	if !exists {
+		metrics.Global.Cache.CacheMisses.Increment()
+		slog.Info("Cache miss", "key", key.Hex)
+		return EntryMetadata[ObjectData]{}, false, ErrCacheMiss
+	}
+
+	metrics.Global.Cache.CacheHits.Increment()
+
+	stale = false
+	if metaPtr.Expires.Before(time.Now()) {
+		stale = true // The entry is stale if the expiration time is in the past
+	}
+
+	slog.Debug("Successfully retrieved metadata", "key", key.Hex)
+	return *metaPtr, stale, nil
 }

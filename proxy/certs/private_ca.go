@@ -82,10 +82,9 @@ func (ca *PrivateCA) createCert(dnsNames []string, hoursValid int) (cert []byte,
 		Subject: pkix.Name{
 			Organization: []string{"reservoir"},
 		},
-		DNSNames:  dnsNames,
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Duration(hoursValid) * time.Hour),
-
+		DNSNames:              dnsNames,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(time.Duration(hoursValid) * time.Hour),
 		KeyUsage:              x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,

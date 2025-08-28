@@ -34,7 +34,7 @@ type Config struct {
 	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
 	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
 	CacheDir                ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored.
-	AlwaysCache             ConfigProp[bool]              `json:"always_cache"`                // If true, the proxy will always cache responses, even if the upstream response requests the opposite.
+	IgnoreCacheControl      ConfigProp[bool]              `json:"ignore_cache_control"`        // If true, the proxy will ignore Cache-Control headers from the upstream response.
 	MaxCacheSize            ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
 	DefaultCacheMaxAge      ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
 	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
@@ -58,7 +58,7 @@ func newDefault() *Config {
 		DashboardDisabled:       NewConfigProp(false),
 		ApiDisabled:             NewConfigProp(false),
 		CacheDir:                NewConfigProp("var/cache/"),
-		AlwaysCache:             NewConfigProp(true), // This this is primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		IgnoreCacheControl:      NewConfigProp(true), // This this is primarily targeted at caching package managers, we want to cache aggressively by default.
 		MaxCacheSize:            NewConfigProp(bytesize.ParseUnchecked("10G")),
 		DefaultCacheMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
 		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.

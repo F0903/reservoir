@@ -76,7 +76,13 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 }
 
 func (hd *HeaderDirectives) ShouldCache() bool {
-	if hd.CacheControl.IsSome() {
+	cfgLock := config.Global.Immutable()
+	var ignoreCacheControl bool
+	cfgLock.Read(func(c *config.Config) {
+		ignoreCacheControl = c.IgnoreCacheControl.Read()
+	})
+
+	if !ignoreCacheControl && hd.CacheControl.IsSome() {
 		cc := hd.CacheControl.ForceUnwrap()
 		if cc.noCache {
 			return false // No caching allowed
@@ -92,6 +98,10 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 		if expires.Before(time.Now()) {
 			return false // If the Expires header is in the past, do not cache
 		}
+	}
+
+	if hd.Range.IsSome() {
+		return false // Do not cache responses to Range requests
 	}
 
 	return true // If no cache control or expires headers prevent caching, we can cache

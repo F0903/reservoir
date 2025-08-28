@@ -1,12 +1,12 @@
 # reservoir
 
-A caching MITM (Man-in-the-Middle) forward proxy written in Go with an embedded dashboard written with Svelte.
+A caching MITM (Man-in-the-Middle) HTTP(S) forward proxy with an embedded dashboard.
 
-Supports caching of both HTTP and HTTPS requests by injecting its own certificate to decrypt and cache the data before sending it back to the client.
+Supports caching of both HTTP and HTTPS requests by injecting a certificate to decrypt and cache the data before sending it back to the client.
 
-The original intended usage is as a central cache proxy for apt or other package managers.
+The original intended usage is as a central cache proxy for apt or other package managers when spread across multiple containers.
 
-The dashboard is directly embedded into the executable, so the final build artifact is a single file.
+The dashboard is directly embedded into the executable, so the final build artifact is a single self-contained executable.
 
 ## Requirements
 

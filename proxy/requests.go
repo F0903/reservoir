@@ -16,6 +16,18 @@ var (
 )
 
 func removeHopByHopHeaders(header http.Header) {
+	for _, v := range header.Values("Connection") {
+		for raw := range strings.SplitSeq(v, ",") {
+			token := http.CanonicalHeaderKey(strings.TrimSpace(raw))
+			if token == "" {
+				continue
+			}
+
+			header.Del(token)
+			slog.Debug("Removed header referenced in Connection header:", "header", token)
+		}
+	}
+
 	hopHeaders := []string{
 		"Connection", "Proxy-Connection", "Keep-Alive", "Proxy-Authenticate",
 		"Proxy-Authorization", "TE", "Trailer", "Transfer-Encoding", "Upgrade",

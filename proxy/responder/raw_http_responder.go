@@ -3,6 +3,7 @@ package responder
 import (
 	"bufio"
 	"io"
+	"net"
 	"net/http"
 	"reservoir/utils/countingreader"
 	"strconv"
@@ -44,6 +45,10 @@ func (c *RawHTTPResponder) parseAndSetContentLength() error {
 
 func (c *RawHTTPResponder) SetHeader(name string, value string) {
 	c.response.Header.Set(name, value)
+}
+
+func (c *RawHTTPResponder) AddHeader(name string, value string) {
+	c.response.Header.Add(name, value)
 }
 
 func (c *RawHTTPResponder) SetHeaders(headers http.Header) {
@@ -108,4 +113,8 @@ func (c *RawHTTPResponder) WriteError(message string, errorCode int) error {
 	h.Set("X-Content-Type-Options", "nosniff")
 
 	return c.writeResponse()
+}
+
+func (c *RawHTTPResponder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, ErrHijackNotSupported
 }
