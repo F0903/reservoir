@@ -2,7 +2,7 @@ import { apiGet, type APIObjectConstructor, type FetchFn } from "$lib/api/api-ob
 import { setPropIfChanged } from "$lib/utils/objects";
 import { SvelteDate } from "svelte/reactivity";
 
-export class TimingMetrics {
+export class SystemMetrics {
     startTime: SvelteDate = new SvelteDate();
 
     constructor(json: Record<string, unknown>) {
@@ -16,9 +16,9 @@ export class TimingMetrics {
     }
 }
 
-export async function getTimingMetrics<C extends APIObjectConstructor<T>, T>(
-    type: C = TimingMetrics as C,
+export async function getSystemMetrics<C extends APIObjectConstructor<T>, T>(
+    type: C = SystemMetrics as C,
     fetchFn: FetchFn = fetch,
 ): Promise<T> {
-    return apiGet<T>("/metrics/timing", type, fetchFn);
+    return apiGet<T>("/metrics/system", type, fetchFn);
 }

@@ -1,29 +1,23 @@
 import { apiGet, type APIObjectConstructor, type FetchFn } from "$lib/api/api-object";
 import { CacheMetrics } from "./cache-metrics.svelte";
 import { RequestMetrics } from "./request-metrics.svelte";
-import { TimingMetrics } from "./timing-metrics.svelte";
+import { SystemMetrics } from "./system-metrics.svelte";
 
 export class Metrics {
     [key: string]: unknown;
 
     cache: CacheMetrics = new CacheMetrics({});
     requests: RequestMetrics = new RequestMetrics({});
-    timing: TimingMetrics = new TimingMetrics({});
+    system: SystemMetrics = new SystemMetrics({});
 
     constructor(json: Record<string, unknown>) {
         this.updateFrom(json);
     }
 
     updateFrom = (json: Record<string, unknown>) => {
-        if (json.cache) {
-            this.cache.updateFrom(json.cache as Record<string, unknown>);
-        }
-        if (json.requests) {
-            this.requests.updateFrom(json.requests as Record<string, unknown>);
-        }
-        if (json.timing) {
-            this.timing.updateFrom(json.timing as Record<string, unknown>);
-        }
+        if (json.cache) this.cache.updateFrom(json.cache as Record<string, unknown>);
+        if (json.requests) this.requests.updateFrom(json.requests as Record<string, unknown>);
+        if (json.system) this.system.updateFrom(json.system as Record<string, unknown>);
     };
 }
 

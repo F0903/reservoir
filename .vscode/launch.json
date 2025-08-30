@@ -16,7 +16,7 @@
         "--log-to-stdout"
       ],
       "console": "integratedTerminal",
-      "preLaunchTask": "build-frontend"
+      "preLaunchTask": "setup-frontend"
     },
     {
       // Used for starting the frontend in dev mode seperately.

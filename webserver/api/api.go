@@ -29,7 +29,7 @@ func New() *API {
 			&metrics.AllMetricsEndpoint{},
 			&metrics.CacheMetricsEndpoint{},
 			&metrics.RequestsMetricsEndpoint{},
-			&metrics.TimingMetricsEndpoint{},
+			&metrics.SystemMetricsEndpoint{},
 			&config.ConfigEndpoint{},
 			&log.LogEndpoint{},
 			&log.LogStreamEndpoint{},

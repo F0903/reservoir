@@ -3,7 +3,7 @@
   "tasks": [
     {
       "type": "shell",
-      "label": "Build",
+      "label": "build",
       "detail": "make build",
       "command": "make",
       "args": ["build"],
@@ -23,10 +23,10 @@
       "problemMatcher": []
     },
     {
-      "label": "build-frontend",
+      "label": "setup-frontend",
       "type": "shell",
       "command": "make",
-      "args": ["build-frontend"],
+      "args": ["setup-frontend"],
       "group": "build",
       "presentation": {
         "echo": true,

@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type timingMetrics struct {
+type systemMetrics struct {
 	StartTime atomics.Time `json:"start_time"`
 }
 
-func NewTimingMetrics() timingMetrics {
-	return timingMetrics{
+func NewSystemMetrics() systemMetrics {
+	return systemMetrics{
 		StartTime: atomics.NewAtomicTime(time.Now()),
 	}
 }
