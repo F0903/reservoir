@@ -132,8 +132,10 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 }
 
 func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
-	isRevalidated := fetched.Cached.fetchInfo.Status == hitStatusRevalidated
-	isMiss := fetched.Cached.fetchInfo.Status == hitStatusMiss
+	fetchInfo := fetched.getFetchInfo()
+
+	isRevalidated := fetchInfo.Status == hitStatusRevalidated
+	isMiss := fetchInfo.Status == hitStatusMiss
 
 	fwdReason := typeutils.None[fwdReason]()
 	if isRevalidated {
@@ -143,15 +145,15 @@ func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
 
 	fwdStatus := typeutils.None[int]()
 	if isRevalidated || isMiss {
-		fwdStatusNum := fetched.Cached.fetchInfo.UpstreamStatus
+		fwdStatusNum := fetchInfo.UpstreamStatus
 		fwdStatus = typeutils.Some(&fwdStatusNum)
 	}
 
 	cacheStatus := cacheStatus{
-		hitStatus: fetched.Cached.Status,
+		hitStatus: fetchInfo.Status,
 		fwdReason: fwdReason,
 		fwdStatus: fwdStatus,
-		stored:    !fetched.Cached.Coalesced && (isMiss || isRevalidated),
+		stored:    !fetched.Cached.Coalesced && (isMiss || isRevalidated) && fetched.Direct.Response.StatusCode == http.StatusOK,
 	}
 
 	return cacheStatus

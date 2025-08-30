@@ -14,35 +14,6 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-type fetchType int
-
-const (
-	fetchTypeCached fetchType = iota
-	fetchTypeDirect
-)
-
-type fetchInfo struct {
-	UpstreamStatus int // Only valid if Status is hitStatusMiss or hitStatusRevalidated
-	Status         hitStatus
-}
-
-type directFetchResult struct {
-	fetchInfo
-	Response *http.Response
-}
-
-type cachedFetchResult struct {
-	fetchInfo
-	Entry     *cache.Entry[cachedRequestInfo]
-	Coalesced bool
-}
-
-type fetchResult struct {
-	Type   fetchType
-	Cached cachedFetchResult // Only valid if Type is fetchTypeCached
-	Direct directFetchResult // Only valid if Type is fetchTypeDirect
-}
-
 type fetcher struct {
 	cache cache.Cache[cachedRequestInfo]
 	group singleflight.Group
@@ -174,7 +145,7 @@ func (f *fetcher) handleCacheMiss(req *http.Request, key cache.CacheKey) (fetchR
 	upFetch.Direct.Response.Body.Close()
 
 	slog.Info("Fetched and cached response after cache miss", "url", req.URL, "status", upFetch.Direct.Response.StatusCode, "upstream_status", upFetch.Direct.Response.StatusCode, "coalesced", false)
-	fetchInfo := fetchInfo{Status: hitStatusMiss}
+	fetchInfo := fetchInfo{Status: hitStatusMiss, UpstreamStatus: upFetch.Direct.Response.StatusCode}
 	cachedResult := cachedFetchResult{fetchInfo: fetchInfo}
 	return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
 }
@@ -234,7 +205,7 @@ func (f *fetcher) internalDedupFetch(req *http.Request, key cache.CacheKey) (fet
 
 	if !cachable {
 		slog.Info("Upstream response is not cachable, returning direct result", "url", up.URL, "status", resp.StatusCode)
-		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: fetchStatus}
+		fetchInfo := fetchInfo{Status: fetchStatus, UpstreamStatus: resp.StatusCode}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
 	}
@@ -252,7 +223,7 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 
 	shouldCoalesce := clientHd.Range.IsNone() && req.Method == http.MethodGet
 	if !shouldCoalesce {
-		slog.Debug("Not coalescing request, fetching upstream...")
+		slog.Debug("Request can't be coalesced, fetching upstream...")
 		return f.fetchUpstream(req)
 	}
 

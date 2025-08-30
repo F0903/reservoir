@@ -2,6 +2,7 @@ package headers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"reservoir/config"
 	"reservoir/utils/typeutils"
@@ -41,10 +42,14 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 		case "If-Modified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.ConditionalHeaders.IfModifiedSince = typeutils.Some(&t)
+			} else {
+				slog.Error("Error parsing If-Modified-Since header", "error", err)
 			}
 		case "If-Unmodified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.ConditionalHeaders.IfUnmodifiedSince = typeutils.Some(&t)
+			} else {
+				slog.Error("Error parsing If-Unmodified-Since header", "error", err)
 			}
 		case "If-None-Match":
 			if value != "" {
@@ -61,14 +66,20 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 		case "Range":
 			if rh, err := parseRangeHeader(value); err == nil {
 				hd.Range = typeutils.Some(&rh)
+			} else {
+				slog.Error("Error parsing Range header", "error", err)
 			}
 		case "Cache-Control":
 			if cc, err := parseCacheControl(value); err == nil {
 				hd.CacheControl = typeutils.Some(cc)
+			} else {
+				slog.Error("Error parsing Cache-Control header", "error", err)
 			}
 		case "Expires":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.Expires = typeutils.Some(&t)
+			} else {
+				slog.Error("Error parsing Expires header", "error", err)
 			}
 		}
 	}
