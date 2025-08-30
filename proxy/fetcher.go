@@ -62,12 +62,15 @@ func shouldResponseBeCached(resp *http.Response, upstreamHd *headers.HeaderDirec
 }
 
 func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) error {
+	slog.Info("Handling 304 response from upstream", "url", req.URL, "key", key)
+
 	var defaultCacheMaxAge time.Duration
 	cfgLock := config.Global.Immutable()
 	cfgLock.Read(func(c *config.Config) {
 		defaultCacheMaxAge = c.DefaultCacheMaxAge.Read().Cast()
 	})
 
+	slog.Info("Revalidating cache metadata...", "url", req.URL, "key", key)
 	err := f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 		// Update the metadata to reflect that the cached response is still valid.
 		maxAge := defaultCacheMaxAge
@@ -82,11 +85,14 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) error
 }
 
 func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key cache.CacheKey, upstreamHd *headers.HeaderDirectives) error {
+	slog.Info("Handling 200 response from upstream", "url", req.URL, "key", key)
+
 	if !shouldResponseBeCached(resp, upstreamHd) {
+		slog.Info("Response is not cachable, returning direct...", "status", resp.Status, "url", req.URL, "key", key)
 		return nil
 	}
 
-	slog.Info("Caching response", "status", resp.Status, "url", req.URL, "key", key)
+	slog.Info("Caching response...", "status", resp.Status, "url", req.URL, "key", key)
 
 	lastModified := time.Now()
 	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
@@ -110,7 +116,7 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key 
 }
 
 func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response, key cache.CacheKey) (cachable bool, err error) {
-	slog.Debug("Handling upstream response...", "url", req.URL, "status", resp.StatusCode)
+	slog.Debug("Preparing to handle upstream response...", "url", req.URL, "status", resp.StatusCode)
 
 	upstreamHd := headers.ParseHeaderDirective(resp.Header)
 
@@ -138,6 +144,7 @@ func (f *fetcher) fetchUpstream(req *http.Request) (fetchResult, error) {
 		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err)
 		return fetchResult{}, err
 	}
+	slog.Info("Received response from upstream", "url", req.URL, "status", resp.Status)
 
 	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}
 	directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
@@ -145,35 +152,42 @@ func (f *fetcher) fetchUpstream(req *http.Request) (fetchResult, error) {
 }
 
 func (f *fetcher) handleCacheMiss(req *http.Request, key cache.CacheKey) (fetchResult, error) {
+	slog.Info("Cache miss, fetching upstream...", "url", req.URL, "key", key)
 	upFetch, err := f.fetchUpstream(req)
 	if err != nil {
+		slog.Error("Error fetching upstream after cache miss", "url", req.URL, "error", err)
 		return fetchResult{}, err
 	}
 	cachable, err := f.handleUpstreamResponse(req, upFetch.Direct.Response, key)
 	if err != nil {
+		slog.Error("Error handling upstream response after cache miss", "url", req.URL, "error", err)
 		upFetch.Direct.Response.Body.Close()
 		return fetchResult{}, err
 	}
 
 	if !cachable {
+		slog.Info("Upstream response is not cachable, returning direct result after cache miss", "url", req.URL, "status", upFetch.Direct.Response.StatusCode)
 		fetchInfo := fetchInfo{UpstreamStatus: upFetch.Direct.Response.StatusCode, Status: hitStatusMiss}
 		directRes := directFetchResult{Response: upFetch.Direct.Response, fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
 	}
 	upFetch.Direct.Response.Body.Close()
 
+	slog.Info("Fetched and cached response after cache miss", "url", req.URL, "status", upFetch.Direct.Response.StatusCode, "upstream_status", upFetch.Direct.Response.StatusCode, "coalesced", false)
 	fetchInfo := fetchInfo{Status: hitStatusMiss}
 	cachedResult := cachedFetchResult{fetchInfo: fetchInfo}
 	return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
 }
 
 // Fetches the requested resource either from cache or upstream.
-// IMPORTANT: Remember to close data streams!
 func (f *fetcher) internalDedupFetch(req *http.Request, key cache.CacheKey) (fetchResult, error) {
+	slog.Info("Trying to get request from cache...")
+
 	// Don't Get here since we are in the group lock.
 	cachedMeta, stale, err := f.cache.GetMetadata(key)
 	if err != nil {
 		if errors.Is(err, cache.ErrCacheMiss) {
+			slog.Info("Cache miss, will fetch from upstream.", "url", req.URL, "key", key)
 			return f.handleCacheMiss(req, key)
 		}
 
@@ -184,6 +198,7 @@ func (f *fetcher) internalDedupFetch(req *http.Request, key cache.CacheKey) (fet
 	}
 
 	if !stale {
+		slog.Info("Cache hit, returning cached response.", "url", req.URL, "key", key)
 		fetchInfo := fetchInfo{Status: hitStatusHit}
 		cachedResult := cachedFetchResult{fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
@@ -218,6 +233,7 @@ func (f *fetcher) internalDedupFetch(req *http.Request, key cache.CacheKey) (fet
 	}
 
 	if !cachable {
+		slog.Info("Upstream response is not cachable, returning direct result", "url", up.URL, "status", resp.StatusCode)
 		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: fetchStatus}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
@@ -230,12 +246,17 @@ func (f *fetcher) internalDedupFetch(req *http.Request, key cache.CacheKey) (fet
 }
 
 // Will deduplicate cachable requests and otherwise return the bypassed upstream response.
+// IMPORTANT: Remember to close data streams!
 func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
+	slog.Debug("Attempting to dedup fetch...")
+
 	shouldCoalesce := clientHd.Range.IsNone() && req.Method == http.MethodGet
 	if !shouldCoalesce {
+		slog.Debug("Not coalescing request, fetching upstream...")
 		return f.fetchUpstream(req)
 	}
 
+	slog.Debug("Coalescing request...")
 	fetchedObj, err, shared := f.group.Do(key.Hex, func() (any, error) {
 		return f.internalDedupFetch(req, key)
 	})
@@ -246,6 +267,7 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 	fetched = fetchedObj.(fetchResult)
 	switch fetched.Type {
 	case fetchTypeCached:
+		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
 		fetched.Cached.Coalesced = shared
 		fetched.Cached.Entry, err = f.cache.Get(key)
 		if err != nil {
@@ -259,8 +281,10 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 
 	case fetchTypeDirect:
 		if shared {
+			slog.Debug("Fetched shared direct response, fetching own upstream...", "url", req.URL, "status", fetched.Direct.Status, "upstream_status", fetched.Direct.UpstreamStatus, "coalesced", shared)
 			return f.fetchUpstream(req) // Followers should fetch their own upstream response
 		}
+		slog.Debug("Fetched direct response", "url", req.URL, "status", fetched.Direct.Status, "upstream_status", fetched.Direct.UpstreamStatus, "coalesced", shared)
 		return fetched, nil
 
 	default:

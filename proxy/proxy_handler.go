@@ -142,7 +142,6 @@ func (p *proxyHandler) handleRangeRequest(r responder.Responder, req *http.Reque
 func (p *proxyHandler) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
-	//TODO: use info from fetched to set cache headers
 	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)

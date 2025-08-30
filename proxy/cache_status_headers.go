@@ -36,6 +36,8 @@ type cacheStatus struct {
 }
 
 func makeCacheStatusHeader(cached typeutils.Optional[cache.Entry[cachedRequestInfo]], cacheStatus cacheStatus) string {
+	slog.Debug("Making Cache-Status header...", "cached", cached, "cacheStatus", cacheStatus)
+
 	params := make([]string, 0, 6)
 	params = append(params, "reservoir")
 
@@ -74,10 +76,15 @@ func makeCacheStatusHeader(cached typeutils.Optional[cache.Entry[cachedRequestIn
 		params = append(params, fmt.Sprintf("ttl=%d", ttl))
 	}
 
-	return strings.Join(params, "; ")
+	headerStr := strings.Join(params, "; ")
+	slog.Debug("Constructed Cache-Status header:", "header", headerStr)
+
+	return headerStr
 }
 
 func getCurrentAge(originalHead http.Header, storedAt time.Time) int {
+	slog.Debug("Calculating current age of cached response...")
+
 	dateHeader := originalHead.Get("Date")
 	upstreamAge := originalHead.Get("Age")
 	now := time.Now()
@@ -99,6 +106,8 @@ func getCurrentAge(originalHead http.Header, storedAt time.Time) int {
 	residentTime := int(now.Sub(storedAt).Seconds())
 
 	currentAge := max(0, correctedInitialAge+residentTime)
+	slog.Debug("Current age of cached response:", "age", currentAge)
+
 	return currentAge
 }
 
