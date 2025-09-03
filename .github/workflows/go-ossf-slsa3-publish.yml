@@ -1,45 +1,64 @@
-name: Build with Make + SLSA
+name: Build with SLSA
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
   release:
     types: [created]
 
-permissions:
-  contents: write
-  id-token: write
-
 jobs:
-  build-with-provenance:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: 1.25
+
+      - name: Build
+        run: make
+
+      - name: Generate artifact hashes
+        shell: bash
+        id: hash
+        run: echo "hashes=$(sha256sum reservoir | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reservoir
+          path: reservoir
+          if-no-files-found: error
+          retention-days: 90
+
+  provenance:
+    needs: build
+    permissions:
+      actions: read # Needed for detection of GitHub Actions environment.
+      id-token: write # Needed for provenance signing and ID
+      contents: write # Needed for release uploads
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
-    secrets: inherit
     with:
-      # Optional: prepare tools needed by your build
-      setup: |
-        set -euxo pipefail
-        # Go 1.25
-        sudo rm -rf /usr/local/go
-        curl -fsSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
-        echo "/usr/local/go/bin" >> "$GITHUB_PATH"
-        go version
+      base64-subjects: "${{ needs.build.outputs.hashes }}"
+      upload-assets: true # Upload provenance to the new release (if any)
 
-        # Node + pnpm (for frontend build/go generate)
-        corepack enable
-        corepack prepare pnpm --activate
-        pnpm --version
+  release:
+    needs: [build, provenance]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') # Only run for tagged releases
+    steps:
+      - name: Download reservoir artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: reservoir
 
-      # Your build steps (Make runs frontend build + go generate + go build)
-      run: |
-        set -euxo pipefail
-        make
-
-      # Artifact(s) to attest and upload (one per line)
-      artifact-paths: |
-        reservoir
-
-      # Optional names
-      artifact-name: reservoir
-      provenance-name: reservoir.intoto.jsonl
-
-      # Attach artifacts and provenance to the GitHub Release (when event is release)
-      upload-assets: true
+      - name: Upload assets
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
+        with:
+          files: |
+            reservoir
