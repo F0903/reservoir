@@ -1,0 +1,45 @@
+name: Build with Make + SLSA
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-with-provenance:
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    secrets: inherit
+    with:
+      # Optional: prepare tools needed by your build
+      setup: |
+        set -euxo pipefail
+        # Go 1.25
+        sudo rm -rf /usr/local/go
+        curl -fsSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xzf -
+        echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+        go version
+
+        # Node + pnpm (for frontend build/go generate)
+        corepack enable
+        corepack prepare pnpm --activate
+        pnpm --version
+
+      # Your build steps (Make runs frontend build + go generate + go build)
+      run: |
+        set -euxo pipefail
+        make
+
+      # Artifact(s) to attest and upload (one per line)
+      artifact-paths: |
+        reservoir
+
+      # Optional names
+      artifact-name: reservoir
+      provenance-name: reservoir.intoto.jsonl
+
+      # Attach artifacts and provenance to the GitHub Release (when event is release)
+      upload-assets: true
