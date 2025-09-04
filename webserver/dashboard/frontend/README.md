@@ -1,38 +1,28 @@
-# sv
+# reservoir Dashboard
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+This is the frontend for reservoir, which is a web interface for managing and monitoring the proxy.
 
-## Creating a project
+## Development
 
-If you're seeing this, you've probably already done this step. Congrats!
+Before starting the frontend, make sure you have [**Node** installed](https://nodejs.org/en/download) and **pnpm** enabled *(run the command `corepack enable pnpm`)*
 
-```bash
-# create a new project in the current directory
-npx sv create
+Then install the frontend dependencies by running `pnpm install` in the `frontend/` directory.
 
-# create a new project in my-app
-npx sv create my-app
+### VS Code Debugging (Recommended)
+
+The easiest and recommended way to start the frontend in development mode is to use the provided VS Code launch configuration.
+
+To use it, follow these steps:
+
+1. Open the project in VS Code
+2. Open the Debug panel (Ctrl+Shift+D)
+3. Select either "Proxy + Dashboard" (recommended) or "Dashboard" (you will need to start the proxy separately)
+4. Start debugging :)
+
+### Starting manually
+
+To start the frontend in development mode, run the following command:
+
+```sh
+pnpm run dev
 ```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

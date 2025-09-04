@@ -1,5 +1,7 @@
 # reservoir
 
+[![Build with SLSA](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml/badge.svg)](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml)
+
 A caching MITM (Man-in-the-Middle) HTTP(S) forward proxy with an embedded dashboard.
 
 Supports caching of both HTTP and HTTPS requests by injecting a certificate to decrypt and cache the data before sending it back to the client.
@@ -29,9 +31,12 @@ openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "
 
 - **Linux:** Add to `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
 - **Windows:** Double-click `ca-cert.pem` and install it to "Trusted Root Certification Authorities".
-- **macOS:** Use Keychain Access to import and trust the certificate.
 
-### Running the Proxy
+## Running the Proxy
+
+To run the proxy you have two options; you can either download a prebuilt binary from the releases page (or an unstable build from the actions page), or you can build it yourself by following the instructions below:
+
+### Building the Proxy
 
 Before getting started, you will need to install a few dependencies:
 
@@ -51,10 +56,6 @@ Then you just have to build the project with **make** by running `make` in the p
 This will automatically build both the frontend and the proxy executable.
 
 Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it, which is recommended.
-
-### Note When Updating
-
-When updating it is recommended to delete the local ``var/cache/`` folder and ``var/config.json``, as changes to the config or metadata format could cause unexpected behaviour.
 
 ## Proxy Configuration
 
