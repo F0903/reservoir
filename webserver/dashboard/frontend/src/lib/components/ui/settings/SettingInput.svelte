@@ -40,7 +40,14 @@
 
     export async function save() {
         if (!hasChanged()) return;
-        await setSetting(settingTransform(value));
+
+        //TODO: Set input error state and show error toast if failed.
+        try {
+            await setSetting(settingTransform(value));
+        } catch (e) {
+            console.error("Failed to save setting:", e);
+            return;
+        }
     }
 
     export async function reset() {
