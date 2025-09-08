@@ -18,9 +18,9 @@ export class Config {
     cacheDir: string = $state("");
     ignoreCacheControl: boolean = $state(false);
     maxCacheSize: number = $state(0);
-    defaultCacheMaxAge: number = $state(0);
+    defaultCacheMaxAge: string = $state(""); // Duration formatted string
     forceDefaultCacheMaxAge: boolean = $state(false);
-    cacheCleanupInterval: number = $state(0);
+    cacheCleanupInterval: string = $state(""); // Duration formatted string
     upstreamDefaultHttps: boolean = $state(false);
     logLevel: string = $state("");
     logFile: string = $state("");
@@ -45,9 +45,9 @@ export class Config {
         setPropIfChanged("cache_dir",                   json, this.cacheDir,                (value) => this.cacheDir = value as string);
         setPropIfChanged("ignore_cache_control",        json, this.ignoreCacheControl,      (value) => this.ignoreCacheControl = value as boolean);
         setPropIfChanged("max_cache_size",              json, this.maxCacheSize,            (value) => this.maxCacheSize = value as number);
-        setPropIfChanged("default_cache_max_age",       json, this.defaultCacheMaxAge,      (value) => this.defaultCacheMaxAge = value as number);
+        setPropIfChanged("default_cache_max_age",       json, this.defaultCacheMaxAge,      (value) => this.defaultCacheMaxAge = value as string);
         setPropIfChanged("force_default_cache_max_age", json, this.forceDefaultCacheMaxAge, (value) => this.forceDefaultCacheMaxAge = value as boolean);
-        setPropIfChanged("cache_cleanup_interval",      json, this.cacheCleanupInterval,    (value) => this.cacheCleanupInterval = value as number);
+        setPropIfChanged("cache_cleanup_interval",      json, this.cacheCleanupInterval,    (value) => this.cacheCleanupInterval = value as string);
         setPropIfChanged("upstream_default_https",      json, this.upstreamDefaultHttps,    (value) => this.upstreamDefaultHttps = value as boolean);
         setPropIfChanged("log_level",                   json, this.logLevel,                (value) => this.logLevel = value as string);
         setPropIfChanged("log_file",                    json, this.logFile,                 (value) => this.logFile = value as string);

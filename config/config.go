@@ -30,6 +30,7 @@ type Config struct {
 	ProxyListen             ConfigProp[string]            `json:"proxy_listen"`                // The address and port that the proxy will listen on.
 	CaCert                  ConfigProp[string]            `json:"ca_cert"`                     // Path to CA certificate file.
 	CaKey                   ConfigProp[string]            `json:"ca_key"`                      // Path to CA private key file.
+	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 	WebserverListen         ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
 	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
 	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
@@ -39,7 +40,6 @@ type Config struct {
 	DefaultCacheMaxAge      ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
 	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
 	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
-	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 	LogLevel                ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
 	LogFile                 ConfigProp[string]            `json:"log_file"`                    // The path to the log file. If empty, no file logging will be done.
 	LogFileMaxSize          ConfigProp[bytesize.ByteSize] `json:"log_file_max_size"`           // The maximum size of the log file.
@@ -54,6 +54,7 @@ func newDefault() *Config {
 		ProxyListen:             NewConfigProp(":9999"),
 		CaCert:                  NewConfigProp("ssl/ca.crt"),
 		CaKey:                   NewConfigProp("ssl/ca.key"),
+		UpstreamDefaultHttps:    NewConfigProp(true),
 		WebserverListen:         NewConfigProp("localhost:8080"),
 		DashboardDisabled:       NewConfigProp(false),
 		ApiDisabled:             NewConfigProp(false),
@@ -63,7 +64,6 @@ func newDefault() *Config {
 		DefaultCacheMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
 		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
-		UpstreamDefaultHttps:    NewConfigProp(true),
 		LogLevel:                NewConfigProp(slog.LevelInfo),
 		LogFile:                 NewConfigProp("var/proxy.log"),
 		LogFileMaxSize:          NewConfigProp(bytesize.ParseUnchecked("500M")),

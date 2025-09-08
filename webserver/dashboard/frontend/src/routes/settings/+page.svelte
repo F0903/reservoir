@@ -13,19 +13,163 @@
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
 
+    const optionalStringPattern = "^.*$";
+    const stringPattern = "^.+$";
+    const boolPattern = "^(true|false)$";
+    const intPattern = "^\\d+$";
+    const bytesizePattern = "^(\\d+)([BKMGT])$";
+    const durationPattern =
+        "^[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|µs|ms|s|m|h)(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|µs|ms|s|m|h))*$"; // Duration format
+    const ipPortPattern =
+        "^(?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._-]+)?\\])?:\\d{1,5}$"; // IP:port or [IPv6]:port
+    const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
+
     const inputSections = [
+        // Dashboard section
         [
-            // Dashboard section
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.dashboardConfig.fields.updateInterval,
                 setSetting: (val: number) => (settings.dashboardConfig.fields.updateInterval = val),
                 settingTransform: (val: string) => parseInt(val),
                 label: "Dashboard Update Interval",
-                pattern: "^\\d+$", // Only digits
+                pattern: intPattern,
                 min: 500,
                 tooltip:
                     "The interval at which the dashboard updates its data from the API in milliseconds.",
+            },
+        ],
+        // Main proxy section
+        [
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.proxyListen,
+                setSetting: async (val: string) => await patchConfig("proxy_listen", val),
+                settingTransform: (val: string) => val,
+                label: "Proxy Listen",
+                pattern: ipPortPattern,
+                tooltip: "The IP address and port that the proxy server will bind to.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.caCert,
+                setSetting: async (val: string) => await patchConfig("ca_cert", val),
+                settingTransform: (val: string) => val,
+                label: "CA Certificate",
+                pattern: stringPattern,
+                tooltip: "The path to the CA certificate for the proxy server.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.caKey,
+                setSetting: async (val: string) => await patchConfig("ca_key", val),
+                settingTransform: (val: string) => val,
+                label: "CA Key",
+                pattern: stringPattern,
+                tooltip: "The path to the CA private key for the proxy server.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.upstreamDefaultHttps,
+                setSetting: async (val: boolean) =>
+                    await patchConfig("upstream_default_https", val),
+                settingTransform: (val: string) => val === "true",
+                label: "Upstream Default HTTPS",
+                pattern: boolPattern,
+                tooltip:
+                    "If true, the proxy will always send HTTPS instead of HTTP to the upstream server.",
+            },
+        ],
+        // Webserver section
+        [
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.webserverListen,
+                setSetting: async (val: string) => await patchConfig("webserver_listen", val),
+                settingTransform: (val: string) => val,
+                label: "Webserver Listen",
+                pattern: ipPortPattern,
+                tooltip: "The IP address and port that the web server will bind to.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.dashboardDisabled,
+                setSetting: async (val: boolean) => await patchConfig("dashboard_disabled", val),
+                settingTransform: (val: string) => val === "true",
+                label: "Dashboard Disabled",
+                pattern: boolPattern,
+                tooltip: "Whether the dashboard is disabled.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.apiDisabled,
+                setSetting: async (val: boolean) => await patchConfig("api_disabled", val),
+                settingTransform: (val: string) => val === "true",
+                label: "API Disabled",
+                pattern: boolPattern,
+                tooltip:
+                    "Whether the API is disabled. The API is required for the dashboard to function.",
+            },
+        ],
+        // Cache section
+        [
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.cacheDir,
+                setSetting: async (val: string) => await patchConfig("cache_dir", val),
+                settingTransform: (val: string) => val,
+                label: "Cache Directory",
+                pattern: stringPattern,
+                tooltip: "The directory where cached files are stored.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.ignoreCacheControl,
+                setSetting: async (val: boolean) => await patchConfig("ignore_cache_control", val),
+                settingTransform: (val: string) => val === "true",
+                label: "Ignore Cache Control",
+                pattern: boolPattern,
+                tooltip: "Whether to ignore Cache-Control headers from the client.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.maxCacheSize,
+                setSetting: async (val: number) => await patchConfig("max_cache_size", val),
+                settingTransform: (val: string) => parseByteString(val),
+                label: "Max Cache Size",
+                pattern: bytesizePattern,
+                tooltip: "The maximum size of the cache. You can use suffixes like B, K, M, G, T.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.defaultCacheMaxAge,
+                setSetting: async (val: string) => await patchConfig("default_cache_max_age", val),
+                settingTransform: (val: string) => val,
+                label: "Default Cache Max Age",
+                pattern: durationPattern,
+                tooltip:
+                    "The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.forceDefaultCacheMaxAge,
+                setSetting: async (val: boolean) =>
+                    await patchConfig("force_default_cache_max_age", val),
+                settingTransform: (val: string) => val === "true",
+                label: "Force Default Cache Max Age",
+                pattern: boolPattern,
+                tooltip:
+                    "If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.",
+            },
+            {
+                InputComponent: TextInput,
+                getSetting: () => settings.proxySettings.fields.cacheCleanupInterval,
+                setSetting: async (val: string) => await patchConfig("cache_cleanup_interval", val),
+                settingTransform: (val: string) => val,
+                label: "Cache Cleanup Interval",
+                pattern: durationPattern,
+                tooltip:
+                    "The interval at which the cache will be cleaned up to remove expired entries.",
             },
         ],
         // Logging section
@@ -36,7 +180,7 @@
                 setSetting: async (val: string) => await patchConfig("log_level", val),
                 settingTransform: (val: string) => val,
                 label: "Log Level",
-                pattern: "^(DEBUG|INFO|WARN|ERROR)$", // One of these values
+                pattern: logLevelPattern,
                 tooltip:
                     "The minimum level of logs to be recorded. Options are: DEBUG, INFO, WARN, ERROR.",
             },
@@ -46,7 +190,7 @@
                 setSetting: async (val: string) => await patchConfig("log_file", val),
                 settingTransform: (val: string) => val,
                 label: "Log File Path",
-                pattern: ".?", // Any string
+                pattern: optionalStringPattern,
                 tooltip:
                     "The file path where the application log will be stored. Leave empty to disable file logging.",
             },
@@ -56,8 +200,9 @@
                 setSetting: async (val: number) => await patchConfig("log_file_max_size", val),
                 settingTransform: (val: string) => parseByteString(val),
                 label: "Log File Max Size",
-                pattern: "^(\\d+)([BKMGT])$", // Only digits
-                tooltip: "The maximum size (in bytes) of the log file before it is rotated.",
+                pattern: bytesizePattern,
+                tooltip:
+                    "The maximum size (in bytes) of the log file before it is rotated. You can use suffixes like B, K, M, G, T.",
             },
             {
                 InputComponent: TextInput,
@@ -65,7 +210,7 @@
                 setSetting: async (val: number) => await patchConfig("log_file_max_backups", val),
                 settingTransform: (val: string) => parseInt(val),
                 label: "Log File Max Backups",
-                pattern: "^\\d+$", // Only digits
+                pattern: intPattern,
                 tooltip:
                     "The maximum number of rotated log files to keep. Older files will be deleted.",
             },
@@ -75,7 +220,7 @@
                 setSetting: async (val: boolean) => await patchConfig("log_file_compress", val),
                 settingTransform: (val: string) => val === "true",
                 label: "Log File Compression",
-                pattern: "^(true|false)$",
+                pattern: boolPattern,
                 tooltip: "Whether to compress log files when they are rotated.",
             },
             {
@@ -84,13 +229,16 @@
                 setSetting: async (val: boolean) => await patchConfig("log_to_stdout", val),
                 settingTransform: (val: string) => val === "true",
                 label: "Log to Stdout",
-                pattern: "^(true|false)$",
+                pattern: boolPattern,
                 tooltip: "Whether to also log to standard output (console).",
             },
         ],
     ];
 
-    const inputComponents: SettingInput<any>[] = $state([]);
+    const inputComponents: InstanceType<typeof SettingInput>[][] = $state(
+        // Initialize a 2D array (an array for each section) to hold references to SettingInput components
+        inputSections.map(() => []),
+    );
     let hasChanges = $state(false);
 
     onMount(() => {
@@ -121,11 +269,22 @@
     }
 
     async function saveInputs() {
-        await Promise.all(inputComponents.map((input) => input.save()));
+        // Consider sending a batch update instead at some point.
+        await Promise.all(
+            inputComponents
+                .flat()
+                .filter((input) => input)
+                .map((input) => input.save()),
+        );
     }
 
     async function resetInputs() {
-        await Promise.all(inputComponents.map((input) => input.reset()));
+        await Promise.all(
+            inputComponents
+                .flat()
+                .filter((input) => input)
+                .map((input) => input.reset()),
+        );
     }
 
     async function applyChanges() {
@@ -148,7 +307,7 @@
 <div class="inputs">
     {#each inputSections as section, i}
         {#each section as input, j}
-            <SettingInput bind:this={inputComponents[i + j]} {...input} {onChange} />
+            <SettingInput bind:this={inputComponents[i][j]} {...input} {onChange} />
         {/each}
         {#if i < inputSections.length - 1}
             <VerticalSpacer --spacer-color="var(--secondary-700)" />
