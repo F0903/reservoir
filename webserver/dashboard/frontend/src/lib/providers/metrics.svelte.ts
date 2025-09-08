@@ -3,15 +3,13 @@ import { type FetchFn, APIJsonObject } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
 import { log } from "$lib/utils/logger";
 import { getContext } from "svelte";
-import type { SettingsProvider } from "./settings.svelte";
-import { get, type Unsubscriber } from "svelte/store";
+import type { SettingsProvider } from "./settings/settings-provider.svelte";
 import type { LoadableState } from "$lib/utils/loadable";
 
 export class MetricsProvider {
     private settings: SettingsProvider;
     private metricsRefreshId: number | null = null;
     private readonly fetchFn: FetchFn;
-    private updateIntervalUnsub: Unsubscriber | null = null;
 
     readonly data: Metrics = new Metrics({});
     private state: LoadableState = $state({
@@ -47,16 +45,15 @@ export class MetricsProvider {
         log.debug("Starting metrics refresh interval");
         this.metricsRefreshId = setInterval(
             () => this.refreshMetrics(),
-            get(this.settings.dashboardConfig.updateInterval),
+            this.settings.dashboardConfig.fields.updateInterval,
         );
 
-        this.updateIntervalUnsub = this.settings.dashboardConfig.updateInterval.subscribe(
-            (interval) => {
-                log.debug("Updating metrics refresh interval to", interval);
-                this.stopRefresh();
-                this.metricsRefreshId = setInterval(() => this.refreshMetrics(), interval);
-            },
-        );
+        $effect(() => {
+            const interval = this.settings.dashboardConfig.fields.updateInterval;
+            log.debug("Updating metrics refresh interval to", interval);
+            this.stopRefresh();
+            this.metricsRefreshId = setInterval(() => this.refreshMetrics(), interval);
+        });
     };
 
     // Stop the metrics refresh interval
@@ -68,11 +65,6 @@ export class MetricsProvider {
         log.debug("Stopping metrics refresh interval");
         clearInterval(this.metricsRefreshId);
         this.metricsRefreshId = null;
-
-        if (this.updateIntervalUnsub) {
-            this.updateIntervalUnsub();
-            this.updateIntervalUnsub = null;
-        }
     };
 
     refreshMetrics = async () => {

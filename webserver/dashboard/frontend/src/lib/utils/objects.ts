@@ -36,20 +36,21 @@ export function deepMerge(
     return result;
 }
 
-// Applies changes from object B to object A
+// Applies changes from one object to another recursively
+// Returns true if any changes were made
 export function patch<A extends Record<string, unknown>>(
-    a: A,
-    b: Partial<A>,
+    to: A,
+    from: Partial<A>,
     keyTransform?: (_key: string) => string,
     recurse: boolean = true,
 ): boolean {
     let changed = false;
-    for (const key in b) {
-        if (!Object.prototype.hasOwnProperty.call(b, key)) continue;
+    for (const key in from) {
+        if (!Object.prototype.hasOwnProperty.call(from, key)) continue;
 
         const keyStr = keyTransform ? keyTransform(key) : key;
-        const bValue = b[keyStr as keyof A];
-        const aValue = a[keyStr as keyof A];
+        const bValue = from[keyStr as keyof A];
+        const aValue = to[keyStr as keyof A];
 
         if (recurse && isPlain(bValue) && isPlain(aValue)) {
             if (patch(aValue as Record<string, unknown>, bValue as Record<string, unknown>)) {
@@ -57,11 +58,11 @@ export function patch<A extends Record<string, unknown>>(
             }
         } else if (Array.isArray(bValue) && Array.isArray(aValue)) {
             if (!arraysEqual(aValue, bValue)) {
-                (a as Record<string, unknown>)[keyStr] = bValue;
+                (to as Record<string, unknown>)[keyStr] = bValue;
                 changed = true;
             }
         } else if (!Object.is(aValue, bValue)) {
-            (a as Record<string, unknown>)[keyStr] = bValue;
+            (to as Record<string, unknown>)[keyStr] = bValue;
             changed = true;
         }
     }
@@ -73,6 +74,7 @@ export function setPropIfChanged<T>(
     object: Record<string, T>,
     currentValue: T,
     setter: (_value: T) => void,
+    comparer?: (_a: T, _b: T) => boolean,
 ) {
     if (!object || !(name in object)) {
         log.debug(`Property '${name}' not found in object, not setting.`);
@@ -80,7 +82,7 @@ export function setPropIfChanged<T>(
     }
 
     const newValue = object[name];
-    if (newValue === currentValue) {
+    if ((comparer && comparer(newValue, currentValue)) || newValue == currentValue) {
         log.debug(`Property '${name}' has not changed. Not setting...`);
         return;
     }

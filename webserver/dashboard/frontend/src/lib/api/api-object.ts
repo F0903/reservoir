@@ -51,3 +51,21 @@ export async function apiGet<T>(
 
     return new type(json) as T;
 }
+
+export async function apiPatch(
+    endpoint: string,
+    json: Record<string, unknown>,
+    fetchFn: FetchFn = fetch,
+): Promise<void> {
+    const response = await fetchFn(`/api${endpoint}`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(json),
+    });
+
+    if (!response.ok) {
+        throw new Error(`PATCH failed: ${response.status} ${response.statusText}`);
+    }
+}

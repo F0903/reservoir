@@ -11,8 +11,8 @@
         type: "action";
         positiveText?: string;
         negativeText?: string;
-        onPositive?: () => void;
-        onNegative?: () => void;
+        onPositive?: () => Promise<void>;
+        onNegative?: () => Promise<void>;
     };
 
     export type ToastProps = BaseProps & ActionProps;
@@ -36,11 +36,11 @@
             --spacer-width="50%"
         />
         <div class="action-buttons">
-            <Button onClick={() => rest.onPositive?.()} {disabled} --btn-font-weight="600"
+            <Button onClick={rest.onPositive} {disabled} --btn-font-weight="600"
                 >{rest.positiveText || "Yes"}</Button
             >
             <Button
-                onClick={() => rest.onNegative?.()}
+                onClick={rest.onNegative}
                 {disabled}
                 --btn-font-weight="600"
                 --btn-background-color="var(--primary-450)"

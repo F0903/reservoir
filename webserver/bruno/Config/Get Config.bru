@@ -1,0 +1,19 @@
+meta {
+  name: Get Config
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{url}}/api/config
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "always_cache": false,
+    "max_cache_size": "15G",
+    "default_cache_max_age": "1h30m0s"
+  }
+}

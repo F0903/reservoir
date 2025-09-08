@@ -1,25 +1,33 @@
 <script lang="ts" generics="T extends Component<any, any, keyof {value: string}>">
-    import { getPropStore, setPropStore } from "$lib/utils/stores";
     import type { Component, ComponentProps } from "svelte";
 
     // We handle these props in here
     type OmittedProps = "value" | "placeholder" | "onSubmit";
 
     let {
-        settingName,
-        settingObject,
+        getSetting,
+        setSetting,
+        settingTransform,
         onChange,
         InputComponent,
         ...restProps
     }: {
-        settingName: string;
-        settingObject: any;
+        getSetting: () => Promise<any> | any;
+        setSetting: (_value: any) => Promise<any> | any;
+        settingTransform: (val: string) => any;
         onChange?: (different: boolean) => void;
         InputComponent: T;
     } & Omit<ComponentProps<T>, OmittedProps> = $props();
 
     let value = $state("");
-    let placeholder = $state(getPropStore(settingName, settingObject));
+    let placeholder = $state("");
+
+    const phState = getSetting();
+    if (phState instanceof Promise) {
+        phState.then((v) => (placeholder = v));
+    } else {
+        placeholder = phState;
+    }
 
     $effect(() => {
         const changed = hasChanged();
@@ -30,14 +38,14 @@
         return value !== "";
     }
 
-    export function save() {
-        setPropStore(settingName, settingObject, value);
-        reset();
+    export async function save() {
+        if (!hasChanged()) return;
+        await setSetting(settingTransform(value));
     }
 
-    export function reset() {
+    export async function reset() {
         value = "";
-        placeholder = getPropStore(settingName, settingObject);
+        placeholder = await getSetting();
     }
 </script>
 

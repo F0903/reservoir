@@ -9,7 +9,7 @@
     import { LayoutDashboard, Logs, Settings } from "@lucide/svelte";
     import { MetricsProvider } from "$lib/providers/metrics.svelte";
     import { setContext } from "svelte";
-    import { SettingsProvider } from "$lib/providers/settings.svelte";
+    import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
     import { ToastProvider } from "$lib/providers/toast.svelte";
 
     let { children } = $props();

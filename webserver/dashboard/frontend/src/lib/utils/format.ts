@@ -1,24 +1,30 @@
+export const ByteUnits = {
+    B: 1,
+    K: 1024,
+    M: 1024 * 1024,
+    G: 1024 * 1024 * 1024,
+    T: 1024 * 1024 * 1024 * 1024,
+};
+
 // Format bytes into human-readable string
-export function formatBytes(bytes: number, decimals = 2): string {
-    if (bytes === 0) return "0 Bytes";
+export function formatBytes(bytes: number, unit: keyof typeof ByteUnits, decimals = 2): string {
+    if (bytes === 0) return "0B";
 
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
-
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+    return parseFloat((bytes / ByteUnits[unit]).toFixed(decimals)) + unit;
 }
 
-// Format number with thousand separators
-export function formatNumber(num: number): string {
-    return num.toLocaleString();
-}
+export function parseByteString(s: string): number {
+    const unitRe = /^(\d+)([BKMGT])$/i;
 
-export function formatPercentage(value: number, total: number, decimals = 1): string {
-    if (total === 0) return "0%";
-    return ((value / total) * 100).toFixed(decimals) + "%";
+    const matches = unitRe.exec(s);
+    if (!matches) throw new Error(`Invalid byte string: ${s}`);
+
+    const value = parseInt(matches[1]);
+    const unit = matches[2].toUpperCase() as keyof typeof ByteUnits;
+
+    if (!(unit in ByteUnits)) throw new Error(`Invalid byte unit: ${unit}`);
+
+    return value * ByteUnits[unit];
 }
 
 export function snakeCaseToCamelCase(s: string): string {

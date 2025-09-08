@@ -1,4 +1,9 @@
-import { apiGet, type APIObjectConstructor, type FetchFn } from "$lib/api/api-object";
+import {
+    apiGet,
+    APIJsonObject,
+    type APIObjectConstructor,
+    type FetchFn,
+} from "$lib/api/api-object";
 import { setPropIfChanged } from "$lib/utils/objects";
 
 export class RequestMetrics {
@@ -29,6 +34,12 @@ export class RequestMetrics {
             this.bytesServed,
             (value) => (this.bytesServed = value as number),
         );
+    };
+
+    // Updates the request metrics object by fetching from the API
+    update = async () => {
+        const data = await getRequestMetrics(APIJsonObject);
+        this.updateFrom(data as Record<string, unknown>);
     };
 }
 

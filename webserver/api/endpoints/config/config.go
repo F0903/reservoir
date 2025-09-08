@@ -8,28 +8,41 @@ import (
 	"reservoir/webserver/api/apitypes"
 )
 
-type configUpdateResponse struct {
-	Success       bool   `json:"success"`
-	RestartNeeded bool   `json:"restart_needed"`
-	Message       string `json:"message"`
-}
-
 type ConfigEndpoint struct{}
 
-func (m *ConfigEndpoint) Path() string {
+func (e *ConfigEndpoint) Path() string {
 	return "/config"
 }
 
-func (m *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
+func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
+			Method: "GET",
+			Func:   e.Get,
+		},
+		{
 			Method: "PATCH",
-			Func:   m.Patch,
+			Func:   e.Patch,
 		},
 	}
 }
 
-func (m *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request) {
+func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request) {
+	cfgLock := config.Global.Immutable()
+	cfg := cfgLock.Copy()
+
+	responseJson, err := json.Marshal(cfg)
+	if err != nil {
+		slog.Error("Error marshaling config to JSON", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(responseJson)
+}
+
+func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
@@ -49,17 +62,5 @@ func (m *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responseJson, err := json.Marshal(configUpdateResponse{
-		Success:       true,
-		RestartNeeded: false,
-		Message:       "Configuration updated successfully",
-	})
-	if err != nil {
-		slog.Error("Error marshaling response", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	w.WriteHeader(http.StatusNoContent)
 }

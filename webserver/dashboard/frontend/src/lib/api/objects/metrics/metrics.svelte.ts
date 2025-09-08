@@ -1,4 +1,9 @@
-import { apiGet, type APIObjectConstructor, type FetchFn } from "$lib/api/api-object";
+import {
+    apiGet,
+    APIJsonObject,
+    type APIObjectConstructor,
+    type FetchFn,
+} from "$lib/api/api-object";
 import { CacheMetrics } from "./cache-metrics.svelte";
 import { RequestMetrics } from "./request-metrics.svelte";
 import { SystemMetrics } from "./system-metrics.svelte";
@@ -18,6 +23,12 @@ export class Metrics {
         if (json.cache) this.cache.updateFrom(json.cache as Record<string, unknown>);
         if (json.requests) this.requests.updateFrom(json.requests as Record<string, unknown>);
         if (json.system) this.system.updateFrom(json.system as Record<string, unknown>);
+    };
+
+    // Updates all metrics by fetching from the API
+    update = async (fetchFn: FetchFn = fetch) => {
+        const data = await getAllMetrics(APIJsonObject, fetchFn);
+        this.updateFrom(data as Record<string, unknown>);
     };
 }
 

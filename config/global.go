@@ -50,7 +50,7 @@ func UpdateAndVerify(f func(*Config)) error {
 		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	slog.Info("Global config updated successfully", "new_config", cfg, "old_config", old)
+	slog.Debug("Global config updated successfully", "new_config", cfg, "old_config", old)
 	return nil
 }
 
