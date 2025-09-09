@@ -48,7 +48,7 @@
         flex-direction: column;
         gap: 0.5rem;
 
-        width: fit-content;
+        width: var(--textinput-width, 100%);
 
         margin: 1.2rem 0px;
     }
@@ -76,10 +76,7 @@
         color: var(--text-primary);
         background-color: var(--primary-600);
 
-        width: calc(
-            var(--box-width-ch) * (1ch + calc(var(--text-input-letter-spacing))) +
-                calc(var(--text-input-padding) * 2) + calc(var(--text-input-border-width) * 2)
-        );
+        width: 100%;
 
         transition-property: border-color;
         transition-timing-function: ease-in-out;

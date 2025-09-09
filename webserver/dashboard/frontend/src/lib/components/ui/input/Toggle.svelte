@@ -91,9 +91,10 @@
         display: flex;
         flex-direction: row;
         align-items: center;
+        justify-content: space-between;
         gap: 15px;
 
-        width: fit-content;
+        width: var(--toggle-width, 100%);
 
         margin: 1.2rem 0px;
     }
