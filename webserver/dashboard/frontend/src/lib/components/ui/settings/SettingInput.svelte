@@ -1,33 +1,34 @@
-<script lang="ts" generics="T extends Component<any, any, keyof {value: string}>">
-    import type { Component, ComponentProps } from "svelte";
+<script lang="ts" generics="C extends Component<any, any, 'value'>, O">
+    import { onMount, type Component, type ComponentProps } from "svelte";
 
-    // We handle these props in here
-    type OmittedProps = "value" | "placeholder" | "onSubmit";
+    // Value type exposed by the InputComponent's `value` prop
+    type V = ComponentProps<C>["value"];
+
+    type SettingV = string | number | boolean;
 
     let {
+        InputComponent,
         getSetting,
         setSetting,
         settingTransform,
         onChange,
-        InputComponent,
+        placeholder,
         ...restProps
     }: {
-        getSetting: () => Promise<any> | any;
-        setSetting: (_value: any) => Promise<any> | any;
-        settingTransform: (val: string) => any;
+        InputComponent: C;
+        getSetting: () => Promise<SettingV> | SettingV;
+        setSetting: (_value: O) => any;
+        settingTransform: (val: V) => O;
         onChange?: (different: boolean) => void;
-        InputComponent: T;
-    } & Omit<ComponentProps<T>, OmittedProps> = $props();
+        placeholder?: string;
+    } = $props();
 
-    let value = $state("");
-    let placeholder = $state("");
+    let startValue: V | undefined;
+    let value: V | undefined = $state();
 
-    const phState = getSetting();
-    if (phState instanceof Promise) {
-        phState.then((v) => (placeholder = v));
-    } else {
-        placeholder = phState;
-    }
+    onMount(async () => {
+        await reset(); // Fetch and set the value and startValue on mount
+    });
 
     $effect(() => {
         const changed = hasChanged();
@@ -35,7 +36,8 @@
     });
 
     export function hasChanged() {
-        return value !== "";
+        // We use != to allow type coercion (e.g. between number and string)
+        return value != startValue;
     }
 
     export async function save() {
@@ -43,6 +45,7 @@
 
         //TODO: Set input error state and show error toast if failed.
         try {
+            // setSetting might be async, so we await it.
             await setSetting(settingTransform(value));
         } catch (e) {
             console.error("Failed to save setting:", e);
@@ -51,8 +54,8 @@
     }
 
     export async function reset() {
-        value = "";
-        placeholder = await getSetting();
+        value = await getSetting();
+        startValue = value;
     }
 </script>
 

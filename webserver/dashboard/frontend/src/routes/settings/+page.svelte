@@ -2,13 +2,14 @@
     import { patchConfig } from "$lib/api/objects/config/config.svelte";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import SettingInput from "$lib/components/ui/settings/SettingInput.svelte";
-    import TextInput from "$lib/components/ui/TextInput.svelte";
+    import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
     import type { ToastProvider } from "$lib/providers/toast.svelte";
     import { parseByteString } from "$lib/utils/format";
     import { log } from "$lib/utils/logger";
-    import { getContext, onMount } from "svelte";
+    import { getContext, onMount, type Component } from "svelte";
+    import Toggle from "$lib/components/ui/input/Toggle.svelte";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
@@ -24,7 +25,19 @@
         "^(?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._-]+)?\\])?:\\d{1,5}$"; // IP:port or [IPv6]:port
     const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
 
-    const inputSections = [
+    //TODO: Tidy these typings up
+    type InputSection = {
+        InputComponent: Component<any, any, "value">;
+        getSetting: () => Promise<any> | any;
+        setSetting: (_value: any) => any;
+        settingTransform: (val: any) => any;
+        label: string;
+        pattern: string;
+        tooltip?: string;
+        [key: string]: any; // Allow additional props for the input component
+    };
+
+    const inputSections: InputSection[][] = [
         // Dashboard section
         [
             {
@@ -69,11 +82,11 @@
                 tooltip: "The path to the CA private key for the proxy server.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.upstreamDefaultHttps,
                 setSetting: async (val: boolean) =>
                     await patchConfig("upstream_default_https", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Upstream Default HTTPS",
                 pattern: boolPattern,
                 tooltip:
@@ -92,19 +105,19 @@
                 tooltip: "The IP address and port that the web server will bind to.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.dashboardDisabled,
                 setSetting: async (val: boolean) => await patchConfig("dashboard_disabled", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Dashboard Disabled",
                 pattern: boolPattern,
                 tooltip: "Whether the dashboard is disabled.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.apiDisabled,
                 setSetting: async (val: boolean) => await patchConfig("api_disabled", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "API Disabled",
                 pattern: boolPattern,
                 tooltip:
@@ -123,10 +136,10 @@
                 tooltip: "The directory where cached files are stored.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.ignoreCacheControl,
                 setSetting: async (val: boolean) => await patchConfig("ignore_cache_control", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Ignore Cache Control",
                 pattern: boolPattern,
                 tooltip: "Whether to ignore Cache-Control headers from the client.",
@@ -151,11 +164,11 @@
                     "The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.forceDefaultCacheMaxAge,
                 setSetting: async (val: boolean) =>
                     await patchConfig("force_default_cache_max_age", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Force Default Cache Max Age",
                 pattern: boolPattern,
                 tooltip:
@@ -215,19 +228,19 @@
                     "The maximum number of rotated log files to keep. Older files will be deleted.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.logFileCompress,
                 setSetting: async (val: boolean) => await patchConfig("log_file_compress", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Log File Compression",
                 pattern: boolPattern,
                 tooltip: "Whether to compress log files when they are rotated.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.logToStdout,
                 setSetting: async (val: boolean) => await patchConfig("log_to_stdout", val),
-                settingTransform: (val: string) => val === "true",
+                settingTransform: (val: boolean) => val,
                 label: "Log to Stdout",
                 pattern: boolPattern,
                 tooltip: "Whether to also log to standard output (console).",
@@ -235,7 +248,7 @@
         ],
     ];
 
-    const inputComponents: InstanceType<typeof SettingInput>[][] = $state(
+    const inputComponents: InstanceType<typeof SettingInput<any, any>>[][] = $state(
         // Initialize a 2D array (an array for each section) to hold references to SettingInput components
         inputSections.map(() => []),
     );
@@ -317,6 +330,11 @@
 
 <style>
     .inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 0px;
+        align-items: flex-start;
+
         width: fit-content;
     }
 </style>

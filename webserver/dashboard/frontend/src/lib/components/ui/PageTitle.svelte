@@ -10,7 +10,7 @@
     .page-title {
         font-size: 1.75rem;
         font-weight: bold;
-        color: var(--secondary-500);
+        color: var(--tertiary-400);
         margin-bottom: 1rem;
     }
 </style>

@@ -1,7 +1,7 @@
 <script>
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import Button from "../ui/Button.svelte";
+    import Button from "../ui/input/Button.svelte";
 
     let { url, children = undefined } = $props();
 

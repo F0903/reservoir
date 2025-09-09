@@ -1,7 +1,4 @@
 <script lang="ts">
-    import { log } from "$lib/utils/logger";
-    import type { HTMLInputTypeAttribute } from "svelte/elements";
-
     let {
         label,
         pattern = ".*",
@@ -28,12 +25,12 @@
 </script>
 
 <div class="input-container">
-    <label class="label" for="{label}-input" title={tooltip}>{label}</label>
+    <label class="label" for="{label}-textinput" title={tooltip}>{label}</label>
     <input
         type="text"
         {pattern}
         class="input"
-        id="{label}-input"
+        id="{label}-textinput"
         bind:value
         {placeholder}
         title={tooltip}

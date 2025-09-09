@@ -1,6 +1,6 @@
 <script lang="ts">
     import { fly } from "svelte/transition";
-    import Button from "./Button.svelte";
+    import Button from "./input/Button.svelte";
     import VerticalSpacer from "./VerticalSpacer.svelte";
 
     type BaseProps = {
