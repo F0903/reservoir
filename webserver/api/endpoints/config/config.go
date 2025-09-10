@@ -8,6 +8,9 @@ import (
 	"reservoir/webserver/api/apitypes"
 )
 
+const successResponse = "success"
+const restartRequiredResponse = "restart required"
+
 type ConfigEndpoint struct{}
 
 func (e *ConfigEndpoint) Path() string {
@@ -56,11 +59,18 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := config.UpdatePartialFromJSON(updates); err != nil {
+	status, err := config.UpdatePartialFromJSON(updates)
+	if err != nil {
 		slog.Error("Failed to partially update config", "error", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusAccepted)
+	switch status {
+	case config.UpdateStatusSuccess:
+		w.Write([]byte(successResponse))
+	case config.UpdateStatusRestartRequired:
+		w.Write([]byte(restartRequiredResponse))
+	}
 }

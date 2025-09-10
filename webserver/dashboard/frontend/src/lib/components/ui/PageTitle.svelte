@@ -11,6 +11,6 @@
         font-size: 1.75rem;
         font-weight: bold;
         color: var(--tertiary-400);
-        margin-bottom: 1rem;
+        margin-bottom: var(--pagetitle-margin-bottom, 1rem);
     }
 </style>

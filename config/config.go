@@ -48,8 +48,20 @@ type Config struct {
 	LogToStdout             ConfigProp[bool]              `json:"log_to_stdout"`               // If true, log messages will be written to stdout.
 }
 
+// Marks all properties that require a restart to take effect as needing a restart.
+func (c *Config) setRestartNeededProps() {
+	c.ProxyListen.SetRequiresRestart()
+	c.CaCert.SetRequiresRestart()
+	c.CaKey.SetRequiresRestart()
+	c.WebserverListen.SetRequiresRestart()
+	c.DashboardDisabled.SetRequiresRestart()
+	c.ApiDisabled.SetRequiresRestart()
+	c.CacheDir.SetRequiresRestart()
+	c.LogFile.SetRequiresRestart()
+}
+
 func newDefault() *Config {
-	return &Config{
+	cfg := &Config{
 		ConfigVersion:           NewConfigProp(configVersion),
 		ProxyListen:             NewConfigProp(":9999"),
 		CaCert:                  NewConfigProp("ssl/ca.crt"),
@@ -71,6 +83,8 @@ func newDefault() *Config {
 		LogFileCompress:         NewConfigProp(true),
 		LogToStdout:             NewConfigProp(false),
 	}
+	cfg.setRestartNeededProps()
+	return cfg
 }
 
 // Writes the configuration to disk.
@@ -122,6 +136,8 @@ func load(path string) (*Config, error) {
 		slog.Error("Unable to verify config", "path", path, "error", err)
 		return nil, fmt.Errorf("%w: %v", ErrConfigVersionMismatch, err)
 	}
+
+	cfg.setRestartNeededProps()
 
 	slog.Info("Successfully loaded config", "path", path)
 	return &cfg, nil

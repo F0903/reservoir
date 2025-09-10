@@ -28,5 +28,5 @@
     });
 </script>
 
-<PageTitle>Log</PageTitle>
+<PageTitle --pagetitle-margin-bottom="1.5rem">Log</PageTitle>
 <TextViewer bind:this={textViewer} --viewer-max-height="90%" />

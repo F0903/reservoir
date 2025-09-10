@@ -75,6 +75,6 @@ export async function patchConfig(
     propName: string,
     value: unknown,
     fetchFn: FetchFn = fetch,
-): Promise<void> {
+): Promise<string> {
     return apiPatch("/config", { [propName]: value }, fetchFn);
 }

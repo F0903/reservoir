@@ -5,11 +5,12 @@
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import type { ToastProvider } from "$lib/providers/toast.svelte";
+    import type { ToastHandle, ToastProvider } from "$lib/providers/toast.svelte";
     import { parseByteString } from "$lib/utils/format";
     import { log } from "$lib/utils/logger";
     import { getContext, onMount, type Component } from "svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
+    import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
@@ -20,9 +21,9 @@
     const intPattern = "^\\d+$";
     const bytesizePattern = "^(\\d+)([BKMGT])$";
     const durationPattern =
-        "^[+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|µs|ms|s|m|h)(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|µs|ms|s|m|h))*$"; // Duration format
+        "^(?:\\+|\\-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$";
     const ipPortPattern =
-        "^(?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._-]+)?\\])?:\\d{1,5}$"; // IP:port or [IPv6]:port
+        "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
     const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
 
     //TODO: Tidy these typings up
@@ -36,6 +37,19 @@
         tooltip?: string;
         [key: string]: any; // Allow additional props for the input component
     };
+
+    // Thin wrapper so we can show a toast if a restart is required
+    async function sendPatch(propName: string, value: unknown) {
+        const status = await patchConfig(propName, value);
+        log.debug(`Patched config ${propName} with value ${value}, status: ${status}`);
+        if (status === "restart required") {
+            toast.show({
+                type: "info",
+                message: "Restart required to apply changes.",
+                durationMs: 10000,
+            });
+        }
+    }
 
     const inputSections: InputSection[][] = [
         // Dashboard section
@@ -57,7 +71,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.proxyListen,
-                setSetting: async (val: string) => await patchConfig("proxy_listen", val),
+                setSetting: async (val: string) => await sendPatch("proxy_listen", val),
                 settingTransform: (val: string) => val,
                 label: "Proxy Listen",
                 pattern: ipPortPattern,
@@ -66,7 +80,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.caCert,
-                setSetting: async (val: string) => await patchConfig("ca_cert", val),
+                setSetting: async (val: string) => await sendPatch("ca_cert", val),
                 settingTransform: (val: string) => val,
                 label: "CA Certificate",
                 pattern: stringPattern,
@@ -75,7 +89,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.caKey,
-                setSetting: async (val: string) => await patchConfig("ca_key", val),
+                setSetting: async (val: string) => await sendPatch("ca_key", val),
                 settingTransform: (val: string) => val,
                 label: "CA Key",
                 pattern: stringPattern,
@@ -84,8 +98,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.upstreamDefaultHttps,
-                setSetting: async (val: boolean) =>
-                    await patchConfig("upstream_default_https", val),
+                setSetting: async (val: boolean) => await sendPatch("upstream_default_https", val),
                 settingTransform: (val: boolean) => val,
                 label: "Upstream Default HTTPS",
                 pattern: boolPattern,
@@ -98,7 +111,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.webserverListen,
-                setSetting: async (val: string) => await patchConfig("webserver_listen", val),
+                setSetting: async (val: string) => await sendPatch("webserver_listen", val),
                 settingTransform: (val: string) => val,
                 label: "Webserver Listen",
                 pattern: ipPortPattern,
@@ -107,7 +120,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.dashboardDisabled,
-                setSetting: async (val: boolean) => await patchConfig("dashboard_disabled", val),
+                setSetting: async (val: boolean) => await sendPatch("dashboard_disabled", val),
                 settingTransform: (val: boolean) => val,
                 label: "Dashboard Disabled",
                 pattern: boolPattern,
@@ -116,7 +129,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.apiDisabled,
-                setSetting: async (val: boolean) => await patchConfig("api_disabled", val),
+                setSetting: async (val: boolean) => await sendPatch("api_disabled", val),
                 settingTransform: (val: boolean) => val,
                 label: "API Disabled",
                 pattern: boolPattern,
@@ -129,7 +142,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.cacheDir,
-                setSetting: async (val: string) => await patchConfig("cache_dir", val),
+                setSetting: async (val: string) => await sendPatch("cache_dir", val),
                 settingTransform: (val: string) => val,
                 label: "Cache Directory",
                 pattern: stringPattern,
@@ -138,7 +151,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.ignoreCacheControl,
-                setSetting: async (val: boolean) => await patchConfig("ignore_cache_control", val),
+                setSetting: async (val: boolean) => await sendPatch("ignore_cache_control", val),
                 settingTransform: (val: boolean) => val,
                 label: "Ignore Cache Control",
                 pattern: boolPattern,
@@ -147,7 +160,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.maxCacheSize,
-                setSetting: async (val: number) => await patchConfig("max_cache_size", val),
+                setSetting: async (val: number) => await sendPatch("max_cache_size", val),
                 settingTransform: (val: string) => parseByteString(val),
                 label: "Max Cache Size",
                 pattern: bytesizePattern,
@@ -156,7 +169,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.defaultCacheMaxAge,
-                setSetting: async (val: string) => await patchConfig("default_cache_max_age", val),
+                setSetting: async (val: string) => await sendPatch("default_cache_max_age", val),
                 settingTransform: (val: string) => val,
                 label: "Default Cache Max Age",
                 pattern: durationPattern,
@@ -167,7 +180,7 @@
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.forceDefaultCacheMaxAge,
                 setSetting: async (val: boolean) =>
-                    await patchConfig("force_default_cache_max_age", val),
+                    await sendPatch("force_default_cache_max_age", val),
                 settingTransform: (val: boolean) => val,
                 label: "Force Default Cache Max Age",
                 pattern: boolPattern,
@@ -177,7 +190,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.cacheCleanupInterval,
-                setSetting: async (val: string) => await patchConfig("cache_cleanup_interval", val),
+                setSetting: async (val: string) => await sendPatch("cache_cleanup_interval", val),
                 settingTransform: (val: string) => val,
                 label: "Cache Cleanup Interval",
                 pattern: durationPattern,
@@ -188,9 +201,10 @@
         // Logging section
         [
             {
-                InputComponent: TextInput,
+                InputComponent: Dropdown,
+                options: ["DEBUG", "INFO", "WARN", "ERROR"],
                 getSetting: () => settings.proxySettings.fields.logLevel,
-                setSetting: async (val: string) => await patchConfig("log_level", val),
+                setSetting: async (val: string) => await sendPatch("log_level", val),
                 settingTransform: (val: string) => val,
                 label: "Log Level",
                 pattern: logLevelPattern,
@@ -200,7 +214,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.logFile,
-                setSetting: async (val: string) => await patchConfig("log_file", val),
+                setSetting: async (val: string) => await sendPatch("log_file", val),
                 settingTransform: (val: string) => val,
                 label: "Log File Path",
                 pattern: optionalStringPattern,
@@ -210,7 +224,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.logFileMaxSize,
-                setSetting: async (val: number) => await patchConfig("log_file_max_size", val),
+                setSetting: async (val: number) => await sendPatch("log_file_max_size", val),
                 settingTransform: (val: string) => parseByteString(val),
                 label: "Log File Max Size",
                 pattern: bytesizePattern,
@@ -220,7 +234,7 @@
             {
                 InputComponent: TextInput,
                 getSetting: () => settings.proxySettings.fields.logFileMaxBackups,
-                setSetting: async (val: number) => await patchConfig("log_file_max_backups", val),
+                setSetting: async (val: number) => await sendPatch("log_file_max_backups", val),
                 settingTransform: (val: string) => parseInt(val),
                 label: "Log File Max Backups",
                 pattern: intPattern,
@@ -230,7 +244,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.logFileCompress,
-                setSetting: async (val: boolean) => await patchConfig("log_file_compress", val),
+                setSetting: async (val: boolean) => await sendPatch("log_file_compress", val),
                 settingTransform: (val: boolean) => val,
                 label: "Log File Compression",
                 pattern: boolPattern,
@@ -239,7 +253,7 @@
             {
                 InputComponent: Toggle,
                 getSetting: () => settings.proxySettings.fields.logToStdout,
-                setSetting: async (val: boolean) => await patchConfig("log_to_stdout", val),
+                setSetting: async (val: boolean) => await sendPatch("log_to_stdout", val),
                 settingTransform: (val: boolean) => val,
                 label: "Log to Stdout",
                 pattern: boolPattern,
@@ -248,26 +262,28 @@
         ],
     ];
 
-    const inputComponents: InstanceType<typeof SettingInput<any, any>>[][] = $state(
+    const inputComponents: SettingInput<any, any>[][] = $state(
         // Initialize a 2D array (an array for each section) to hold references to SettingInput components
         inputSections.map(() => []),
     );
     let hasChanges = $state(false);
 
-    onMount(() => {
-        settings.proxySettings.reload();
-        settings.dashboardConfig.reload();
+    var changesToast: ToastHandle | null = null;
+
+    onMount(async () => {
+        await settings.proxySettings.reload();
+        await settings.dashboardConfig.reload();
     });
 
     $effect(() => {
         if (!hasChanges) {
-            toast.close();
+            changesToast?.close();
             log.debug("No unsaved changes, closing toast if open.");
             return;
         }
 
         log.debug("Unsaved changes detected, prompting user to save or discard.");
-        toast.show({
+        changesToast = toast.show({
             type: "action",
             message: "You have unsaved changes!",
             negativeText: "Discard",
@@ -302,16 +318,15 @@
 
     async function applyChanges() {
         await saveInputs();
-        toast.close();
+        changesToast?.close();
         await settings.proxySettings.reload();
         await resetInputs();
-
         log.debug("Settings have been saved.");
     }
 
     async function discardChanges() {
         await resetInputs();
-        toast.close();
+        changesToast?.close();
         log.debug("Changes have been discarded.");
     }
 </script>

@@ -7,13 +7,18 @@ import (
 	"reservoir/utils/typeutils"
 )
 
-type ConfigProp[T any] struct {
-	value    typeutils.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
-	onChange event.Event[T]
+type ConfigProp[T comparable] struct {
+	value           typeutils.Overwritable[T] // We use Overwritable to allow temporary overrides while still retaining and persisting the original value.
+	onChange        event.Event[T]
+	requiresRestart bool
 }
 
-func NewConfigProp[T any](value T) ConfigProp[T] {
+func NewConfigProp[T comparable](value T) ConfigProp[T] {
 	return ConfigProp[T]{value: typeutils.NewOverwritable(value)}
+}
+
+func (p *ConfigProp[T]) SetRequiresRestart() {
+	p.requiresRestart = true
 }
 
 func (p ConfigProp[T]) Read() T {
@@ -38,7 +43,14 @@ func (p *ConfigProp[T]) Overwrite(value T) {
 }
 
 func (p *ConfigProp[T]) Set(value T) {
+	oldVal := p.value.Original()
+
 	p.value.Set(value)
+
+	if p.requiresRestart && (oldVal != value) {
+		setRestartNeeded()
+	}
+
 	p.onChange.Fire(value)
 }
 

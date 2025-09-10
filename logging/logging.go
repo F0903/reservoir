@@ -10,25 +10,17 @@ import (
 	"reservoir/config"
 	"reservoir/logging/early"
 	"reservoir/utils/assertedpath"
-
-	"github.com/DeRuina/timberjack"
 )
 
 var (
 	ErrNoLogFile = errors.New("no log file configured")
 )
 
+var fileLog *fileLogger = nil // Current file logger instance if any
 var logLevel slog.LevelVar
 
 func OpenLogFileRead() (*os.File, error) {
-	cfgLock := config.Global.Immutable()
-
-	var logFilePath string
-	cfgLock.Read(func(c *config.Config) {
-		logFilePath = c.LogFile.Read()
-	})
-
-	assertedPath, err := assertedpath.TryAssert(logFilePath)
+	assertedPath, err := assertedpath.TryAssert(fileLog.Path())
 	if err != nil {
 		return nil, err
 	}
@@ -64,18 +56,12 @@ func appendLogFileWriter(writers *[]io.Writer) io.Writer {
 		return nil
 	}
 
-	tj := &timberjack.Logger{
-		Filename:   logFilePath,
-		MaxSize:    logFileMaxSize,
-		MaxBackups: logFileMaxBackups,
-		Compress:   logFileCompress,
-		LocalTime:  true,
-	}
+	fileLog = newFileLogger(logFilePath, logFileMaxSize, logFileMaxBackups, logFileCompress)
 
-	*writers = append(*writers, tj)
+	*writers = append(*writers, fileLog)
 	slog.Info("Added log file writer", "path", logFilePath, "max_size", logFileMaxSize, "max_backups", logFileMaxBackups, "compress", logFileCompress)
 
-	return tj
+	return fileLog
 }
 
 func SetLogLevel(level slog.Level) {

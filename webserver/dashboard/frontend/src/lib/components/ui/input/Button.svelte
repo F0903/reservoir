@@ -11,6 +11,10 @@
         filter: brightness(0.9);
     }
 
+    .btn:disabled {
+        filter: brightness(0.75);
+    }
+
     .btn:enabled:active {
         filter: brightness(0.8);
         scale: 0.95;

@@ -1,3 +1,5 @@
+import { log } from "$lib/utils/logger";
+
 export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promise<Response>;
 
 export interface APIObjectConstructor<T> {
@@ -52,11 +54,11 @@ export async function apiGet<T>(
     return new type(json) as T;
 }
 
-export async function apiPatch(
+export async function apiPatch<T>(
     endpoint: string,
     json: Record<string, unknown>,
     fetchFn: FetchFn = fetch,
-): Promise<void> {
+): Promise<T> {
     const response = await fetchFn(`/api${endpoint}`, {
         method: "PATCH",
         headers: {
@@ -68,4 +70,15 @@ export async function apiPatch(
     if (!response.ok) {
         throw new Error(`PATCH failed: ${response.status} ${response.statusText}`);
     }
+
+    const contentType = response.headers.get("Content-Type");
+    if (contentType && contentType.includes("application/json")) {
+        log.debug("Parsing JSON response from PATCH");
+        const respJson = await response.json();
+        return respJson as T;
+    }
+
+    log.debug("Unknown or no content type in response from PATCH, returning body text");
+    const respText = await response.text();
+    return respText as T;
 }

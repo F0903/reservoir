@@ -2,6 +2,8 @@
     import { fly } from "svelte/transition";
     import Button from "./input/Button.svelte";
     import VerticalSpacer from "./VerticalSpacer.svelte";
+    import { onMount, unmount } from "svelte";
+    import type { ToastHandle } from "$lib/providers/toast.svelte";
 
     type BaseProps = {
         message: string;
@@ -15,37 +17,93 @@
         onNegative?: () => Promise<void>;
     };
 
-    export type ToastProps = BaseProps & ActionProps;
+    type InfoProps = {
+        type: "info";
+        durationMs: number;
+        dismissText?: string;
+        onDismiss?: () => Promise<void>;
+    };
+
+    type ErrorProps = {
+        type: "error";
+        durationMs: number;
+        dismissText?: string;
+        onDismiss?: () => Promise<void>;
+    };
+
+    export type ToastProps =
+        | (BaseProps & ActionProps)
+        | (BaseProps & InfoProps)
+        | (BaseProps & ErrorProps);
     export type ToastType = ToastProps["type"];
 
-    let { message, type = "action", ...rest }: ToastProps = $props();
+    let props: ToastProps & { handle: ToastHandle } = $props();
 
     let disabled = $state(false);
+
+    onMount(() => {
+        if (props.type === "info" || props.type === "error") {
+            setTimeout(async () => {
+                disabled = true;
+                await props.onDismiss?.();
+                props.handle.close();
+            }, props.durationMs);
+        }
+    });
+
+    function disableAndDo(fn?: () => Promise<void>) {
+        return async () => {
+            disabled = true;
+            await fn?.();
+        };
+    }
 
     export function disable() {
         disabled = true;
     }
 </script>
 
-<div class="toast" transition:fly={{ y: 500, duration: 200 }}>
-    <h1 class="toast-message">{message}</h1>
-    {#if type === "action"}
+<div class="toast {props.type}" transition:fly={{ y: 500, duration: 200 }}>
+    <h1 class="toast-message">{props.message}</h1>
+    {#if props.type === "action"}
         <VerticalSpacer
             --spacer-color="var(--primary-450)"
             --spacer-margin="15px"
             --spacer-width="50%"
         />
         <div class="action-buttons">
-            <Button onClick={rest.onPositive} {disabled} --btn-font-weight="600"
-                >{rest.positiveText || "Yes"}</Button
+            <Button onClick={disableAndDo(props.onPositive)} {disabled} --btn-font-weight="600"
+                >{props.positiveText || "Yes"}</Button
             >
             <Button
-                onClick={rest.onNegative}
+                onClick={disableAndDo(props.onNegative)}
                 {disabled}
                 --btn-font-weight="600"
                 --btn-background-color="var(--primary-450)"
-                >{rest.negativeText || "No"}
+                >{props.negativeText || "No"}
             </Button>
+        </div>
+    {:else if props.type === "info"}
+        <VerticalSpacer
+            --spacer-color="var(--primary-450)"
+            --spacer-margin="15px"
+            --spacer-width="50%"
+        />
+        <div class="action-buttons">
+            <Button onClick={disableAndDo(props.onDismiss)} {disabled} --btn-font-weight="600"
+                >{props.dismissText || "OK"}</Button
+            >
+        </div>
+    {:else if props.type === "error"}
+        <VerticalSpacer
+            --spacer-color="var(--primary-450)"
+            --spacer-margin="15px"
+            --spacer-width="50%"
+        />
+        <div class="action-buttons">
+            <Button onClick={disableAndDo(props.onDismiss)} {disabled} --btn-font-weight="600"
+                >{props.dismissText || "Dismiss"}</Button
+            >
         </div>
     {/if}
 </div>
@@ -64,6 +122,12 @@
         font-size: 1.2rem;
         font-weight: 400;
         margin-bottom: 0px;
+    }
+
+    .toast.error {
+        border-color: var(--error-border-color);
+        background-color: var(--error-background-color);
+        color: var(--error-text-color);
     }
 
     .toast {

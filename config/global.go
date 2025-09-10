@@ -23,6 +23,14 @@ var Global *writesynced.WriteSynced[Config] = func() *writesynced.WriteSynced[Co
 	return writesynced.New(*cfg)
 }()
 
+type UpdateStatus int
+
+const (
+	UpdateStatusFailed UpdateStatus = iota
+	UpdateStatusSuccess
+	UpdateStatusRestartRequired
+)
+
 // UpdateAndVerify applies the provided function to the global config, verifies it, and persists it.
 // If verification or persistence fails, it reverts to the old config.
 func UpdateAndVerify(f func(*Config)) error {
@@ -54,15 +62,22 @@ func UpdateAndVerify(f func(*Config)) error {
 	return nil
 }
 
-func UpdatePartialFromJSON(updates map[string]any) error {
+func UpdatePartialFromJSON(updates map[string]any) (UpdateStatus, error) {
 	slog.Debug("Updating global config with partial JSON", "updates", updates)
 
 	if updates == nil {
 		slog.Error("UpdatePartialFromJSON called with nil updates")
-		return nil
+		return UpdateStatusFailed, nil
 	}
 
-	return UpdateAndVerify(func(cfg *Config) {
+	UpdateAndVerify(func(cfg *Config) {
 		setPropsFromMap(cfg, updates)
 	})
+
+	status := UpdateStatusSuccess
+	if IsRestartNeeded() {
+		slog.Info("Restart is required after updating global config")
+		status = UpdateStatusRestartRequired
+	}
+	return status, nil
 }

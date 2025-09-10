@@ -1,26 +1,44 @@
 import Toast, { type ToastProps } from "$lib/components/ui/Toast.svelte";
 import { mount, unmount } from "svelte";
 
+export class ToastHandle {
+    #closed: boolean = false;
+    #closer: () => void;
+
+    constructor(closer: () => void, closed = false) {
+        this.#closer = closer;
+        this.#closed = closed;
+    }
+
+    close = () => {
+        if (this.#closed) return;
+        this.#closed = true;
+        this.#closer();
+    };
+}
+
 export class ToastProvider {
-    private openToast: Toast | null = null;
+    // Show a new toast and return a function to close it
+    show = (props: ToastProps): ToastHandle => {
+        let toast: Toast | null = null;
+        const handle = new ToastHandle(() => {
+            if (toast) this.#closeToast(toast);
+        });
 
-    show = (props: ToastProps) => {
-        if (this.openToast) return; // As of now, only one toast can be open at a time
-
-        this.openToast = mount(Toast, {
+        toast = mount(Toast, {
             target: document.body,
             props: {
+                handle,
                 ...props,
             },
         });
+        return handle;
     };
 
-    close = () => {
-        if (!this.openToast) return;
-
-        unmount(this.openToast, {
+    #closeToast = (toast: Toast) => {
+        // We don't care about waiting for the transition to finish, so no await.
+        unmount(toast, {
             outro: true,
         });
-        this.openToast = null;
     };
 }
