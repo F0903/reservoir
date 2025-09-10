@@ -2,7 +2,6 @@ import { browser } from "$app/environment";
 import { type FetchFn, APIJsonObject } from "$lib/api/api-object";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
 import { log } from "$lib/utils/logger";
-import { getContext } from "svelte";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";
 import type { LoadableState } from "$lib/utils/loadable";
 
@@ -18,9 +17,7 @@ export class MetricsProvider {
     });
 
     // Create a new MetricsProvider instance and immediately refresh metrics
-    static createAndRefresh(fetchFn: FetchFn = fetch): MetricsProvider {
-        const settings = getContext("settings") as SettingsProvider;
-
+    static createAndRefresh(settings: SettingsProvider, fetchFn: FetchFn = fetch): MetricsProvider {
         const provider = new MetricsProvider(fetchFn, settings);
         provider.startRefresh();
         provider.refreshMetrics(); // Do not wait for it to complete, just start it and move on
