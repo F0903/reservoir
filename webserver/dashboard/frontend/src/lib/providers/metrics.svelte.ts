@@ -16,17 +16,9 @@ export class MetricsProvider {
         errorMsg: null,
     });
 
-    // Create a new MetricsProvider instance and immediately refresh metrics
-    static createAndRefresh(settings: SettingsProvider, fetchFn: FetchFn = fetch): MetricsProvider {
-        const provider = new MetricsProvider(fetchFn, settings);
-        provider.startRefresh();
-        provider.refreshMetrics(); // Do not wait for it to complete, just start it and move on
-        return provider;
-    }
-
-    private constructor(fetchFn: FetchFn = fetch, settings: SettingsProvider) {
-        this.fetchFn = fetchFn;
+    constructor(settings: SettingsProvider, fetchFn: FetchFn = fetch) {
         this.settings = settings;
+        this.fetchFn = fetchFn;
     }
 
     getLoadableState(): LoadableState {
@@ -38,12 +30,6 @@ export class MetricsProvider {
         if (!browser) return; // Do not run this in SSR
 
         if (this.metricsRefreshId !== null) return;
-
-        log.debug("Starting metrics refresh interval");
-        this.metricsRefreshId = setInterval(
-            () => this.refreshMetrics(),
-            this.settings.dashboardConfig.fields.updateInterval,
-        );
 
         $effect(() => {
             const interval = this.settings.dashboardConfig.fields.updateInterval;

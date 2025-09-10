@@ -15,7 +15,7 @@
     let { children } = $props();
 
     const settings = setContext("settings", new SettingsProvider());
-    const metrics = setContext("metrics", MetricsProvider.createAndRefresh(settings, fetch));
+    const metrics = setContext("metrics", new MetricsProvider(settings, fetch));
     const toast = setContext("toast", new ToastProvider());
 
     function onAsyncError(event: PromiseRejectionEvent) {
