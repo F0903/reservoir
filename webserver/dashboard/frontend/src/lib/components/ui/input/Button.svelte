@@ -12,15 +12,20 @@
     }
 
     .btn:disabled {
-        filter: brightness(0.75);
+        filter: brightness(0.8);
+        scale: 0.95;
+        box-shadow: var(--button-pressed-shadow);
     }
 
     .btn:enabled:active {
         filter: brightness(0.8);
-        scale: 0.95;
+        scale: 0.9;
+        box-shadow: var(--button-pressed-shadow);
     }
 
     .btn {
+        --button-pressed-shadow: inset 0px 0px 5px -1px rgba(0, 0, 0, 0.5);
+
         padding: 0.5rem 0.75rem;
         border: none;
         border-radius: 15px;
