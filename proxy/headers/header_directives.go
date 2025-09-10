@@ -26,7 +26,7 @@ func parseIfRange(value string) typeutils.Optional[typeutils.Either[eTag, time.T
 	}
 
 	if t, err := time.Parse(http.TimeFormat, value); err == nil {
-		timeIfRange := typeutils.Right[eTag, time.Time](&t)
+		timeIfRange := typeutils.Right[eTag](&t)
 		return typeutils.Some(&timeIfRange)
 	}
 
