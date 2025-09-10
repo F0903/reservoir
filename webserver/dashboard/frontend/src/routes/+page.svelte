@@ -7,7 +7,7 @@
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
     import ComponentMasonryGrid from "$lib/components/layout/ComponentMasonryGrid.svelte";
     import { getContext, onMount } from "svelte";
-    import type { MetricsProvider } from "$lib/providers/metrics.svelte";
+    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
 
     const metrics = getContext("metrics") as MetricsProvider;
 

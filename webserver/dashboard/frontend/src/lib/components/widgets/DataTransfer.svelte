@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { MetricsProvider } from "$lib/providers/metrics.svelte";
-    import { formatBytes } from "$lib/utils/format";
+    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
+    import { formatBytes, formatBytesToLargest } from "$lib/utils/format";
     import { getContext } from "svelte";
     import Card from "../ui/Card.svelte";
     import Widget from "./base/Widget.svelte";
@@ -14,7 +14,7 @@
         <Card --card-background="var(--primary-600)" --card-padding="1rem">
             <div class="primary-metric">
                 <div class="primary-metric-value">
-                    {formatBytes(metrics.data.requests.bytesServed)}
+                    {formatBytesToLargest(metrics.data.requests.bytesServed)}
                 </div>
                 <div class="primary-metric-label label">Total Bytes Served</div>
             </div>
@@ -33,7 +33,7 @@
                 {#if metrics.data.requests.httpProxyRequests + metrics.data.requests.httpsProxyRequests > 0}
                     <div class="secondary-metric">
                         <span class="secondary-metric-value"
-                            >{formatBytes(
+                            >{formatBytesToLargest(
                                 metrics.data.requests.bytesServed /
                                     (metrics.data.requests.httpProxyRequests +
                                         metrics.data.requests.httpsProxyRequests),

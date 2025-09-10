@@ -7,10 +7,10 @@
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
     import { LayoutDashboard, Logs, Settings } from "@lucide/svelte";
-    import { MetricsProvider } from "$lib/providers/metrics.svelte";
+    import { MetricsProvider } from "$lib/providers/metric-providers.svelte";
     import { setContext } from "svelte";
     import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import { ToastProvider } from "$lib/providers/toast.svelte";
+    import { ToastProvider } from "$lib/providers/toast-provider.svelte";
 
     let { children } = $props();
 

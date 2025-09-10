@@ -5,7 +5,7 @@
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import type { ToastHandle, ToastProvider } from "$lib/providers/toast.svelte";
+    import type { ToastHandle, ToastProvider } from "$lib/providers/toast-provider.svelte";
     import { parseByteString } from "$lib/utils/format";
     import { log } from "$lib/utils/logger";
     import { getContext, onMount, type Component } from "svelte";

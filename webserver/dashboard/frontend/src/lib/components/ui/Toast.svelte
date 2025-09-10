@@ -3,7 +3,7 @@
     import Button from "./input/Button.svelte";
     import VerticalSpacer from "./VerticalSpacer.svelte";
     import { onMount, unmount } from "svelte";
-    import type { ToastHandle } from "$lib/providers/toast.svelte";
+    import type { ToastHandle } from "$lib/providers/toast-provider.svelte";
 
     type BaseProps = {
         message: string;
@@ -61,6 +61,8 @@
     export function disable() {
         disabled = true;
     }
+
+    //TODO: refine style of the different toast types.
 </script>
 
 <div class="toast {props.type}" transition:fly={{ y: 500, duration: 200 }}>

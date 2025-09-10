@@ -1,6 +1,6 @@
 <script lang="ts">
     import { formatTimeSinceDate } from "$lib/utils/dates";
-    import type { MetricsProvider } from "$lib/providers/metrics.svelte";
+    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
     import PolledWidget from "./base/PolledWidget.svelte";
     import { getContext } from "svelte";
     import MetricCard from "./utils/MetricCard.svelte";

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { MetricsProvider } from "$lib/providers/metrics.svelte";
-    import { formatBytes } from "$lib/utils/format";
+    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
+    import { formatBytesToLargest } from "$lib/utils/format";
     import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
@@ -25,14 +25,17 @@
                 label="Cache Errors"
                 value={metrics.data.cache.cacheErrors.toLocaleString()}
             />
-            <MetricCard label="Bytes Cached" value={formatBytes(metrics.data.cache.bytesCached)} />
+            <MetricCard
+                label="Bytes Cached"
+                value={formatBytesToLargest(metrics.data.cache.bytesCached)}
+            />
             <MetricCard
                 label="Cleanup Runs"
                 value={metrics.data.cache.cleanupRuns.toLocaleString()}
             />
             <MetricCard
                 label="Bytes Cleaned"
-                value={formatBytes(metrics.data.cache.bytesCleaned)}
+                value={formatBytesToLargest(metrics.data.cache.bytesCleaned)}
             />
         </div>
     </Loadable>
