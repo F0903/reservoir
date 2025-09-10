@@ -21,7 +21,7 @@
     const intPattern = "^\\d+$";
     const bytesizePattern = "^(\\d+)([BKMGT])$";
     const durationPattern =
-        "^(?:\\+|\\-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$";
+        "^(?:\\+|-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$";
     const ipPortPattern =
         "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
     const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
