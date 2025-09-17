@@ -43,13 +43,13 @@
     export async function save() {
         if (!hasChanged()) return;
 
-        //TODO: Set input error state and show error toast if failed.
         try {
             // setSetting might be async, so we await it.
             await setSetting(settingTransform(value));
         } catch (e) {
             console.error("Failed to save setting:", e);
-            return;
+            // Error toast will be shown by global handler.
+            throw e;
         }
     }
 

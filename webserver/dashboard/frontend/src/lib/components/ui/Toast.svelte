@@ -138,6 +138,8 @@
         right: 50%;
         transform: translateX(50%);
 
+        text-align: center;
+
         padding: 1.5rem;
         border: 1px solid var(--primary-400);
         border-radius: 25px;

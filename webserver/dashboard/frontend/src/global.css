@@ -29,9 +29,9 @@
 
     --default-shadow: 5px 5px 10px 1px rgba(0, 0, 0, 0.5);
 
-    --error-background-color: hsla(0, 44%, 51%);
-    --error-border-color: hsla(0, 38%, 59%);
-    --error-text-color: hsl(0, 100%, 85%);
+    --error-background-color: hsl(0, 50%, 50%);
+    --error-border-color: hsl(0, 100%, 70%);
+    --error-text-color: var(--text-400);
 }
 
 * {

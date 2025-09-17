@@ -11,6 +11,7 @@
     import { getContext, onMount, type Component } from "svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
+    import Toast from "$lib/components/ui/Toast.svelte";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
