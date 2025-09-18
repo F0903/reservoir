@@ -2,7 +2,7 @@
     import { fly } from "svelte/transition";
     import Button from "./input/Button.svelte";
     import VerticalSpacer from "./VerticalSpacer.svelte";
-    import { onMount, unmount } from "svelte";
+    import { onMount } from "svelte";
     import type { ToastHandle } from "$lib/providers/toast-provider.svelte";
 
     type BaseProps = {
@@ -61,8 +61,6 @@
     export function disable() {
         disabled = true;
     }
-
-    //TODO: refine style of the different toast types.
 </script>
 
 <div class="toast {props.type}" transition:fly={{ y: 500, duration: 200 }}>
@@ -81,7 +79,7 @@
                 onClick={disableAndDo(props.onNegative)}
                 {disabled}
                 --btn-font-weight="600"
-                --btn-background-color="var(--primary-450)"
+                --btn-background-color="var(--secondary-600)"
                 >{props.negativeText || "No"}
             </Button>
         </div>
@@ -130,9 +128,14 @@
         border-color: var(--error-border-color);
         background-color: var(--error-background-color);
         color: var(--error-text-color);
+
+        --btn-background-color: var(--secondary-600);
     }
 
     .toast {
+        --toast-bg-color: var(--primary-300);
+        --toast-border-color: var(--primary-400);
+
         position: fixed;
         bottom: 50px;
         right: 50%;
@@ -141,10 +144,10 @@
         text-align: center;
 
         padding: 1.5rem;
-        border: 1px solid var(--primary-400);
+        border: 2px solid var(--toast-border-color);
         border-radius: 25px;
 
-        background-color: var(--primary-300);
+        background-color: var(--toast-bg-color);
 
         box-shadow: 0px 2px 15px rgba(0, 0, 0, 0.1);
     }
