@@ -1,6 +1,6 @@
 import { browser } from "$app/environment";
+import { setPropIfChanged } from "$lib/utils/objects/props";
 import type { Settings } from "./settings-provider.svelte";
-import { setPropIfChanged } from "$lib/utils/objects";
 
 class Fields {
     updateInterval = $state(10000);

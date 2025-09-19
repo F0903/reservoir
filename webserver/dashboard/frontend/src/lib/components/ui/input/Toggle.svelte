@@ -3,10 +3,12 @@
         label,
         value = $bindable(),
         tooltip,
+        disabled = false,
     }: {
         label: string;
         value: boolean;
         tooltip?: string;
+        disabled?: boolean;
     } = $props();
 
     function onToggleClick() {
@@ -23,9 +25,16 @@
         title={tooltip}
         aria-checked={value}
         role="switch"
+        {disabled}
     />
     <label class="label" for="{label}-toggle" title={tooltip}>{label}</label>
-    <div class="track" class:checked={value} aria-hidden="true" onclick={onToggleClick}>
+    <div
+        class="track"
+        class:checked={value}
+        aria-hidden="true"
+        onclick={onToggleClick}
+        class:disabled
+    >
         <div class="thumb"></div>
     </div>
 </div>
@@ -55,6 +64,11 @@
 
     .track.checked {
         background-color: var(--tertiary-500);
+    }
+
+    .track.disabled {
+        filter: brightness(0.8);
+        pointer-events: none;
     }
 
     .track {

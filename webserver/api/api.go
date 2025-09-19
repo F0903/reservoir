@@ -31,6 +31,7 @@ func New() *API {
 			&metrics.RequestsMetricsEndpoint{},
 			&metrics.SystemMetricsEndpoint{},
 			&config.ConfigEndpoint{},
+			&config.RestartRequiredEndpoint{},
 			&log.LogEndpoint{},
 			&log.LogStreamEndpoint{},
 		},

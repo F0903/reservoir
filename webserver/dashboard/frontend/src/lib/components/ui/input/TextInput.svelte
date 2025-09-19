@@ -10,6 +10,7 @@
         min,
         max,
         onSubmit,
+        disabled = false,
     }: {
         label: string;
         pattern?: string;
@@ -21,6 +22,7 @@
         min?: number;
         max?: number;
         onSubmit?: (event: Event) => void;
+        disabled?: boolean;
     } = $props();
 </script>
 
@@ -39,6 +41,7 @@
         {min}
         {max}
         style:--box-width-ch={boxWidthCh}
+        {disabled}
     />
 </div>
 
@@ -57,6 +60,10 @@
         font-size: 1rem;
         color: var(--secondary-500);
         letter-spacing: 0.05em;
+    }
+
+    .input:disabled {
+        filter: brightness(0.8);
     }
 
     .input {

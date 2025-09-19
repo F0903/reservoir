@@ -45,7 +45,3 @@ export function parseByteString(s: string): number {
 
     return value * ByteUnits[unit];
 }
-
-export function snakeCaseToCamelCase(s: string): string {
-    return s.replace(/_+([a-z0-9])/gi, (_m, c: string) => c.toUpperCase());
-}

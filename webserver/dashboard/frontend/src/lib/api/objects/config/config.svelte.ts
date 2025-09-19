@@ -5,7 +5,7 @@ import {
     APIJsonObject,
     apiPatch,
 } from "$lib/api/api-object";
-import { setPropIfChanged } from "$lib/utils/objects";
+import { setPropIfChanged } from "$lib/utils/objects/props";
 
 export class Config {
     configVersion: number = $state(0);

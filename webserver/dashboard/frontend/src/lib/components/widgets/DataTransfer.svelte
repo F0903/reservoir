@@ -1,10 +1,10 @@
 <script lang="ts">
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { formatBytes, formatBytesToLargest } from "$lib/utils/format";
     import { getContext } from "svelte";
     import Card from "../ui/Card.svelte";
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { formatBytesToLargest } from "$lib/utils/bytestring";
 
     let metrics = getContext("metrics") as MetricsProvider;
 </script>

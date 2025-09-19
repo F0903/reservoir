@@ -4,7 +4,7 @@ import {
     type APIObjectConstructor,
     type FetchFn,
 } from "$lib/api/api-object";
-import { setPropIfChanged } from "$lib/utils/objects";
+import { setPropIfChanged } from "$lib/utils/objects/props";
 
 export class RequestMetrics {
     httpProxyRequests: number = $state(0);

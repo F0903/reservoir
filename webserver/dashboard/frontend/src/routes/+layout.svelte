@@ -11,6 +11,7 @@
     import { setContext } from "svelte";
     import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
     import { ToastProvider } from "$lib/providers/toast-provider.svelte";
+    import { log } from "$lib/utils/logger";
 
     let { children } = $props();
 
@@ -21,7 +22,7 @@
     function onAsyncError(event: PromiseRejectionEvent) {
         event.preventDefault();
 
-        console.error("Unhandled promise rejection caught: ", event.reason, event.promise);
+        log.error("Unhandled promise rejection caught: ", event.reason, event.promise);
 
         toast.show({
             type: "error",
@@ -40,13 +41,13 @@
     ) {
         let message = "";
         if (eventOrMessage instanceof Event) {
-            eventOrMessage.preventDefault();
+            log.debug("Unhandled error parameter was event.");
         } else {
             message = eventOrMessage;
         }
 
         message ??= error?.message ?? "An unexpected error occurred.";
-        console.error("Unhandled error caught: ", message, source, lineno, colno, error);
+        log.error("Unhandled error caught: ", message, source, lineno, colno, error);
 
         toast.show({
             type: "error",
@@ -57,7 +58,7 @@
     }
 </script>
 
-<svelte:window onerror={onError} onunhandledrejection={onAsyncError} />
+<svelte:window onunhandledrejection={onAsyncError} />
 
 <div class="layout-grid">
     <div class="header-area">
@@ -71,7 +72,7 @@
         </SideNav>
     </div>
     <div class="main-area">
-        <BackdropBox --box-border-radius="25px 0px 0px 0px">
+        <BackdropBox --box-border-radius="20px 0px 0px 0px">
             <div class="page-container">
                 {@render children()}
             </div>

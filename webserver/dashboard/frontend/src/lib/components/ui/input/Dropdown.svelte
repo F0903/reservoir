@@ -1,24 +1,24 @@
 <script lang="ts">
-    import { log } from "$lib/utils/logger";
-
     let {
         label,
         options,
         required = true,
         value = $bindable(),
         tooltip,
+        disabled = false,
     }: {
         label: string;
         options: string[];
         required: boolean;
         value: string;
         tooltip?: string;
+        disabled?: boolean;
     } = $props();
 </script>
 
 <div class="input-container">
     <label class="label" for="{label}-dropdown" title={tooltip}>{label}</label>
-    <select class="input" name="{label}-dropdown" id="{label}-dropdown" bind:value>
+    <select class="input" name="{label}-dropdown" id="{label}-dropdown" bind:value {disabled}>
         {#if !required}
             <option value="" selected={value === ""}>Select an option</option>
         {/if}
@@ -43,6 +43,10 @@
         font-size: 1rem;
         color: var(--secondary-500);
         letter-spacing: 0.05em;
+    }
+
+    .input:disabled {
+        filter: brightness(0.8);
     }
 
     .input {

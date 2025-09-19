@@ -6,12 +6,11 @@
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
     import type { ToastHandle, ToastProvider } from "$lib/providers/toast-provider.svelte";
-    import { parseByteString } from "$lib/utils/format";
     import { log } from "$lib/utils/logger";
     import { getContext, onMount, type Component } from "svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
-    import Toast from "$lib/components/ui/Toast.svelte";
+    import { parseByteString } from "$lib/utils/bytestring";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
@@ -44,6 +43,7 @@
         const status = await patchConfig(propName, value);
         log.debug(`Patched config ${propName} with value ${value}, status: ${status}`);
         if (status === "restart required") {
+            settings.proxySettings.needsRestart = true;
             toast.show({
                 type: "info",
                 message: "Restart required to apply changes.",
@@ -333,6 +333,11 @@
 </script>
 
 <PageTitle>Settings</PageTitle>
+{#if settings.proxySettings.needsRestart}
+    <span class="restart-warning"
+        >Changes have been made that require a restart to take effect.</span
+    >
+{/if}
 <div class="inputs">
     {#each inputSections as section, i}
         {#each section as input, j}

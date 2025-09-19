@@ -3,8 +3,8 @@
     import { onDestroy, onMount } from "svelte";
     import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
     import { customChartColors } from "$lib/utils/chart-colors";
-    import { deepMerge } from "$lib/utils/objects";
     import { log } from "$lib/utils/logger";
+    import { merge } from "chart.js/helpers";
 
     // Register the custom color plugin
     Chart.register(customChartColors);
@@ -74,9 +74,9 @@
     onMount(() => {
         let processedOptions = defaultOptions;
         if (type === "bar") {
-            processedOptions = deepMerge(processedOptions, defaultBarOptions);
+            processedOptions = merge(processedOptions, defaultBarOptions);
         }
-        processedOptions = deepMerge(processedOptions, options || {});
+        processedOptions = merge(processedOptions, options || {});
 
         chart = new Chart(canvas, {
             type: type,

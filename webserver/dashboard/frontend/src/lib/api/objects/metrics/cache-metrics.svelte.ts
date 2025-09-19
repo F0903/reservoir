@@ -4,7 +4,7 @@ import {
     type APIObjectConstructor,
     APIJsonObject,
 } from "$lib/api/api-object";
-import { setPropIfChanged } from "$lib/utils/objects";
+import { setPropIfChanged } from "$lib/utils/objects/props";
 
 export class CacheMetrics {
     cacheHits: number = $state(0);

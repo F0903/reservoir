@@ -5,7 +5,7 @@ import {
     type FetchFn,
 } from "$lib/api/api-object";
 import { log } from "$lib/utils/logger";
-import { setPropIfChanged } from "$lib/utils/objects";
+import { setPropIfChanged } from "$lib/utils/objects/props";
 import { SvelteDate } from "svelte/reactivity";
 
 export class SystemMetrics {

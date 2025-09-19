@@ -58,6 +58,10 @@ func (c *Config) setRestartNeededProps() {
 	c.ApiDisabled.SetRequiresRestart()
 	c.CacheDir.SetRequiresRestart()
 	c.LogFile.SetRequiresRestart()
+	c.LogFileMaxSize.SetRequiresRestart()
+	c.LogFileMaxBackups.SetRequiresRestart()
+	c.LogFileCompress.SetRequiresRestart()
+	c.LogToStdout.SetRequiresRestart()
 }
 
 func newDefault() *Config {

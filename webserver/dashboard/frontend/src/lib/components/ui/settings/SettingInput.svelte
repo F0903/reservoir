@@ -1,4 +1,5 @@
 <script lang="ts" generics="C extends Component<any, any, 'value'>, O">
+    import { log } from "$lib/utils/logger";
     import { onMount, type Component, type ComponentProps } from "svelte";
 
     // Value type exposed by the InputComponent's `value` prop
@@ -12,7 +13,7 @@
         setSetting,
         settingTransform,
         onChange,
-        placeholder,
+        disabled = false,
         ...restProps
     }: {
         InputComponent: C;
@@ -20,7 +21,7 @@
         setSetting: (_value: O) => any;
         settingTransform: (val: V) => O;
         onChange?: (different: boolean) => void;
-        placeholder?: string;
+        disabled?: boolean;
     } = $props();
 
     let startValue: V | undefined;
@@ -47,7 +48,7 @@
             // setSetting might be async, so we await it.
             await setSetting(settingTransform(value));
         } catch (e) {
-            console.error("Failed to save setting:", e);
+            log.error("Failed to save setting:", e);
             // Error toast will be shown by global handler.
             throw e;
         }
@@ -59,4 +60,4 @@
     }
 </script>
 
-<InputComponent bind:value {placeholder} {...restProps}></InputComponent>
+<InputComponent bind:value {disabled} {...restProps}></InputComponent>
