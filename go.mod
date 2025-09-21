@@ -9,4 +9,7 @@ require (
 	golang.org/x/sync v0.17.0
 )
 
-require golang.org/x/sys v0.36.0 // indirect
+require (
+	github.com/jmoiron/sqlx v1.4.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+)

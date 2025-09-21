@@ -52,7 +52,7 @@ func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
-			mux.HandleFunc(pattern, method.Func)
+			mux.HandleFunc(pattern, apitypes.WrapWithContext(method.Func, true))
 			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
 	"reservoir/webserver/api"
+	"reservoir/webserver/auth"
 	"reservoir/webserver/dashboard"
 	"syscall"
 )
@@ -82,6 +83,8 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 			return fmt.Errorf("failed to register API: %v", err)
 		}
 	}
+
+	auth.StartSessionGC()
 
 	slog.Info("Starting webserver", "address", webserverListen)
 	webserver.Listen(webserverListen, errChan, ctx)

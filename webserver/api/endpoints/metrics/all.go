@@ -23,7 +23,7 @@ func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
+func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
 	metricsJson, err := json.Marshal(metrics.Global)
 	if err != nil {
 		slog.Error("Error marshaling all metrics", "error", err)

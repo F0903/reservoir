@@ -1,10 +1,15 @@
+// This package exists to avoid circular imports between api and the endpoints.
 package apitypes
 
-import "net/http"
+import (
+	"net/http"
+)
+
+type MethodFunc func(w http.ResponseWriter, r *http.Request, ctx *Context)
 
 type EndpointMethod struct {
 	Method string
-	Func   http.HandlerFunc
+	Func   MethodFunc
 }
 
 type Endpoint interface {

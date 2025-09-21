@@ -23,7 +23,7 @@ func (m *SystemMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *SystemMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request) {
+func (m *SystemMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
 	systemJson, err := json.Marshal(metrics.Global.System)
 	if err != nil {
 		slog.Error("Error marshaling system metrics", "error", err)

@@ -1,6 +1,9 @@
 package syncmap
 
-import "sync"
+import (
+	"iter"
+	"sync"
+)
 
 type SyncMap[K comparable, V any] struct {
 	ma map[K]V
@@ -10,6 +13,26 @@ type SyncMap[K comparable, V any] struct {
 func New[K comparable, V any]() *SyncMap[K, V] {
 	return &SyncMap[K, V]{
 		ma: make(map[K]V),
+	}
+}
+
+func (s *SyncMap[K, V]) Keys() iter.Seq[K] {
+	return func(yield func(K) bool) {
+		for k := range s.ma {
+			if !yield(k) {
+				return
+			}
+		}
+	}
+}
+
+func (s *SyncMap[K, V]) Items() iter.Seq[V] {
+	return func(yield func(V) bool) {
+		for _, v := range s.ma {
+			if !yield(v) {
+				return
+			}
+		}
 	}
 }
 
