@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-type MethodFunc func(w http.ResponseWriter, r *http.Request, ctx *Context)
+type MethodFunc func(w http.ResponseWriter, r *http.Request, ctx Context)
 
 type EndpointMethod struct {
 	Method string

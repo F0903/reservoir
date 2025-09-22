@@ -1,9 +1,7 @@
 package auth
 
 import (
-	"runtime"
-
-	"golang.org/x/crypto/argon2"
+	"reservoir/db/stores"
 )
 
 type Credentials struct {
@@ -11,17 +9,21 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-func (c *Credentials) Authenticate() bool {
+func (c *Credentials) Authenticate() (bool, error) {
 	usernameMatch := c.Username == "admin" // Currently hardcoded for simplicity. Later on we should support multiple users.
 
-	// Use between 1 and 4 threads for hashing based on CPU count.
-	// We use half of the CPU cores to avoid taking resources from the proxy which is more important.
-	argonThreads := min(4, max(1, runtime.NumCPU()/2))
-	hashedCandidate := argon2.IDKey([]byte(c.Password), []byte("saltsticks"), 1, 64*1024, uint8(argonThreads), 32)
+	users, err := stores.OpenUserStore()
+	if err != nil {
+		return false, err
+	}
+	defer users.Close()
 
-	userHashedPassword := "" //TODO: load from user store
+	user, err := users.GetByUsername(c.Username)
+	if err != nil {
+		return false, err
+	}
 
-	passwordMatch := string(hashedCandidate) == userHashedPassword
+	passwordMatch := user.PasswordHash.VerifyArgon2id(c.Password)
 
-	return usernameMatch && passwordMatch
+	return usernameMatch && passwordMatch, nil
 }

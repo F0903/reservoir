@@ -2,21 +2,34 @@ package db
 
 import (
 	"context"
+	"embed"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	_ "modernc.org/sqlite"
 )
 
-func Open(path string, busyTimeout int) (*sqlx.DB, error) {
+var (
+	ErrMigrationFailed = errors.New("database migration failed")
+)
+
+//go:embed migrations/*.sql
+var migrationFs embed.FS
+
+type Database struct {
+	raw *sqlx.DB
+}
+
+func Open(path string, busyTimeout int) (Database, error) {
 	// Windows-friendly file URI. Relative path is fine too.
 	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(%d)&_pragma=foreign_keys(1)", path, busyTimeout)
 	db, err := sqlx.Open("sqlite", dsn)
 	if err != nil {
-		return nil, err
+		return Database{}, err
 	}
 
-	// Pool settings (SQLite = 1 writer; keep small)
 	db.SetMaxOpenConns(4)
 	db.SetMaxIdleConns(4)
 	db.SetConnMaxLifetime(0)
@@ -30,7 +43,48 @@ func Open(path string, busyTimeout int) (*sqlx.DB, error) {
     PRAGMA synchronous = NORMAL;
   `); err != nil {
 		_ = db.Close()
-		return nil, err
+		return Database{}, err
 	}
-	return db, nil
+
+	// Return by value for now since we are just wrapping a pointer
+	return Database{raw: db}, nil
+}
+
+func (db *Database) Get(dest any, query string, args ...any) error {
+	return db.raw.Get(dest, query, args...)
+}
+
+func (db *Database) Exec(query string, args ...any) error {
+	_, err := db.raw.Exec(query, args...)
+	return err
+}
+
+func (db *Database) Migrate() error {
+	files, _ := migrationFs.ReadDir("migrations")
+
+	tx, err := db.raw.Begin()
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		mig, _ := migrationFs.ReadFile("migrations/" + file.Name())
+		migStr := string(mig)
+
+		_, err := tx.Exec(migStr)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("%w: %v", ErrMigrationFailed, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (db *Database) Close() error {
+	return db.raw.Close()
 }

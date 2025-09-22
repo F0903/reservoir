@@ -23,7 +23,7 @@ func (m *CacheMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *CacheMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (m *CacheMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	cacheJson, err := json.Marshal(metrics.Global.Cache)
 	if err != nil {
 		slog.Error("Error marshaling cache metrics", "error", err)

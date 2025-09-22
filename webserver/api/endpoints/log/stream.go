@@ -100,7 +100,7 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 	}
 }
 
-func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	header := w.Header()
 
 	flusher, ok := w.(http.Flusher)

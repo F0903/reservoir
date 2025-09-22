@@ -10,9 +10,9 @@ type Context struct {
 	Session *auth.Session
 }
 
-func CreateContext(r *http.Request) *Context {
+func CreateContext(r *http.Request) Context {
 	sess, _ := auth.SessionFromRequest(r)
-	return &Context{
+	return Context{
 		Session: sess,
 	}
 }

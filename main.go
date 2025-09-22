@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"reservoir/config"
+	"reservoir/db"
 	"reservoir/logging"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
@@ -103,6 +104,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	if err := db.MigrateDatabases(); err != nil {
+		slog.Error("Failed to migrate databases", "error", err)
+		panic(err)
+	}
 
 	if err := startProxy(errChan, ctx); err != nil {
 		slog.Error("Failed to start proxy", "error", err)

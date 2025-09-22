@@ -30,7 +30,7 @@ func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	cfgLock := config.Global.Immutable()
 	cfg := cfgLock.Copy()
 
@@ -45,7 +45,7 @@ func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apityp
 	w.Write(responseJson)
 }
 
-func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return

@@ -85,3 +85,18 @@ func SessionFromRequest(r *http.Request) (sess *Session, ok bool) {
 	}
 	return sess, true
 }
+
+func (s *Session) BuildSessionCookie() *http.Cookie {
+	return &http.Cookie{
+		Path:     "/",
+		Name:     "reservoir.sid",
+		Value:    s.ID,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	}
+}
+
+func (s *Session) Destroy() {
+	sessionStore.Delete(s.ID)
+	slog.Debug("Destroyed session", "session_id", s.ID)
+}

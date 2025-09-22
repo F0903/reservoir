@@ -22,9 +22,7 @@ func (e *LoginEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
-	//TODO: Handle login authentication logic here
-
+func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	json := json.NewDecoder(r.Body)
 	var creds auth.Credentials
 	err := json.Decode(&creds)
@@ -33,4 +31,12 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx *apityp
 		return
 	}
 
+	if ctx.IsAuthenticated() {
+		w.Write([]byte("Already authenticated"))
+		return
+	}
+
+	sess := auth.CreateSession()
+	http.SetCookie(w, sess.BuildSessionCookie())
+	w.Write([]byte("Logged in successfully"))
 }

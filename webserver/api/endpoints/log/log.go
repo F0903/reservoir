@@ -24,7 +24,7 @@ func (m *LogEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	logFile, err := logging.OpenLogFileRead()
 	if err != nil {
 		if errors.Is(err, logging.ErrNoLogFile) {

@@ -22,7 +22,7 @@ func (e *RestartRequiredEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (e *RestartRequiredEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx *apitypes.Context) {
+func (e *RestartRequiredEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	restart := config.IsRestartNeeded()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"restart_required": restart})
