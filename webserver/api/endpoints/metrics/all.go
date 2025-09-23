@@ -17,8 +17,9 @@ func (m *AllMetricsEndpoint) Path() string {
 func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "GET",
-			Func:   m.Get,
+			Method:       "GET",
+			Func:         m.Get,
+			RequiresAuth: true,
 		},
 	}
 }

@@ -18,8 +18,9 @@ func (m *LogEndpoint) Path() string {
 func (m *LogEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "GET",
-			Func:   m.Get,
+			Method:       "GET",
+			Func:         m.Get,
+			RequiresAuth: true,
 		},
 	}
 }

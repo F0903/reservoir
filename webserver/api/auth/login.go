@@ -16,8 +16,9 @@ func (e *LoginEndpoint) Path() string {
 func (e *LoginEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "POST",
-			Func:   e.Post,
+			Method:       "POST",
+			Func:         e.Post,
+			RequiresAuth: false,
 		},
 	}
 }

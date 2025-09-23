@@ -15,18 +15,14 @@ func (e *LogoutEndpoint) Path() string {
 func (e *LogoutEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "POST",
-			Func:   e.Post,
+			Method:       "POST",
+			Func:         e.Post,
+			RequiresAuth: true,
 		},
 	}
 }
 
 func (e *LogoutEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	if !ctx.IsAuthenticated() {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
 	ctx.Session.Destroy()
 
 	cookie := ctx.Session.BuildSessionCookie()

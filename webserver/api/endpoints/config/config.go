@@ -20,12 +20,14 @@ func (e *ConfigEndpoint) Path() string {
 func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "GET",
-			Func:   e.Get,
+			Method:       "GET",
+			Func:         e.Get,
+			RequiresAuth: true,
 		},
 		{
-			Method: "PATCH",
-			Func:   e.Patch,
+			Method:       "PATCH",
+			Func:         e.Patch,
+			RequiresAuth: true,
 		},
 	}
 }

@@ -30,8 +30,9 @@ func (m *LogStreamEndpoint) Path() string {
 func (m *LogStreamEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method: "GET",
-			Func:   m.Get,
+			Method:       "GET",
+			Func:         m.Get,
+			RequiresAuth: true,
 		},
 	}
 }

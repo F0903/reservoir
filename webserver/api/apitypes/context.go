@@ -17,18 +17,6 @@ func CreateContext(r *http.Request) Context {
 	}
 }
 
-func WrapWithContext(methodFunc MethodFunc, ensureAuthenticated bool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := CreateContext(r)
-		if ensureAuthenticated && !ctx.IsAuthenticated() {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		methodFunc(w, r, ctx)
-	}
-}
-
 func (c *Context) IsAuthenticated() bool {
 	return c.Session != nil
 }

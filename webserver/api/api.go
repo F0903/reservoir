@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrEndpointNoMethod   = errors.New("endpoint has no method defined")
-	ErrEndpointNoFunction = errors.New("endpoint has no function defined")
+	ErrEndpointNoMethod     = errors.New("endpoint has no method defined")
+	ErrEndpointNoFunction   = errors.New("endpoint has no function defined")
+	ErrEndpointUnauthorized = errors.New("authentication required")
 )
 
 type API struct {
@@ -38,6 +39,33 @@ func New() *API {
 	}
 }
 
+func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (statusCode int, err error) {
+	if !method.RequiresAuth {
+		return http.StatusOK, nil
+	}
+
+	if !ctx.IsAuthenticated() {
+		return http.StatusUnauthorized, ErrEndpointUnauthorized
+	}
+
+	return http.StatusOK, nil
+}
+
+func WrapHandler(methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := apitypes.CreateContext(r)
+
+		if preRunHook != nil {
+			if status, err := preRunHook(ctx); err != nil {
+				http.Error(w, err.Error(), status)
+				return
+			}
+		}
+
+		methodFunc(w, r, ctx)
+	}
+}
+
 func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 	for _, endpoint := range api.endpoints {
 		for _, method := range endpoint.EndpointMethods() {
@@ -52,7 +80,9 @@ func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
-			mux.HandleFunc(pattern, apitypes.WrapWithContext(method.Func, true))
+			mux.HandleFunc(pattern, WrapHandler(method.Func, func(ctx apitypes.Context) (int, error) {
+				return EnsureAllowed(ctx, method)
+			}))
 			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())
 		}
 	}
