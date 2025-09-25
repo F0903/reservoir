@@ -37,12 +37,12 @@ func (m *LogStreamEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	}
 }
 
-func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte) error, store *logStreamStore) {
+func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte) error, store *logStreamStore) error {
 	logStat, err := os.Stat(store.logPath)
 	if err != nil {
 		// transient error; try again on next tick
 		slog.Error("failed to stat log file in SSE stream", "error", err)
-		return
+		return err
 	}
 
 	logSize := logStat.Size()
@@ -54,7 +54,7 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 		store.logFile.Close() // Close old one before opening new.
 		store.logFile, store.currentOffset, err = utils.OpenWithSize(store.logPath)
 		if err != nil {
-			return
+			return err
 		}
 		defer store.logFile.Close()
 
@@ -63,7 +63,7 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 
 	if logSize == store.currentOffset {
 		slog.Debug("no new data in log file", "log_file", store.logPath)
-		return
+		return nil
 	}
 
 	// Cap burst reads to 1MB per tick to avoid huge allocations
@@ -73,7 +73,7 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 	readCount, err := store.logFile.ReadAt(buf, store.currentOffset)
 	if err != nil && !errors.Is(err, io.EOF) {
 		slog.Error("failed to read log file in SSE stream", "error", err)
-		return
+		return err
 	}
 
 	store.currentOffset += int64(readCount)
@@ -83,7 +83,7 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 	lines := bytes.Split(chunk, []byte{'\n'})
 	if len(lines) == 0 {
 		slog.Debug("no complete lines read, skipping", "log_file", store.logPath)
-		return
+		return nil
 	}
 
 	store.partial = nil
@@ -96,9 +96,11 @@ func (m *LogStreamEndpoint) Tick(w http.ResponseWriter, writeStream func([]byte)
 
 	for _, line := range lines {
 		if err := writeStream(line); err != nil {
-			return
+			return err
 		}
 	}
+
+	return nil
 }
 
 func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
@@ -138,4 +140,9 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 	}
 	sse := streaming.NewSseStream(header, w, flusher, 1*time.Second, 500*time.Millisecond, r.Context(), m, store)
 	defer sse.Close()
+	if err := sse.Start(); err != nil {
+		slog.Error("SSE stream failed", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }

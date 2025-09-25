@@ -9,7 +9,7 @@ import (
 )
 
 type SseStreamer[Store any] interface {
-	Tick(w http.ResponseWriter, writeStream func([]byte) error, store *Store)
+	Tick(w http.ResponseWriter, writeStream func([]byte) error, store *Store) error
 }
 
 type SseStream[Store any] struct {
@@ -34,7 +34,6 @@ func NewSseStream[Store any](header http.Header, writer http.ResponseWriter, flu
 		streamer:       streamer,
 		streamerStore:  streamerStore,
 	}
-	me.start()
 
 	return me
 }
@@ -62,7 +61,7 @@ func (s *SseStream[Store]) writeStream(line []byte) error {
 	return nil
 }
 
-func (s *SseStream[Store]) start() {
+func (s *SseStream[Store]) Start() error {
 	s.header.Set("Content-Type", "text/event-stream")
 	s.header.Set("Cache-Control", "no-cache")
 	s.header.Set("Connection", "keep-alive")
@@ -73,7 +72,7 @@ func (s *SseStream[Store]) start() {
 		select {
 		case <-s.requestContext.Done():
 			slog.Debug("SSE stream done")
-			return
+			return nil
 
 		case <-s.heartbeat.C:
 			// SSE heartbeat (comment format)
@@ -83,7 +82,10 @@ func (s *SseStream[Store]) start() {
 
 		case <-s.ticker.C:
 			slog.Debug("running SSE tick")
-			s.streamer.Tick(s.writer, s.writeStream, &s.streamerStore)
+			if err := s.streamer.Tick(s.writer, s.writeStream, &s.streamerStore); err != nil {
+				slog.Error("SSE tick failed", "error", err)
+				return err
+			}
 		}
 	}
 }
