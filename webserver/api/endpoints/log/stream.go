@@ -109,7 +109,7 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		slog.Error("response writer does not support flushing, so can't use SSE", "content-type", header.Get("Content-Type"))
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		http.Error(w, "Streaming Unsupported", http.StatusInternalServerError)
 		return
 	}
 
@@ -121,13 +121,13 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 	})
 
 	if logFilePath == "" {
-		http.Error(w, "no log file configured", http.StatusNotFound)
+		http.Error(w, "No Log File Configured", http.StatusNotFound)
 		return
 	}
 
 	f, offset, err := utils.OpenWithSize(logFilePath)
 	if err != nil {
-		http.Error(w, "failed to open log file", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	defer f.Close()

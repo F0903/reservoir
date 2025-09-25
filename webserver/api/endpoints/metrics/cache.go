@@ -28,7 +28,7 @@ func (m *CacheMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx a
 	cacheJson, err := json.Marshal(metrics.Global.Cache)
 	if err != nil {
 		slog.Error("Error marshaling cache metrics", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 

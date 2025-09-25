@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/webserver/api/apitypes"
+	"reservoir/webserver/api/auth"
 	"reservoir/webserver/api/endpoints/config"
 	"reservoir/webserver/api/endpoints/log"
 	"reservoir/webserver/api/endpoints/metrics"
@@ -35,6 +36,8 @@ func New() *API {
 			&config.RestartRequiredEndpoint{},
 			&log.LogEndpoint{},
 			&log.LogStreamEndpoint{},
+			&auth.LoginEndpoint{},
+			&auth.LogoutEndpoint{},
 		},
 	}
 }
@@ -57,7 +60,13 @@ func WrapHandler(methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Contex
 
 		if preRunHook != nil {
 			if status, err := preRunHook(ctx); err != nil {
-				http.Error(w, err.Error(), status)
+				if err == ErrEndpointUnauthorized {
+					http.Error(w, "Unauthorized", status)
+					return
+				}
+
+				slog.Warn("Pre-run hook failed", "error", err, "status", status)
+				http.Error(w, "Internal Server Error", status)
 				return
 			}
 		}

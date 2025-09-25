@@ -28,7 +28,7 @@ func (m *RequestsMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ct
 	requestsJson, err := json.Marshal(metrics.Global.Requests)
 	if err != nil {
 		slog.Error("Error marshaling requests metrics", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 

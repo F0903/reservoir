@@ -10,8 +10,6 @@ type Credentials struct {
 }
 
 func (c *Credentials) Authenticate() (bool, error) {
-	usernameMatch := c.Username == "admin" // Currently hardcoded for simplicity. Later on we should support multiple users.
-
 	users, err := stores.OpenUserStore()
 	if err != nil {
 		return false, err
@@ -22,8 +20,10 @@ func (c *Credentials) Authenticate() (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if user == nil {
+		return false, nil
+	}
 
 	passwordMatch := user.PasswordHash.VerifyArgon2id(c.Password)
-
-	return usernameMatch && passwordMatch, nil
+	return passwordMatch, nil
 }

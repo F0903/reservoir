@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/auth"
@@ -28,16 +29,29 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 	var creds auth.Credentials
 	err := json.Decode(&creds)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusBadRequest)
+		slog.Error("Error decoding credentials JSON", "error", err)
+		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
 	if ctx.IsAuthenticated() {
-		w.Write([]byte("Already authenticated"))
+		w.Write([]byte("Already Authenticated"))
+		return
+	}
+
+	ok, err := creds.Authenticate()
+	if err != nil {
+		slog.Error("Error during authentication", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	if !ok {
+		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 		return
 	}
 
 	sess := auth.CreateSession()
 	http.SetCookie(w, sess.BuildSessionCookie())
-	w.Write([]byte("Logged in successfully"))
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
@@ -48,6 +49,11 @@ func Open(path string, busyTimeout int) (Database, error) {
 
 	// Return by value for now since we are just wrapping a pointer
 	return Database{raw: db}, nil
+}
+
+func IsResponseEmpty(err error) bool {
+	// If other db backends are added, this can be made part of a Database interface
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 func (db *Database) Get(dest any, query string, args ...any) error {

@@ -64,7 +64,7 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apity
 	status, err := config.UpdatePartialFromJSON(updates)
 	if err != nil {
 		slog.Error("Failed to partially update config", "error", err)
-		http.Error(w, "Failed to update config", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 

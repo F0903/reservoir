@@ -31,5 +31,5 @@ func (e *LogoutEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apityp
 	cookie.MaxAge = -1
 
 	http.SetCookie(w, cookie)
-	w.Write([]byte("Logged out successfully"))
+	w.WriteHeader(http.StatusNoContent)
 }

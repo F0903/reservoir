@@ -28,10 +28,14 @@ func (s *UserStore) Save(user *models.User) error {
 	)
 }
 
+// Returns the user with the given username, or nil if no such user exists.
 func (s *UserStore) GetByUsername(username string) (*models.User, error) {
 	var user models.User
 	err := s.db.Get(&user, "SELECT * FROM users WHERE username = ?", username)
 	if err != nil {
+		if db.IsResponseEmpty(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &user, nil
