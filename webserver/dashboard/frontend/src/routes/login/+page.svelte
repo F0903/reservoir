@@ -23,6 +23,7 @@
 
     async function onLogin() {
         try {
+            error = null;
             loggingIn = true;
 
             await login({ username, password });
@@ -30,6 +31,7 @@
 
             let returnTo = data.return ?? "/dashboard";
             await goto(returnTo, { replaceState: true, invalidateAll: true });
+            log.debug("Redirected to ", returnTo);
         } catch (err) {
             log.error("Login failed: ", err);
             if (err instanceof UnauthorizedError) {
