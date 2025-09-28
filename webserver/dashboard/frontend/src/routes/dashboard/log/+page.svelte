@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { apiGetTextStream } from "$lib/api/api-object";
+    import { apiGetTextStream } from "$lib/api/api-methods";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import TextViewer from "$lib/components/ui/TextViewer.svelte";
     import { onDestroy, onMount } from "svelte";

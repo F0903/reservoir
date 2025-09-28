@@ -11,6 +11,7 @@
         max,
         onSubmit,
         disabled = false,
+        censor = false,
     }: {
         label: string;
         pattern?: string;
@@ -23,16 +24,35 @@
         max?: number;
         onSubmit?: (event: Event) => void;
         disabled?: boolean;
+        censor?: boolean;
     } = $props();
+
+    let input: HTMLInputElement | undefined = $state();
+
+    let hasCustomError = false;
+
+    export function setError(err: string) {
+        input!.setCustomValidity(err);
+        input!.reportValidity();
+        hasCustomError = true;
+    }
+
+    $effect(() => {
+        if (value && hasCustomError) {
+            input!.setCustomValidity("");
+            hasCustomError = false;
+        }
+    });
 </script>
 
 <div class="input-container">
     <label class="label" for="{label}-textinput" title={tooltip}>{label}</label>
     <input
-        type="text"
-        {pattern}
+        bind:this={input}
+        type={censor ? "password" : "text"}
         class="input"
         id="{label}-textinput"
+        {pattern}
         bind:value
         {placeholder}
         title={tooltip}

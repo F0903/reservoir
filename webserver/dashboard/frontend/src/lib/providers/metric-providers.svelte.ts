@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { type FetchFn, APIJsonObject } from "$lib/api/api-object";
+import { type FetchFn, APIJsonObject } from "$lib/api/api-methods";
 import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
 import { log } from "$lib/utils/logger";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";

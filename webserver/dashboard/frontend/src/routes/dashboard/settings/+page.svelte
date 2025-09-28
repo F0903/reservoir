@@ -318,8 +318,11 @@
     }
 
     async function applyChanges() {
-        await saveInputs();
-        changesToast?.close();
+        try {
+            await saveInputs();
+        } finally {
+            changesToast?.close();
+        }
         await settings.proxySettings.reload();
         await resetInputs();
         log.debug("Settings have been saved.");

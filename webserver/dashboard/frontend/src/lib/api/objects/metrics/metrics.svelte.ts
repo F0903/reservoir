@@ -3,7 +3,7 @@ import {
     APIJsonObject,
     type APIObjectConstructor,
     type FetchFn,
-} from "$lib/api/api-object";
+} from "$lib/api/api-methods";
 import { CacheMetrics } from "./cache-metrics.svelte";
 import { RequestMetrics } from "./request-metrics.svelte";
 import { SystemMetrics } from "./system-metrics.svelte";

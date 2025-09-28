@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-object";
+import { apiGet, type FetchFn } from "$lib/api/api-methods";
 
 export class RestartRequiredResponse {
     constructor(json: Record<string, unknown>) {

@@ -3,7 +3,7 @@ import {
     APIJsonObject,
     type APIObjectConstructor,
     type FetchFn,
-} from "$lib/api/api-object";
+} from "$lib/api/api-methods";
 import { log } from "$lib/utils/logger";
 import { setPropIfChanged } from "$lib/utils/objects/props";
 import { SvelteDate } from "svelte/reactivity";

@@ -15,6 +15,7 @@
         filter: brightness(0.8);
         scale: 0.95;
         box-shadow: var(--button-pressed-shadow);
+        cursor: default;
     }
 
     .btn:enabled:active {
@@ -26,16 +27,18 @@
     .btn {
         --button-pressed-shadow: inset 0px 0px 5px -1px rgba(0, 0, 0, 0.5);
 
+        display: block;
+        margin: var(--btn-margin, 0px);
         padding: 0.5rem 0.75rem;
         border: none;
-        border-radius: 15px;
+        border-radius: var(--btn-border-radius, 15px);
 
         cursor: pointer;
         background-color: var(--btn-background-color, var(--tertiary-400));
 
-        color: var(--btn-text-color, var(--text-primary));
+        color: var(--btn-text-color, var(--primary-200));
         font-size: 1rem;
-        font-weight: var(--btn-font-weight, inherit);
+        font-weight: var(--btn-font-weight, 600);
         text-align: center;
 
         transition-property: filter, scale;

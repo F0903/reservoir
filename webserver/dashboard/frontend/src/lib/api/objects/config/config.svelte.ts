@@ -4,7 +4,7 @@ import {
     type APIObjectConstructor,
     APIJsonObject,
     apiPatch,
-} from "$lib/api/api-object";
+} from "$lib/api/api-methods";
 import { setPropIfChanged } from "$lib/utils/objects/props";
 
 export class Config {
