@@ -11,6 +11,7 @@ import (
 
 type Session struct {
 	ID                   string
+	UserID               int64
 	CreatedAt, ExpiresAt time.Time
 }
 
@@ -59,10 +60,11 @@ func GetSession(sid string) (*Session, bool) {
 	return sess, ok
 }
 
-func CreateSession() *Session {
+func CreateSession(userId int64) *Session {
 	sid := rand.Text()
 	sess := &Session{
 		ID:        sid,
+		UserID:    userId,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(defaultLifetime),
 	}

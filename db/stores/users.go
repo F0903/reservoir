@@ -20,9 +20,10 @@ func OpenUserStore() (*UserStore, error) {
 
 func (s *UserStore) Save(user *models.User) error {
 	return s.db.Exec(
-		"INSERT INTO users (username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?)",
+		"INSERT INTO users (username, password_hash, password_reset_required, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
 		user.Username,
 		user.PasswordHash,
+		user.PasswordResetRequired,
 		user.CreatedAt,
 		user.UpdatedAt,
 	)

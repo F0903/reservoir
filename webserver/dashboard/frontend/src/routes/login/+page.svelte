@@ -26,10 +26,19 @@
             error = null;
             loggingIn = true;
 
-            await login({ username, password });
+            const returnTo = data.return ?? "/dashboard";
+
+            const user = await login({ username, password });
+            if (user.password_reset_required) {
+                log.debug("Login successful, password reset required, redirecting...");
+                const params = new URLSearchParams();
+                params.set("return", returnTo);
+                await goto("/reset-password?" + params.toString(), { replaceState: true });
+                return;
+            }
+
             log.debug("Login successful, redirecting...");
 
-            let returnTo = data.return ?? "/dashboard";
             await goto(returnTo, { replaceState: true, invalidateAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {

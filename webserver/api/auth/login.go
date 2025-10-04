@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"reservoir/webserver/api/apitypes"
@@ -25,9 +26,9 @@ func (e *LoginEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	json := json.NewDecoder(r.Body)
+	jsonDecoder := json.NewDecoder(r.Body)
 	var creds auth.Credentials
-	err := json.Decode(&creds)
+	err := jsonDecoder.Decode(&creds)
 	if err != nil {
 		slog.Error("Error decoding credentials JSON", "error", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -39,19 +40,26 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	ok, err := creds.Authenticate()
+	user, err := creds.Authenticate()
 	if err != nil {
+		if errors.Is(err, auth.ErrInvalidCredentials) {
+			http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
+			return
+		}
 		slog.Error("Error during authentication", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if !ok {
-		http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
+	sess := auth.CreateSession(user.ID)
+	http.SetCookie(w, sess.BuildSessionCookie())
+
+	userJson, err := json.Marshal(user)
+	if err != nil {
+		slog.Error("Error marshaling user JSON", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	sess := auth.CreateSession()
-	http.SetCookie(w, sess.BuildSessionCookie())
-	w.WriteHeader(http.StatusNoContent)
+	w.Write(userJson)
 }

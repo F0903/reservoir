@@ -56,7 +56,13 @@ func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (status
 
 func WrapHandler(methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := apitypes.CreateContext(r)
+		ctx, err := apitypes.CreateContext(r)
+		if err != nil {
+			slog.Error("Error creating request context", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		defer ctx.Close()
 
 		if preRunHook != nil {
 			if status, err := preRunHook(ctx); err != nil {

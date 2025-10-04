@@ -3,20 +3,34 @@ package apitypes
 
 import (
 	"net/http"
+	"reservoir/db/stores"
 	"reservoir/webserver/auth"
 )
 
 type Context struct {
-	Session *auth.Session
+	Session   *auth.Session
+	UserStore *stores.UserStore
 }
 
-func CreateContext(r *http.Request) Context {
-	sess, _ := auth.SessionFromRequest(r)
-	return Context{
-		Session: sess,
+func CreateContext(r *http.Request) (Context, error) {
+	sess, authorized := auth.SessionFromRequest(r)
+	var users *stores.UserStore
+	if authorized {
+		users, _ = stores.OpenUserStore()
 	}
+
+	return Context{
+		Session:   sess,
+		UserStore: users,
+	}, nil
 }
 
 func (c *Context) IsAuthenticated() bool {
 	return c.Session != nil
+}
+
+func (c *Context) Close() {
+	if c.UserStore != nil {
+		c.UserStore.Close()
+	}
 }
