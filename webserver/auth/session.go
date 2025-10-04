@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+var (
+	ErrNoSession = errors.New("no user session found")
+)
+
 type Session struct {
 	ID                   string
 	UserID               int64

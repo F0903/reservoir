@@ -12,9 +12,6 @@
 
     let { data }: PageProps = $props();
 
-    let usernameInput: TextInput | undefined = $state();
-    let passwordInput: TextInput | undefined = $state();
-
     let username = $state("");
     let password = $state("");
 
@@ -33,12 +30,11 @@
                 log.debug("Login successful, password reset required, redirecting...");
                 const params = new URLSearchParams();
                 params.set("return", returnTo);
-                await goto("/reset-password?" + params.toString(), { replaceState: true });
+                await goto("/change-password?" + params.toString(), { replaceState: true });
                 return;
             }
 
             log.debug("Login successful, redirecting...");
-
             await goto(returnTo, { replaceState: true, invalidateAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {
@@ -61,14 +57,12 @@
         <Form onSubmit={onLogin}>
             <h1>Login</h1>
             <TextInput
-                bind:this={usernameInput}
                 label="Username"
                 bind:value={username}
                 placeholder="Enter your username"
                 disabled={loggingIn}
             />
             <TextInput
-                bind:this={passwordInput}
                 label="Password"
                 bind:value={password}
                 placeholder="Enter your password"

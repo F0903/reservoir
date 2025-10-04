@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Update the 'updated_at' timestamp on user updates
-CREATE TRIGGER users_set_updated_at
+CREATE TRIGGER IF NOT EXISTS users_set_updated_at
 BEFORE UPDATE ON users
 FOR EACH ROW
 WHEN NEW.updated_at IS OLD.updated_at

@@ -3,6 +3,7 @@ package apitypes
 
 import (
 	"net/http"
+	"reservoir/db/models"
 	"reservoir/db/stores"
 	"reservoir/webserver/auth"
 )
@@ -27,6 +28,13 @@ func CreateContext(r *http.Request) (Context, error) {
 
 func (c *Context) IsAuthenticated() bool {
 	return c.Session != nil
+}
+
+func (c *Context) GetCurrentUser() (*models.User, error) {
+	if !c.IsAuthenticated() {
+		return nil, auth.ErrNoSession
+	}
+	return c.UserStore.GetByID(c.Session.UserID)
 }
 
 func (c *Context) Close() {
