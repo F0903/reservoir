@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"database/sql/driver"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -215,4 +216,23 @@ func (p *PHC) Scan(src any) error {
 // Implements the driver.Valuer interface to write a PHC to a database value.
 func (p PHC) Value() (driver.Value, error) {
 	return p.String(), nil
+}
+
+func (p *PHC) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	parsed, err := ParsePHC(s)
+	if err != nil {
+		return err
+	}
+	*p = *parsed
+
+	return nil
+}
+
+func (p PHC) MarshalJSON() ([]byte, error) {
+	return []byte(p.String()), nil
 }
