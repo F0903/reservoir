@@ -66,15 +66,17 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 	passwordMatch := user.PasswordHash.VerifyArgon2id(req.CurrentPassword)
 	if !passwordMatch {
 		slog.Warn("Failed password change attempt", "user_id", user.ID)
-		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		http.Error(w, "Current password is incorrect", http.StatusBadRequest)
 		return
 	}
 
 	user.PasswordHash = *phc.GenerateArgon2id(req.NewPassword)
-	user.PasswordResetRequired = false
+	user.PasswordChangeRequired = false
 	if err := ctx.UserStore.Save(user); err != nil {
 		slog.Error("Error updating user password", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

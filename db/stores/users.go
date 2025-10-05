@@ -23,16 +23,16 @@ func OpenUserStore() (*UserStore, error) {
 func (s *UserStore) Save(user *models.User) error {
 	return s.db.Exec(
 		`
-		INSERT INTO users (username, password_hash, password_reset_required)
+		INSERT INTO users (username, password_hash, password_change_required)
 		VALUES (?, ?, ?)
 		ON CONFLICT(username) DO UPDATE SET
 			username = excluded.username,
 			password_hash = excluded.password_hash,
-			password_reset_required = excluded.password_reset_required;
+			password_change_required = excluded.password_change_required;
 		`,
 		user.Username,
 		user.PasswordHash,
-		user.PasswordResetRequired,
+		user.PasswordChangeRequired,
 	)
 }
 

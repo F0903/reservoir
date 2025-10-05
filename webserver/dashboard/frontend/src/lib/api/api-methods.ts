@@ -12,6 +12,7 @@ export class UnauthorizedError extends Error {
 }
 
 export type LoginRedirectOptions = { returnToLastWindow: boolean };
+export const DefaultRedirectOptions: LoginRedirectOptions = { returnToLastWindow: true };
 
 export interface APIObjectConstructor<T> {
     new (_json: Record<string, unknown>): T;
@@ -29,7 +30,9 @@ export class APIJsonObject {
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
     if (redirect.returnToLastWindow) {
-        params.append("return", window.location.pathname + window.location.search);
+        const returnTo = window.location.pathname + window.location.search;
+        log.debug("Redirecting to login from API call, will return to:", returnTo);
+        params.append("return", returnTo);
     }
     let loginUrl = resolve(`/login`);
     if (params.size > 0) {
@@ -61,7 +64,7 @@ async function assertResponse(
 async function getAssert(
     endpoint: string,
     fetchFn: FetchFn = fetch,
-    redirectOnUnauthorized: LoginRedirectOptions | null = { returnToLastWindow: true },
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<Response> {
     const fullEndpoint = `/api${endpoint}`;
 
@@ -82,7 +85,7 @@ async function getAssert(
 export async function apiGetTextStream(
     endpoint: string,
     fetchFn: FetchFn = fetch,
-    redirectOnUnauthorized: LoginRedirectOptions | null = { returnToLastWindow: true },
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<ReadableStream<string>> {
     try {
         const resp = await getAssert(endpoint, fetchFn);
@@ -103,26 +106,18 @@ export async function apiGet<T>(
     endpoint: string,
     type: APIObjectConstructor<T>,
     fetchFn: FetchFn = fetch,
-    redirectOnUnauthorized: LoginRedirectOptions | null = { returnToLastWindow: true },
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
-    try {
-        const resp = await getAssert(endpoint, fetchFn);
-        const json = await resp.json();
-        return new type(json) as T;
-    } catch (err) {
-        if (redirectOnUnauthorized && err instanceof UnauthorizedError) {
-            return new type({}) as T;
-        } else {
-            throw err;
-        }
-    }
+    const resp = await getAssert(endpoint, fetchFn, redirectOnUnauthorized);
+    const json = await resp.json();
+    return new type(json) as T;
 }
 
 export async function apiPatch<T>(
     endpoint: string,
     json: Record<string, unknown>,
     fetchFn: FetchFn = fetch,
-    redirectOnUnauthorized: LoginRedirectOptions | null = { returnToLastWindow: true },
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
     const response = await fetchFn(`/api${endpoint}`, {
         method: "PATCH",
@@ -150,7 +145,7 @@ export async function apiPost<T>(
     endpoint: string,
     json: Record<string, unknown>,
     fetchFn: FetchFn = fetch,
-    redirectOnUnauthorized: LoginRedirectOptions | null = { returnToLastWindow: true },
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
     const response = await fetchFn(`/api${endpoint}`, {
         method: "POST",

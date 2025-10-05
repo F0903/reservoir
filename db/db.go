@@ -6,6 +6,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -66,10 +67,12 @@ func (db *Database) Exec(query string, args ...any) error {
 }
 
 func (db *Database) Migrate() error {
+	slog.Debug("Migrating database...")
 	files, _ := migrationFs.ReadDir("migrations")
 
 	tx, err := db.raw.Begin()
 	if err != nil {
+		slog.Error("Failed to begin database transaction", "error", err)
 		return err
 	}
 
@@ -83,11 +86,13 @@ func (db *Database) Migrate() error {
 
 		_, err := tx.Exec(migStr)
 		if err != nil {
+			slog.Error("Failed to execute migration. Rolling back...", "file", file.Name(), "error", err)
 			_ = tx.Rollback()
 			return fmt.Errorf("%w: %v", ErrMigrationFailed, err)
 		}
 	}
 
+	slog.Debug("Database migration completed successfully. Committing...")
 	return tx.Commit()
 }
 

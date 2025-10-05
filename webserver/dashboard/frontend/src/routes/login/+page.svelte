@@ -24,12 +24,16 @@
             loggingIn = true;
 
             const returnTo = data.return ?? "/dashboard";
+            log.debug("Return to: ", returnTo);
 
             const user = await login({ username, password });
-            if (user.password_reset_required) {
-                log.debug("Login successful, password reset required, redirecting...");
+            log.debug("Got user from login: ", user);
+            log.debug("Password change required: ", user.password_change_required);
+            if (user.password_change_required) {
+                log.debug("Login successful, password change required, redirecting...");
                 const params = new URLSearchParams();
                 params.set("return", returnTo);
+                params.set("required", "true");
                 await goto("/change-password?" + params.toString(), { replaceState: true });
                 return;
             }

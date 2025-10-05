@@ -1,19 +1,20 @@
 import Toast, { type ToastProps } from "$lib/components/ui/Toast.svelte";
 import { mount, unmount } from "svelte";
 
+// A class that provides a "handle" to a toast that can be used to close it.
 export class ToastHandle {
-    #closed: boolean = false;
-    #closer: () => void;
+    private closed: boolean = false;
+    private closer: () => void;
 
     constructor(closer: () => void, closed = false) {
-        this.#closer = closer;
-        this.#closed = closed;
+        this.closer = closer;
+        this.closed = closed;
     }
 
     close = () => {
-        if (this.#closed) return;
-        this.#closed = true;
-        this.#closer();
+        if (this.closed) return;
+        this.closed = true;
+        this.closer();
     };
 }
 
@@ -22,7 +23,7 @@ export class ToastProvider {
     show = (props: ToastProps): ToastHandle => {
         let toast: Toast | null = null;
         const handle = new ToastHandle(() => {
-            if (toast) this.#closeToast(toast);
+            if (toast) this.closeToast(toast);
         });
 
         toast = mount(Toast, {
@@ -35,7 +36,7 @@ export class ToastProvider {
         return handle;
     };
 
-    #closeToast = (toast: Toast) => {
+    private closeToast = (toast: Toast) => {
         // We don't care about waiting for the transition to finish, so no await.
         unmount(toast, {
             outro: true,

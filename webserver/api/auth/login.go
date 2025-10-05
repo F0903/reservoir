@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/webserver/api/apitypes"
+	"reservoir/webserver/api/auth/models"
 	"reservoir/webserver/auth"
 )
 
@@ -54,12 +55,19 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 	sess := auth.CreateSession(user.ID)
 	http.SetCookie(w, sess.BuildSessionCookie())
 
-	userJson, err := json.Marshal(user)
+	userJson, err := json.Marshal(models.UserInfo{
+		ID:                     user.ID,
+		Username:               user.Username,
+		PasswordChangeRequired: user.PasswordChangeRequired,
+		CreatedAt:              user.CreatedAt,
+		UpdatedAt:              user.UpdatedAt,
+	})
 	if err != nil {
 		slog.Error("Error marshaling user JSON", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(userJson)
 }

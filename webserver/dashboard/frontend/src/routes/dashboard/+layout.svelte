@@ -4,58 +4,9 @@
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
     import { LayoutDashboard, Logs, Settings } from "@lucide/svelte";
-    import { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { setContext } from "svelte";
-    import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import { ToastProvider } from "$lib/providers/toast-provider.svelte";
-    import { log } from "$lib/utils/logger";
 
     let { children } = $props();
-
-    const settings = setContext("settings", new SettingsProvider());
-    const metrics = setContext("metrics", new MetricsProvider(settings, fetch));
-    const toast = setContext("toast", new ToastProvider());
-
-    function onAsyncError(event: PromiseRejectionEvent) {
-        event.preventDefault();
-
-        log.error("Unhandled promise rejection caught: ", event.reason, event.promise);
-
-        toast.show({
-            type: "error",
-            message: event.reason ?? "An unexpected error occurred.",
-            durationMs: 10000,
-            dismissText: "Dismiss",
-        });
-    }
-
-    function onError(
-        eventOrMessage: Event | string,
-        source?: string,
-        lineno?: number,
-        colno?: number,
-        error?: Error,
-    ) {
-        let message = "";
-        if (eventOrMessage instanceof Event) {
-            log.debug("Unhandled error parameter was event.");
-        } else {
-            message = eventOrMessage;
-        }
-
-        message ??= error?.message ?? "An unexpected error occurred.";
-        log.error("Unhandled error caught: ", message, source, lineno, colno, error);
-
-        toast.show({
-            type: "error",
-            message,
-            durationMs: 10000,
-            dismissText: "Dismiss",
-        });
-    }
 </script>
-
-<svelte:window onunhandledrejection={onAsyncError} />
 
 <div class="layout-grid">
     <div class="header-area">
