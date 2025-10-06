@@ -104,13 +104,12 @@ export async function apiGetTextStream(
 
 export async function apiGet<T>(
     endpoint: string,
-    type: APIObjectConstructor<T>,
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
     const resp = await getAssert(endpoint, fetchFn, redirectOnUnauthorized);
     const json = await resp.json();
-    return new type(json) as T;
+    return json as T;
 }
 
 export async function apiPatch<T>(

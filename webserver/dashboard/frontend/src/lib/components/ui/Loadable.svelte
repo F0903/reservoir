@@ -3,16 +3,17 @@
     import ErrorBox from "./ErrorBox.svelte";
     import type { Loadable } from "$lib/utils/loadable";
 
-    let { loadable = $bindable(), children }: { loadable: Loadable; children: Snippet } = $props();
+    let { state, loadable, children }: { state?: any; loadable: Loadable; children: Snippet } =
+        $props();
 
-    const state = $derived.by(() => loadable.getLoadableState());
+    const loadState = $derived.by(() => loadable.getLoadableState());
 </script>
 
-{#if state.tag === "loading"}
+{#if loadState.tag === "loading"}
     <div class="loading-box"></div>
-{:else if state.tag === "error"}
-    <ErrorBox>{state.errorMsg}</ErrorBox>
-{:else}
+{:else if loadState.tag === "error"}
+    <ErrorBox>{loadState.errorMsg}</ErrorBox>
+{:else if state !== null}
     {@render children()}
 {/if}
 

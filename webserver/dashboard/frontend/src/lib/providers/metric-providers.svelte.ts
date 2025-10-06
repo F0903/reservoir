@@ -1,16 +1,17 @@
 import { browser } from "$app/environment";
-import { type FetchFn, APIJsonObject } from "$lib/api/api-methods";
-import { getAllMetrics, Metrics } from "$lib/api/objects/metrics/metrics.svelte";
+import { type FetchFn } from "$lib/api/api-methods";
+import { getAllMetrics, type Metrics } from "$lib/api/objects/metrics/metrics";
 import { log } from "$lib/utils/logger";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";
 import type { LoadableState } from "$lib/utils/loadable";
+import { patch } from "$lib/utils/objects/patch";
 
 export class MetricsProvider {
     private settings: SettingsProvider;
     private metricsRefreshId: number | null = null;
     private readonly fetchFn: FetchFn;
 
-    readonly data: Metrics = new Metrics({});
+    data: Metrics | null = $state(null);
     private state: LoadableState = $state({
         tag: "loading",
         errorMsg: null,
@@ -56,8 +57,12 @@ export class MetricsProvider {
         log.debug("Refreshing metrics...");
 
         try {
-            const newData = await getAllMetrics(APIJsonObject, this.fetchFn);
-            this.data.updateFrom(newData as Record<string, unknown>);
+            const newData = await getAllMetrics(this.fetchFn);
+            if (this.data === null) {
+                this.data = newData;
+            } else {
+                patch(this.data, newData);
+            }
             this.state = { tag: "ok", errorMsg: null };
         } catch (error) {
             this.state = { tag: "error", errorMsg: error as string };

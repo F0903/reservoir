@@ -10,11 +10,11 @@
 </script>
 
 <Widget title="Data Transfer">
-    <Loadable loadable={metrics}>
+    <Loadable state={metrics.data} loadable={metrics}>
         <Card --card-background="var(--primary-600)" --card-padding="1rem">
             <div class="primary-metric">
                 <div class="primary-metric-value">
-                    {formatBytesToLargest(metrics.data.requests.bytesServed)}
+                    {formatBytesToLargest(metrics.data!.requests.bytes_served)}
                 </div>
                 <div class="primary-metric-label label">Total Bytes Served</div>
             </div>
@@ -23,20 +23,20 @@
                 <div class="secondary-metric">
                     <span class="secondary-metric-value"
                         >{(
-                            metrics.data.requests.httpProxyRequests +
-                            metrics.data.requests.httpsProxyRequests
+                            metrics.data!.requests.http_proxy_requests +
+                            metrics.data!.requests.https_proxy_requests
                         ).toLocaleString()}</span
                     >
                     <span class="secondary-metric-label label">Total Requests</span>
                 </div>
 
-                {#if metrics.data.requests.httpProxyRequests + metrics.data.requests.httpsProxyRequests > 0}
+                {#if metrics.data!.requests.http_proxy_requests + metrics.data!.requests.https_proxy_requests > 0}
                     <div class="secondary-metric">
                         <span class="secondary-metric-value"
                             >{formatBytesToLargest(
-                                metrics.data.requests.bytesServed /
-                                    (metrics.data.requests.httpProxyRequests +
-                                        metrics.data.requests.httpsProxyRequests),
+                                metrics.data!.requests.bytes_served /
+                                    (metrics.data!.requests.http_proxy_requests +
+                                        metrics.data!.requests.https_proxy_requests),
                             )}</span
                         >
                         <span class="secondary-metric-label label">Avg per Request</span>

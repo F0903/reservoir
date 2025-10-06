@@ -44,16 +44,15 @@ export type MergeOptions = {
 
 // Applies changes from one object to another recursively
 // Returns true if any changes were made
-export function merge<T extends Record<string, unknown>>(
+export function patch<T extends Record<string, unknown>>(
     to: T,
     from: DeepPartial<T>,
     keyTransformOrOptions?: KeyTransform | MergeOptions,
     recurseFlag?: boolean,
 ): boolean {
-    // Defaults
     const defaults: MergeOptions = {
         recurse: true,
-        replaceArrays: true,
+        replaceArrays: false,
         allowNull: true,
         compare: Object.is,
     };
@@ -75,19 +74,19 @@ export function merge<T extends Record<string, unknown>>(
 
         const fromKey = key; // original key in 'from'
         const toKey = options.keyTransform ? options.keyTransform(fromKey) : fromKey;
+        const toRec = to as Record<string, unknown>;
 
         const bValue = (from as Record<string, unknown>)[fromKey];
         if (bValue === undefined) continue;
         if (bValue === null && !options.allowNull) continue;
+        const bRec = bValue as Record<string, unknown>;
 
         const aValue = (to as Record<string, unknown>)[toKey];
+        const aRec = aValue as Record<string, unknown>;
 
         // Recurse into plain objects when both sides are plain and recurse enabled
         if (options.recurse && isPlain(bValue) && isPlain(aValue)) {
-            if (
-                merge(aValue as Record<string, unknown>, bValue as Record<string, unknown>, options)
-            )
-                changed = true;
+            if (patch(aRec, bRec, options)) changed = true;
             continue;
         }
 
@@ -95,7 +94,7 @@ export function merge<T extends Record<string, unknown>>(
         if (Array.isArray(bValue) && Array.isArray(aValue)) {
             if (options.replaceArrays) {
                 if (!arraysEqual(aValue, bValue, compare)) {
-                    (to as Record<string, unknown>)[toKey] = bValue;
+                    toRec[toKey] = bValue;
                     changed = true;
                 }
             } else {
@@ -108,13 +107,24 @@ export function merge<T extends Record<string, unknown>>(
                         localChanged = true;
                     }
                 }
+                if (aValue.length > bValue.length) {
+                    aValue.length = bValue.length; // truncate if longer
+                    localChanged = true;
+                } else if (aValue.length < bValue.length) {
+                    // push remaining items from other if shorter
+                    const diff = bValue.length - aValue.length;
+                    for (let i = 0; i < diff; i++) {
+                        aValue.push(bValue[minLen + i]);
+                    }
+                }
+
                 if (localChanged) changed = true;
             }
             continue;
         }
 
         if (!compare(aValue, bValue)) {
-            (to as Record<string, unknown>)[toKey] = bValue;
+            toRec[toKey] = bValue;
             changed = true;
         }
     }

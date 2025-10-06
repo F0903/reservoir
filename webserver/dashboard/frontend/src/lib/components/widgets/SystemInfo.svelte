@@ -5,25 +5,32 @@
     import { getContext } from "svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { SvelteDate } from "svelte/reactivity";
 
     let metrics = getContext("metrics") as MetricsProvider;
 
-    let currentUptime: string = $state("");
+    let currentUptime: string = $state("N/A");
 
     function updateUptime() {
         if (!metrics) {
             return;
         }
 
-        const startTime = metrics.data.system.startTime;
-        currentUptime = formatTimeSinceDate(startTime);
+        if (!metrics.data) {
+            currentUptime = "N/A";
+            return;
+        }
+
+        // There are much more efficient ways of doing this, but cant be bothered
+        const startTime = metrics.data.system.start_time;
+        currentUptime = formatTimeSinceDate(new Date(startTime));
     }
 </script>
 
-<PolledWidget title="System Metrics" pollFn={updateUptime} pollInterval={1000}>
-    <Loadable loadable={metrics}>
+<Loadable state={metrics.data} loadable={metrics}>
+    <PolledWidget title="System Metrics" pollFn={updateUptime} pollInterval={1000}>
         <div class="metrics">
             <MetricCard label="Uptime" value={currentUptime} --metric-value-size="1.1rem" />
         </div>
-    </Loadable>
-</PolledWidget>
+    </PolledWidget>
+</Loadable>

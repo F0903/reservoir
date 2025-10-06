@@ -3,7 +3,6 @@
     import { changePassword } from "$lib/api/auth/auth";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
-    import Form from "$lib/components/ui/input/Form.svelte";
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import { log } from "$lib/utils/logger";
@@ -11,6 +10,7 @@
     import type { PageProps } from "./$types";
     import type { ToastProvider } from "$lib/providers/toast-provider.svelte";
     import { UnauthorizedError } from "$lib/api/api-methods";
+    import Form from "$lib/components/ui/input/Form.svelte";
 
     let { data }: PageProps = $props();
 

@@ -8,18 +8,18 @@
 
     let metrics = getContext("metrics") as MetricsProvider;
 
-    let chart: Chart | undefined = $state();
-
     let totalCacheRequests = $derived(
-        metrics.data.cache.cacheHits + metrics.data.cache.cacheMisses,
+        (metrics.data?.cache.cache_hits ?? 0) + (metrics.data?.cache.cache_misses ?? 0),
     );
     let hitRate = $derived(
-        totalCacheRequests > 0 ? (metrics.data.cache.cacheHits / totalCacheRequests) * 100 : 0,
+        totalCacheRequests > 0
+            ? ((metrics.data?.cache.cache_hits ?? 0) / totalCacheRequests) * 100
+            : 0,
     );
 </script>
 
 <Widget title="Cache Efficiency">
-    <Loadable loadable={metrics}>
+    <Loadable state={metrics.data} loadable={metrics}>
         <div class="efficiency-display">
             <MetricCard
                 label="Hit Rate"
@@ -32,24 +32,23 @@
 
             <div class="efficiency-chart">
                 <Chart
-                    bind:this={chart}
                     type="bar"
                     data={{
                         labels: ["Cache Operations"],
                         datasets: [
                             {
                                 label: "Hits",
-                                data: [metrics.data.cache.cacheHits],
+                                data: [metrics!.data!.cache.cache_hits],
                                 backgroundColor: "var(--secondary-400)",
                             },
                             {
                                 label: "Misses",
-                                data: [metrics.data.cache.cacheMisses],
+                                data: [metrics!.data!.cache.cache_misses],
                                 backgroundColor: "var(--tertiary-400)",
                             },
                             {
                                 label: "Errors",
-                                data: [metrics.data.cache.cacheErrors],
+                                data: [metrics!.data!.cache.cache_errors],
                                 backgroundColor: "var(--primary-200)",
                             },
                         ],

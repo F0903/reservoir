@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { patchConfig } from "$lib/api/objects/config/config.svelte";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import SettingInput from "$lib/components/ui/settings/SettingInput.svelte";
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
@@ -71,7 +70,7 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.proxyListen,
+                getSetting: () => settings.proxySettings.fields?.proxy_listen,
                 setSetting: async (val: string) => await sendPatch("proxy_listen", val),
                 settingTransform: (val: string) => val,
                 label: "Proxy Listen",
@@ -80,7 +79,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.caCert,
+                getSetting: () => settings.proxySettings.fields?.ca_cert,
                 setSetting: async (val: string) => await sendPatch("ca_cert", val),
                 settingTransform: (val: string) => val,
                 label: "CA Certificate",
@@ -89,7 +88,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.caKey,
+                getSetting: () => settings.proxySettings.fields?.ca_key,
                 setSetting: async (val: string) => await sendPatch("ca_key", val),
                 settingTransform: (val: string) => val,
                 label: "CA Key",
@@ -98,7 +97,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.upstreamDefaultHttps,
+                getSetting: () => settings.proxySettings.fields?.upstream_default_https,
                 setSetting: async (val: boolean) => await sendPatch("upstream_default_https", val),
                 settingTransform: (val: boolean) => val,
                 label: "Upstream Default HTTPS",
@@ -111,7 +110,7 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.webserverListen,
+                getSetting: () => settings.proxySettings.fields?.webserver_listen,
                 setSetting: async (val: string) => await sendPatch("webserver_listen", val),
                 settingTransform: (val: string) => val,
                 label: "Webserver Listen",
@@ -120,7 +119,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.dashboardDisabled,
+                getSetting: () => settings.proxySettings.fields?.dashboard_disabled,
                 setSetting: async (val: boolean) => await sendPatch("dashboard_disabled", val),
                 settingTransform: (val: boolean) => val,
                 label: "Dashboard Disabled",
@@ -129,7 +128,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.apiDisabled,
+                getSetting: () => settings.proxySettings.fields?.api_disabled,
                 setSetting: async (val: boolean) => await sendPatch("api_disabled", val),
                 settingTransform: (val: boolean) => val,
                 label: "API Disabled",
@@ -142,7 +141,7 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.cacheDir,
+                getSetting: () => settings.proxySettings.fields?.cache_dir,
                 setSetting: async (val: string) => await sendPatch("cache_dir", val),
                 settingTransform: (val: string) => val,
                 label: "Cache Directory",
@@ -151,7 +150,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.ignoreCacheControl,
+                getSetting: () => settings.proxySettings.fields?.ignore_cache_control,
                 setSetting: async (val: boolean) => await sendPatch("ignore_cache_control", val),
                 settingTransform: (val: boolean) => val,
                 label: "Ignore Cache Control",
@@ -160,7 +159,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.maxCacheSize,
+                getSetting: () => settings.proxySettings.fields?.max_cache_size,
                 setSetting: async (val: number) => await sendPatch("max_cache_size", val),
                 settingTransform: (val: string) => parseByteString(val),
                 label: "Max Cache Size",
@@ -169,7 +168,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.defaultCacheMaxAge,
+                getSetting: () => settings.proxySettings.fields?.default_cache_max_age,
                 setSetting: async (val: string) => await sendPatch("default_cache_max_age", val),
                 settingTransform: (val: string) => val,
                 label: "Default Cache Max Age",
@@ -179,7 +178,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.forceDefaultCacheMaxAge,
+                getSetting: () => settings.proxySettings.fields?.force_default_cache_max_age,
                 setSetting: async (val: boolean) =>
                     await sendPatch("force_default_cache_max_age", val),
                 settingTransform: (val: boolean) => val,
@@ -190,7 +189,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.cacheCleanupInterval,
+                getSetting: () => settings.proxySettings.fields?.cache_cleanup_interval,
                 setSetting: async (val: string) => await sendPatch("cache_cleanup_interval", val),
                 settingTransform: (val: string) => val,
                 label: "Cache Cleanup Interval",
@@ -204,7 +203,7 @@
             {
                 InputComponent: Dropdown,
                 options: ["DEBUG", "INFO", "WARN", "ERROR"],
-                getSetting: () => settings.proxySettings.fields.logLevel,
+                getSetting: () => settings.proxySettings.fields?.log_level,
                 setSetting: async (val: string) => await sendPatch("log_level", val),
                 settingTransform: (val: string) => val,
                 label: "Log Level",
@@ -214,7 +213,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.logFile,
+                getSetting: () => settings.proxySettings.fields?.log_file,
                 setSetting: async (val: string) => await sendPatch("log_file", val),
                 settingTransform: (val: string) => val,
                 label: "Log File Path",
@@ -224,7 +223,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.logFileMaxSize,
+                getSetting: () => settings.proxySettings.fields?.log_file_max_size,
                 setSetting: async (val: number) => await sendPatch("log_file_max_size", val),
                 settingTransform: (val: string) => parseByteString(val),
                 label: "Log File Max Size",
@@ -234,7 +233,7 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields.logFileMaxBackups,
+                getSetting: () => settings.proxySettings.fields?.log_file_max_backups,
                 setSetting: async (val: number) => await sendPatch("log_file_max_backups", val),
                 settingTransform: (val: string) => parseInt(val),
                 label: "Log File Max Backups",
@@ -244,7 +243,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.logFileCompress,
+                getSetting: () => settings.proxySettings.fields?.log_file_compress,
                 setSetting: async (val: boolean) => await sendPatch("log_file_compress", val),
                 settingTransform: (val: boolean) => val,
                 label: "Log File Compression",
@@ -253,7 +252,7 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields.logToStdout,
+                getSetting: () => settings.proxySettings.fields?.log_to_stdout,
                 setSetting: async (val: boolean) => await sendPatch("log_to_stdout", val),
                 settingTransform: (val: boolean) => val,
                 label: "Log to Stdout",

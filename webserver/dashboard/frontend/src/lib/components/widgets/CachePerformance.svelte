@@ -9,7 +9,7 @@
 </script>
 
 <Widget title="Cache Performance">
-    <Loadable loadable={metrics}>
+    <Loadable state={metrics.data} loadable={metrics}>
         <Chart
             type="doughnut"
             data={{
@@ -17,9 +17,9 @@
                 datasets: [
                     {
                         data: [
-                            metrics.data.cache.cacheHits,
-                            metrics.data.cache.cacheMisses,
-                            metrics.data.cache.cacheErrors,
+                            metrics.data!.cache.cache_hits,
+                            metrics.data!.cache.cache_misses,
+                            metrics.data!.cache.cache_errors,
                         ],
                     },
                 ],

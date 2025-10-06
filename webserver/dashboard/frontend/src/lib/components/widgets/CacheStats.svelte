@@ -10,32 +10,35 @@
 </script>
 
 <Widget title="Cache Statistics">
-    <Loadable loadable={metrics}>
+    <Loadable state={metrics.data} loadable={metrics}>
         <div class="metrics-grid">
             <MetricCard
                 label="Cache Entries"
-                value={metrics.data.cache.cacheEntries.toLocaleString()}
+                value={metrics.data!.cache.cache_entries.toLocaleString()}
             />
-            <MetricCard label="Cache Hits" value={metrics.data.cache.cacheHits.toLocaleString()} />
+            <MetricCard
+                label="Cache Hits"
+                value={metrics.data!.cache.cache_hits.toLocaleString()}
+            />
             <MetricCard
                 label="Cache Misses"
-                value={metrics.data.cache.cacheMisses.toLocaleString()}
+                value={metrics.data!.cache.cache_misses.toLocaleString()}
             />
             <MetricCard
                 label="Cache Errors"
-                value={metrics.data.cache.cacheErrors.toLocaleString()}
+                value={metrics.data!.cache.cache_errors.toLocaleString()}
             />
             <MetricCard
                 label="Bytes Cached"
-                value={formatBytesToLargest(metrics.data.cache.bytesCached)}
+                value={formatBytesToLargest(metrics.data!.cache.bytes_cached)}
             />
             <MetricCard
                 label="Cleanup Runs"
-                value={metrics.data.cache.cleanupRuns.toLocaleString()}
+                value={metrics.data!.cache.cleanup_runs.toLocaleString()}
             />
             <MetricCard
                 label="Bytes Cleaned"
-                value={formatBytesToLargest(metrics.data.cache.bytesCleaned)}
+                value={formatBytesToLargest(metrics.data!.cache.bytes_cleaned)}
             />
         </div>
     </Loadable>

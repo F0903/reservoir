@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { log } from "$lib/utils/logger";
     import { mount, type Component } from "svelte";
+    import { log } from "$lib/utils/logger";
 
     let { components, columns = 4 }: { components: Component<any, any, any>[]; columns?: number } =
         $props();
