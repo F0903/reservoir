@@ -15,21 +15,21 @@
     },
     "devDependencies": {
         "@eslint/compat": "^1.4.0",
-        "@eslint/js": "^9.36.0",
-        "@sveltejs/adapter-auto": "^6.1.0",
-        "@sveltejs/kit": "^2.43.5",
+        "@eslint/js": "^9.37.0",
+        "@sveltejs/adapter-auto": "^6.1.1",
+        "@sveltejs/kit": "^2.44.0",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
-        "eslint": "^9.36.0",
+        "eslint": "^9.37.0",
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-svelte": "^3.12.4",
         "globals": "^16.4.0",
         "prettier": "^3.6.2",
         "prettier-plugin-svelte": "^3.4.0",
-        "svelte": "^5.39.6",
+        "svelte": "^5.39.9",
         "svelte-check": "^4.3.2",
-        "typescript": "^5.9.2",
-        "typescript-eslint": "^8.44.1",
-        "vite": "^7.1.7",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.46.0",
+        "vite": "^7.1.9",
         "vite-plugin-devtools-json": "^0.2.1"
     },
     "pnpm": {
@@ -41,7 +41,7 @@
         "@fontsource-variable/chivo-mono": "^5.2.8",
         "@fontsource-variable/open-sans": "^5.2.7",
         "@lucide/svelte": "^0.525.0",
-        "@sveltejs/adapter-static": "^3.0.9",
+        "@sveltejs/adapter-static": "^3.0.10",
         "chart.js": "^4.5.0"
     }
 }
