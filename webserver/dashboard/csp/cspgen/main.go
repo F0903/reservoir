@@ -164,7 +164,7 @@ func main() {
 		panic(fmt.Sprintf("Unable to create output file: %v", err))
 	}
 
-	fmt.Fprintf(os.Stderr, "cspgen: wrote %s", out)
+	fmt.Fprintf(os.Stderr, "cspgen: wrote %s\n", out)
 }
 
 func generateGoFile(header string, scriptHashes []string) string {
