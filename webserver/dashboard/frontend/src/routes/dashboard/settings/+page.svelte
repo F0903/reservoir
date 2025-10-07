@@ -10,6 +10,7 @@
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
     import { parseByteString } from "$lib/utils/bytestring";
+    import { patchConfig } from "$lib/api/objects/config/config";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
