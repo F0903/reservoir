@@ -8,6 +8,6 @@ export interface Settings {
 
 // A container for all settings objects. Provided as context to all components.
 export class SettingsProvider {
-    dashboardConfig: DashboardSettings = new DashboardSettings();
+    dashboardSettings: DashboardSettings = new DashboardSettings();
     proxySettings: ProxySettings = new ProxySettings();
 }

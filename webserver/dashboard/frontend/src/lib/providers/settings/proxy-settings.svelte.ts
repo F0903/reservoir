@@ -2,12 +2,12 @@ import { browser } from "$app/environment";
 import { getConfig, type Config } from "$lib/api/objects/config/config";
 import { getRestartRequired } from "$lib/api/objects/config/restart-required";
 import { log } from "$lib/utils/logger";
-import { patch } from "$lib/utils/objects/patch";
+import { patch } from "$lib/utils/patch";
 import type { Settings } from "./settings-provider.svelte";
 
 // Manages proxy settings from API.
 export class ProxySettings implements Settings {
-    fields: Config | null = $state(null);
+    fields: Config = $state({} as Config);
     needsRestart = $state(false);
 
     constructor() {
@@ -20,12 +20,10 @@ export class ProxySettings implements Settings {
             return;
         }
 
+        log.debug("Reloading proxy settings from API...", this.fields);
         const newData = await getConfig();
-        if (this.fields === null) {
-            this.fields = newData;
-        } else {
-            patch(this.fields, newData);
-        }
+        patch(this.fields, newData);
+        log.debug("Updated proxy settings from API: (snapshot)", $state.snapshot(this.fields));
 
         this.needsRestart = (await getRestartRequired()).restart_required;
         log.debug("Needs restart:", this.needsRestart);

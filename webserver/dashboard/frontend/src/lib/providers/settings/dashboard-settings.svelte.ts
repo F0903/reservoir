@@ -1,14 +1,16 @@
 import { browser } from "$app/environment";
-import { setPropIfChanged } from "$lib/utils/objects/props";
+import { log } from "$lib/utils/logger";
 import type { Settings } from "./settings-provider.svelte";
 
-class Fields {
-    updateInterval = $state(10000);
-}
+type Fields = {
+    updateInterval: number;
+};
 
 // Manages browser stored settings for the dashboard
 export class DashboardSettings implements Settings {
-    fields = new Fields();
+    fields: Fields = $state({
+        updateInterval: 10000,
+    });
 
     constructor() {
         this.reload();
@@ -27,7 +29,9 @@ export class DashboardSettings implements Settings {
         }
 
         let configJson = localStorage.getItem("dashboardConfig");
+        log.debug("Reloading dashboard settings from localStorage...", configJson);
         if (!configJson) {
+            log.debug("No dashboard settings found in localStorage, saving defaults...");
             this.save(); // Try to save defaults if nothing is present
 
             configJson = localStorage.getItem("dashboardConfig");
@@ -37,13 +41,15 @@ export class DashboardSettings implements Settings {
         }
 
         const savedData = JSON.parse(configJson);
-        setPropIfChanged(
-            "updateInterval",
-            savedData,
-            this.fields.updateInterval,
-            (value) => (this.fields.updateInterval = value as number),
-        );
+        log.debug("Parsed dashboard settings from localStorage:", savedData);
+        if (savedData.updateInterval == this.fields.updateInterval) {
+            log.debug("No changes detected in dashboard settings.");
+            return Promise.resolve();
+        }
 
+        this.fields.updateInterval = savedData.updateInterval;
+
+        log.debug("Updated dashboard settings from localStorage:", this.fields);
         return Promise.resolve();
     };
 

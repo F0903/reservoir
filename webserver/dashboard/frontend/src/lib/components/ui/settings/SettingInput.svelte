@@ -1,62 +1,68 @@
 <script lang="ts" generics="C extends Component<any, any, 'value'>, O">
     import { log } from "$lib/utils/logger";
-    import { onMount, type Component, type ComponentProps } from "svelte";
+    import { type Component, type ComponentProps } from "svelte";
 
     // Value type exposed by the InputComponent's `value` prop
     type V = ComponentProps<C>["value"];
 
-    type SettingV = string | number | boolean;
-
     let {
         InputComponent,
-        getSetting,
-        setSetting,
-        settingTransform,
+        get,
+        commit: commitValue,
+        valueTransform,
         onChange,
         disabled = false,
         ...restProps
     }: {
         InputComponent: C;
-        getSetting: () => Promise<SettingV> | SettingV;
-        setSetting: (_value: O) => any;
-        settingTransform: (val: V) => O;
+        get: () => V;
+        commit: (val: any) => Promise<any>;
+        valueTransform?: (val: V) => O;
         onChange?: (different: boolean) => void;
         disabled?: boolean;
     } = $props();
 
-    let startValue: V | undefined;
-    let value: V | undefined = $state();
+    let store: V = $state(get());
 
-    onMount(async () => {
-        await reset(); // Fetch and set the value and startValue on mount
-    });
+    let value: V | undefined = $state();
+    let lastChangeValue = false;
 
     $effect(() => {
-        const changed = hasChanged();
-        onChange?.(changed);
+        const change = hasChanged();
+        if (change !== lastChangeValue) {
+            lastChangeValue = change;
+            log.debug(`SettingInput change state updated: ${change}`);
+            onChange?.(change);
+        }
     });
 
+    // Has 'value' changed from 'store'?
     export function hasChanged() {
         // We use != to allow type coercion (e.g. between number and string)
-        return value != startValue;
+        return value != store;
     }
 
-    export async function save() {
+    export async function commit() {
         if (!hasChanged()) return;
 
         try {
-            // setSetting might be async, so we await it.
-            await setSetting(settingTransform(value));
+            let valueToWrite = value;
+            if (valueTransform) {
+                valueToWrite = valueTransform(value);
+                log.debug(`Committing setting with transformed value: ${valueToWrite}`);
+            }
+            await commitValue(valueToWrite);
+            log.debug("Setting committed successfully.");
         } catch (e) {
-            log.error("Failed to save setting:", e);
+            log.error("Failed to commit setting:", e);
             // Error toast will be shown by global handler.
             throw e;
         }
     }
 
     export async function reset() {
-        value = await getSetting();
-        startValue = value;
+        value = await get();
+        store = value;
     }
 </script>
 

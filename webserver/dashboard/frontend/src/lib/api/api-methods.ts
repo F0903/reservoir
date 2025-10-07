@@ -38,6 +38,7 @@ async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     if (params.size > 0) {
         loginUrl += `?${params.toString()}`;
     }
+
     await goto(loginUrl, {
         replaceState: true,
     });

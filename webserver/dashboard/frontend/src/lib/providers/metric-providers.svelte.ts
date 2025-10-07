@@ -4,7 +4,7 @@ import { getAllMetrics, type Metrics } from "$lib/api/objects/metrics/metrics";
 import { log } from "$lib/utils/logger";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";
 import type { LoadableState } from "$lib/utils/loadable";
-import { patch } from "$lib/utils/objects/patch";
+import { patch } from "$lib/utils/patch";
 
 export class MetricsProvider {
     private settings: SettingsProvider;
@@ -33,7 +33,7 @@ export class MetricsProvider {
         if (this.metricsRefreshId !== null) return;
 
         $effect(() => {
-            const interval = this.settings.dashboardConfig.fields.updateInterval;
+            const interval = this.settings.dashboardSettings.fields.updateInterval;
             log.debug("Updating metrics refresh interval to", interval);
             this.stopRefresh();
             this.metricsRefreshId = setInterval(() => this.refreshMetrics(), interval);
@@ -57,6 +57,7 @@ export class MetricsProvider {
         log.debug("Refreshing metrics...");
 
         try {
+            this.state = { tag: "loading", errorMsg: null };
             const newData = await getAllMetrics(this.fetchFn);
             if (this.data === null) {
                 this.data = newData;

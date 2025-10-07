@@ -26,12 +26,11 @@
         "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
     const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
 
-    //TODO: Tidy these typings up
     type InputSection = {
         InputComponent: Component<any, any, "value">;
-        getSetting: () => Promise<any> | any;
-        setSetting: (_value: any) => any;
-        settingTransform: (val: any) => any;
+        get: () => any;
+        valueTransform?: (val: any) => any;
+        commit: (val: any) => Promise<any>;
         label: string;
         pattern: string;
         tooltip?: string;
@@ -57,9 +56,10 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.dashboardConfig.fields.updateInterval,
-                setSetting: (val: number) => (settings.dashboardConfig.fields.updateInterval = val),
-                settingTransform: (val: string) => parseInt(val),
+                get: () => settings.dashboardSettings.fields.updateInterval,
+                commit: async (val: number) =>
+                    (settings.dashboardSettings.fields.updateInterval = val),
+                valueTransform: (val: string) => parseInt(val),
                 label: "Dashboard Update Interval",
                 pattern: intPattern,
                 min: 500,
@@ -71,36 +71,32 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.proxy_listen,
-                setSetting: async (val: string) => await sendPatch("proxy_listen", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.proxy_listen,
+                commit: async (val: string) => await sendPatch("proxy_listen", val),
                 label: "Proxy Listen",
                 pattern: ipPortPattern,
                 tooltip: "The IP address and port that the proxy server will bind to.",
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.ca_cert,
-                setSetting: async (val: string) => await sendPatch("ca_cert", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.ca_cert,
+                commit: async (val: string) => await sendPatch("ca_cert", val),
                 label: "CA Certificate",
                 pattern: stringPattern,
                 tooltip: "The path to the CA certificate for the proxy server.",
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.ca_key,
-                setSetting: async (val: string) => await sendPatch("ca_key", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.ca_key,
+                commit: async (val: string) => await sendPatch("ca_key", val),
                 label: "CA Key",
                 pattern: stringPattern,
                 tooltip: "The path to the CA private key for the proxy server.",
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.upstream_default_https,
-                setSetting: async (val: boolean) => await sendPatch("upstream_default_https", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.upstream_default_https,
+                commit: async (val: boolean) => await sendPatch("upstream_default_https", val),
                 label: "Upstream Default HTTPS",
                 pattern: boolPattern,
                 tooltip:
@@ -111,27 +107,24 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.webserver_listen,
-                setSetting: async (val: string) => await sendPatch("webserver_listen", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.webserver_listen,
+                commit: async (val: string) => await sendPatch("webserver_listen", val),
                 label: "Webserver Listen",
                 pattern: ipPortPattern,
                 tooltip: "The IP address and port that the web server will bind to.",
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.dashboard_disabled,
-                setSetting: async (val: boolean) => await sendPatch("dashboard_disabled", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.dashboard_disabled,
+                commit: async (val: boolean) => await sendPatch("dashboard_disabled", val),
                 label: "Dashboard Disabled",
                 pattern: boolPattern,
                 tooltip: "Whether the dashboard is disabled.",
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.api_disabled,
-                setSetting: async (val: boolean) => await sendPatch("api_disabled", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.api_disabled,
+                commit: async (val: boolean) => await sendPatch("api_disabled", val),
                 label: "API Disabled",
                 pattern: boolPattern,
                 tooltip:
@@ -142,36 +135,33 @@
         [
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.cache_dir,
-                setSetting: async (val: string) => await sendPatch("cache_dir", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.cache_dir,
+                commit: async (val: string) => await sendPatch("cache_dir", val),
                 label: "Cache Directory",
                 pattern: stringPattern,
                 tooltip: "The directory where cached files are stored.",
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.ignore_cache_control,
-                setSetting: async (val: boolean) => await sendPatch("ignore_cache_control", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.ignore_cache_control,
+                commit: async (val: boolean) => await sendPatch("ignore_cache_control", val),
                 label: "Ignore Cache Control",
                 pattern: boolPattern,
                 tooltip: "Whether to ignore Cache-Control headers from the client.",
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.max_cache_size,
-                setSetting: async (val: number) => await sendPatch("max_cache_size", val),
-                settingTransform: (val: string) => parseByteString(val),
+                get: () => settings.proxySettings.fields.max_cache_size,
+                valueTransform: (val: string) => parseByteString(val),
+                commit: async (val: number) => await sendPatch("max_cache_size", val),
                 label: "Max Cache Size",
                 pattern: bytesizePattern,
                 tooltip: "The maximum size of the cache. You can use suffixes like B, K, M, G, T.",
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.default_cache_max_age,
-                setSetting: async (val: string) => await sendPatch("default_cache_max_age", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.default_cache_max_age,
+                commit: async (val: string) => await sendPatch("default_cache_max_age", val),
                 label: "Default Cache Max Age",
                 pattern: durationPattern,
                 tooltip:
@@ -179,10 +169,8 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.force_default_cache_max_age,
-                setSetting: async (val: boolean) =>
-                    await sendPatch("force_default_cache_max_age", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.force_default_cache_max_age,
+                commit: async (val: boolean) => await sendPatch("force_default_cache_max_age", val),
                 label: "Force Default Cache Max Age",
                 pattern: boolPattern,
                 tooltip:
@@ -190,9 +178,8 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.cache_cleanup_interval,
-                setSetting: async (val: string) => await sendPatch("cache_cleanup_interval", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.cache_cleanup_interval,
+                commit: async (val: string) => await sendPatch("cache_cleanup_interval", val),
                 label: "Cache Cleanup Interval",
                 pattern: durationPattern,
                 tooltip:
@@ -204,9 +191,8 @@
             {
                 InputComponent: Dropdown,
                 options: ["DEBUG", "INFO", "WARN", "ERROR"],
-                getSetting: () => settings.proxySettings.fields?.log_level,
-                setSetting: async (val: string) => await sendPatch("log_level", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.log_level,
+                commit: async (val: string) => await sendPatch("log_level", val),
                 label: "Log Level",
                 pattern: logLevelPattern,
                 tooltip:
@@ -214,9 +200,8 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.log_file,
-                setSetting: async (val: string) => await sendPatch("log_file", val),
-                settingTransform: (val: string) => val,
+                get: () => settings.proxySettings.fields.log_file,
+                commit: async (val: string) => await sendPatch("log_file", val),
                 label: "Log File Path",
                 pattern: optionalStringPattern,
                 tooltip:
@@ -224,9 +209,9 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.log_file_max_size,
-                setSetting: async (val: number) => await sendPatch("log_file_max_size", val),
-                settingTransform: (val: string) => parseByteString(val),
+                get: () => settings.proxySettings.fields.log_file_max_size,
+                valueTransform: (val: string) => parseByteString(val),
+                commit: async (val: number) => await sendPatch("log_file_max_size", val),
                 label: "Log File Max Size",
                 pattern: bytesizePattern,
                 tooltip:
@@ -234,9 +219,9 @@
             },
             {
                 InputComponent: TextInput,
-                getSetting: () => settings.proxySettings.fields?.log_file_max_backups,
-                setSetting: async (val: number) => await sendPatch("log_file_max_backups", val),
-                settingTransform: (val: string) => parseInt(val),
+                get: () => settings.proxySettings.fields.log_file_max_backups,
+                valueTransform: (val: string) => parseInt(val),
+                commit: async (val: number) => await sendPatch("log_file_max_backups", val),
                 label: "Log File Max Backups",
                 pattern: intPattern,
                 tooltip:
@@ -244,18 +229,16 @@
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.log_file_compress,
-                setSetting: async (val: boolean) => await sendPatch("log_file_compress", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.log_file_compress,
+                commit: async (val: boolean) => await sendPatch("log_file_compress", val),
                 label: "Log File Compression",
                 pattern: boolPattern,
                 tooltip: "Whether to compress log files when they are rotated.",
             },
             {
                 InputComponent: Toggle,
-                getSetting: () => settings.proxySettings.fields?.log_to_stdout,
-                setSetting: async (val: boolean) => await sendPatch("log_to_stdout", val),
-                settingTransform: (val: boolean) => val,
+                get: () => settings.proxySettings.fields.log_to_stdout,
+                commit: async (val: boolean) => await sendPatch("log_to_stdout", val),
                 label: "Log to Stdout",
                 pattern: boolPattern,
                 tooltip: "Whether to also log to standard output (console).",
@@ -269,11 +252,16 @@
     );
     let hasChanges = $state(false);
 
-    var changesToast: ToastHandle | null = null;
+    let inputsDisabled = $state(true); // Disable inputs until settings are loaded
+
+    let changesToast: ToastHandle | null = null;
 
     onMount(async () => {
-        await settings.proxySettings.reload();
-        await settings.dashboardConfig.reload();
+        log.debug("Loading settings for settings page...");
+        await Promise.all([settings.proxySettings.reload(), settings.dashboardSettings.reload()]);
+        await resetInputs();
+        inputsDisabled = false;
+        log.debug("Settings loaded, inputs enabled.");
     });
 
     $effect(() => {
@@ -290,7 +278,7 @@
             negativeText: "Discard",
             positiveText: "Save",
             onNegative: discardChanges,
-            onPositive: applyChanges,
+            onPositive: commitChanges,
         });
     });
 
@@ -298,13 +286,13 @@
         hasChanges = different;
     }
 
-    async function saveInputs() {
+    async function commitInputs() {
         // Consider sending a batch update instead at some point.
         await Promise.all(
             inputComponents
                 .flat()
                 .filter((input) => input)
-                .map((input) => input.save()),
+                .map((input) => input.commit()),
         );
     }
 
@@ -317,21 +305,24 @@
         );
     }
 
-    async function applyChanges() {
+    async function commitChanges() {
         try {
-            await saveInputs();
+            await commitInputs();
+            log.debug("Settings have been committed.");
         } finally {
             changesToast?.close();
         }
         await settings.proxySettings.reload();
         await resetInputs();
-        log.debug("Settings have been saved.");
     }
 
     async function discardChanges() {
-        await resetInputs();
-        changesToast?.close();
-        log.debug("Changes have been discarded.");
+        try {
+            await resetInputs();
+            log.debug("Changes have been discarded.");
+        } finally {
+            changesToast?.close();
+        }
     }
 </script>
 
@@ -344,7 +335,12 @@
 <div class="inputs">
     {#each inputSections as section, i}
         {#each section as input, j}
-            <SettingInput bind:this={inputComponents[i][j]} {...input} {onChange} />
+            <SettingInput
+                bind:this={inputComponents[i][j]}
+                {...input}
+                {onChange}
+                disabled={inputsDisabled}
+            />
         {/each}
         {#if i < inputSections.length - 1}
             <VerticalSpacer --spacer-color="var(--secondary-700)" />
