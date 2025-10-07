@@ -44,17 +44,16 @@
     onMount(() => {
         if (props.type === "info" || props.type === "error") {
             setTimeout(async () => {
-                disabled = true;
-                await props.onDismiss?.();
-                props.handle.close();
+                await disableAndDo(props.onDismiss)();
             }, props.durationMs);
         }
     });
 
-    function disableAndDo(fn?: () => Promise<void>) {
+    function disableAndDo(fn?: () => Promise<void>): () => Promise<void> {
         return async () => {
             disabled = true;
             await fn?.();
+            props.handle.close();
         };
     }
 
