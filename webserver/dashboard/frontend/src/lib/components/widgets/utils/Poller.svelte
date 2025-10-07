@@ -1,9 +1,10 @@
+<!-- A utility component for polling a function at a specified interval as long as its children are visible -->
+
 <script lang="ts">
     import { visible } from "$lib/attachments/visible";
     import { log } from "$lib/utils/logger";
-    import Widget from "./Widget.svelte";
 
-    let { title, isVisible = $bindable(true), pollFn, pollInterval = 5000, children } = $props();
+    let { isVisible = $bindable(true), pollFn, pollInterval = 5000, children } = $props();
 
     let intervalId: number | null = null;
 
@@ -40,8 +41,6 @@
     });
 </script>
 
-<Widget {title}>
-    <div {@attach visible(visibilityChanged)}>
-        {@render children()}
-    </div>
-</Widget>
+<div class="poller" {@attach visible(visibilityChanged)}>
+    {@render children()}
+</div>

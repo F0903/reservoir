@@ -1,11 +1,11 @@
 <script lang="ts">
     import { formatTimeSinceDate } from "$lib/utils/dates";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import PolledWidget from "./base/PolledWidget.svelte";
     import { getContext } from "svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
-    import { SvelteDate } from "svelte/reactivity";
+    import Widget from "./base/Widget.svelte";
+    import Poller from "./utils/Poller.svelte";
 
     let metrics = getContext("metrics") as MetricsProvider;
 
@@ -27,10 +27,12 @@
     }
 </script>
 
-<Loadable state={metrics.data} loadable={metrics}>
-    <PolledWidget title="System Metrics" pollFn={updateUptime} pollInterval={1000}>
-        <div class="metrics">
-            <MetricCard label="Uptime" value={currentUptime} --metric-value-size="1.1rem" />
-        </div>
-    </PolledWidget>
-</Loadable>
+<Widget title="System Metrics">
+    <Loadable state={metrics.data} loadable={metrics}>
+        <Poller pollFn={updateUptime} pollInterval={1000}>
+            <div class="metrics">
+                <MetricCard label="Uptime" value={currentUptime} --metric-value-size="1.1rem" />
+            </div>
+        </Poller>
+    </Loadable>
+</Widget>
