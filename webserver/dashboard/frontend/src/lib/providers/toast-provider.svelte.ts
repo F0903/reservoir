@@ -1,4 +1,5 @@
 import Toast, { type ToastProps } from "$lib/components/ui/Toast.svelte";
+import { log } from "$lib/utils/logger";
 import { mount, unmount } from "svelte";
 
 // A class that provides a "handle" to a toast that can be used to close it.
@@ -12,7 +13,11 @@ export class ToastHandle {
     }
 
     close = () => {
-        if (this.closed) return;
+        if (this.closed) {
+            log.debug("Toast already closed, ignoring close() call");
+            return;
+        }
+        log.debug("Closing toast...");
         this.closed = true;
         this.closer();
     };
