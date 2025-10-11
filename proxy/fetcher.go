@@ -224,6 +224,7 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 	shouldCoalesce := clientHd.Range.IsNone() && req.Method == http.MethodGet
 	if !shouldCoalesce {
 		slog.Debug("Request can't be coalesced, fetching upstream...")
+		metrics.Global.Requests.NonCoalescedRequests.Increment()
 		return f.fetchUpstream(req)
 	}
 
@@ -236,10 +237,25 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 	}
 
 	fetched = fetchedObj.(fetchResult)
+	
+	// Track coalescing metrics
+	if shared {
+		metrics.Global.Requests.CoalescedRequests.Increment()
+	}
+	
 	switch fetched.Type {
 	case fetchTypeCached:
 		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
 		fetched.Cached.Coalesced = shared
+		
+		// Track coalesced cache hits/misses
+		if shared {
+			if fetched.Cached.Status == hitStatusHit {
+				metrics.Global.Requests.CoalescedCacheHits.Increment()
+			} else if fetched.Cached.Status == hitStatusMiss || fetched.Cached.Status == hitStatusRevalidated {
+				metrics.Global.Requests.CoalescedCacheMisses.Increment()
+			}
+		}
 		fetched.Cached.Entry, err = f.cache.Get(key)
 		if err != nil {
 			if errors.Is(err, cache.ErrCacheMiss) {
