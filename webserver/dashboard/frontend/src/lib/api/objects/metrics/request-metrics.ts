@@ -7,6 +7,7 @@ export type RequestMetrics = {
     coalesced_requests: number;
     non_coalesced_requests: number;
     coalesced_cache_hits: number;
+    coalesced_cache_revalidations: number;
     coalesced_cache_misses: number;
 };
 

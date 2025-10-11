@@ -6,7 +6,14 @@
     import Loadable from "../ui/Loadable.svelte";
     import { formatBytesToLargest } from "$lib/utils/bytestring";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
+
+    let totalBytesServed = $derived(metrics.data?.requests.bytes_served ?? 0);
+    let totalRequests = $derived(
+        (metrics.data?.requests.http_proxy_requests ?? 0) +
+            (metrics.data?.requests.https_proxy_requests ?? 0),
+    );
+    let avgBytesPerRequest = $derived(totalRequests > 0 ? totalBytesServed / totalRequests : 0);
 </script>
 
 <Widget title="Data Transfer">
@@ -14,30 +21,21 @@
         <Card --card-background="var(--primary-600)" --card-padding="1rem">
             <div class="primary-metric">
                 <div class="primary-metric-value">
-                    {formatBytesToLargest(metrics.data!.requests.bytes_served)}
+                    {formatBytesToLargest(totalBytesServed)}
                 </div>
                 <div class="primary-metric-label label">Total Bytes Served</div>
             </div>
 
             <div class="secondary-metrics">
                 <div class="secondary-metric">
-                    <span class="secondary-metric-value"
-                        >{(
-                            metrics.data!.requests.http_proxy_requests +
-                            metrics.data!.requests.https_proxy_requests
-                        ).toLocaleString()}</span
-                    >
+                    <span class="secondary-metric-value">{totalRequests.toLocaleString()}</span>
                     <span class="secondary-metric-label label">Total Requests</span>
                 </div>
 
-                {#if metrics.data!.requests.http_proxy_requests + metrics.data!.requests.https_proxy_requests > 0}
+                {#if totalRequests > 0}
                     <div class="secondary-metric">
                         <span class="secondary-metric-value"
-                            >{formatBytesToLargest(
-                                metrics.data!.requests.bytes_served /
-                                    (metrics.data!.requests.http_proxy_requests +
-                                        metrics.data!.requests.https_proxy_requests),
-                            )}</span
+                            >{formatBytesToLargest(avgBytesPerRequest)}</span
                         >
                         <span class="secondary-metric-label label">Avg per Request</span>
                     </div>

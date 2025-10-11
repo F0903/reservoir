@@ -1,5 +1,5 @@
 <script lang="ts">
-    import TotalRequests from "$lib/components/widgets/TotalRequests.svelte";
+    import TotalRequests from "$lib/components/widgets/HTTPRequests.svelte";
     import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
     import CacheEfficiency from "$lib/components/widgets/CacheEfficiency.svelte";
     import CachePerformance from "$lib/components/widgets/CachePerformance.svelte";

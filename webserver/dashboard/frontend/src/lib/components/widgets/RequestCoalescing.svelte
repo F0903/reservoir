@@ -6,22 +6,29 @@
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
 
-    let totalCoalescedRequests = $derived(
-        (metrics.data?.requests.coalesced_requests ?? 0)
-    );
+    let totalCoalescedRequests = $derived(metrics.data?.requests.coalesced_requests ?? 0);
     let totalRequests = $derived(
-        totalCoalescedRequests + (metrics.data?.requests.non_coalesced_requests ?? 0)
+        totalCoalescedRequests + (metrics.data?.requests.non_coalesced_requests ?? 0),
     );
     let coalescingRate = $derived(
-        totalRequests > 0 
-            ? (totalCoalescedRequests / totalRequests) * 100
-            : 0,
+        totalRequests > 0 ? (totalCoalescedRequests / totalRequests) * 100 : 0,
+    );
+    let coalescedHits = $derived(metrics.data?.requests.coalesced_cache_hits ?? 0);
+    let coalescedRevalidations = $derived(
+        metrics.data?.requests.coalesced_cache_revalidations ?? 0,
+    );
+    let coalescedMisses = $derived(metrics.data?.requests.coalesced_cache_misses ?? 0);
+    let resolvedCoalescedRequests = $derived(
+        coalescedHits + coalescedRevalidations + coalescedMisses,
     );
     let coalescedCacheHitRate = $derived(
-        totalCoalescedRequests > 0
-            ? ((metrics.data?.requests.coalesced_cache_hits ?? 0) / totalCoalescedRequests) * 100
+        resolvedCoalescedRequests > 0 ? (coalescedHits / resolvedCoalescedRequests) * 100 : 0,
+    );
+    let coalescedRevalidationRate = $derived(
+        resolvedCoalescedRequests > 0
+            ? (coalescedRevalidations / resolvedCoalescedRequests) * 100
             : 0,
     );
 </script>
@@ -54,6 +61,14 @@
                     --metric-label-color="var(--secondary-600)"
                     --metric-value-color="var(--primary-400)"
                 />
+                <MetricCard
+                    label="Revalidation Rate"
+                    value={coalescedRevalidationRate.toFixed(1) + "%"}
+                    --metric-label-size="0.875rem"
+                    --metric-value-size="2rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--primary-500)"
+                />
             </div>
 
             <div class="coalescing-chart">
@@ -64,12 +79,17 @@
                         datasets: [
                             {
                                 label: "Cache Hits",
-                                data: [metrics.data?.requests.coalesced_cache_hits ?? 0],
+                                data: [coalescedHits],
                                 backgroundColor: "var(--secondary-400)",
                             },
                             {
+                                label: "Revalidations",
+                                data: [coalescedRevalidations],
+                                backgroundColor: "var(--primary-500)",
+                            },
+                            {
                                 label: "Cache Misses",
-                                data: [metrics.data?.requests.coalesced_cache_misses ?? 0],
+                                data: [coalescedMisses],
                                 backgroundColor: "var(--tertiary-400)",
                             },
                         ],

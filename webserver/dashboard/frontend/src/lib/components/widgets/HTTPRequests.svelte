@@ -5,10 +5,10 @@
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
 </script>
 
-<Widget title="Requests">
+<Widget title="HTTP/HTTPS Requests">
     <Loadable state={metrics.data} loadable={metrics}>
         <Chart
             type="doughnut"

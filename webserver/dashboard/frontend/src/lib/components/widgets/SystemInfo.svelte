@@ -7,7 +7,7 @@
     import Widget from "./base/Widget.svelte";
     import Poller from "./utils/Poller.svelte";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
 
     let currentUptime: string = $state("N/A");
 
