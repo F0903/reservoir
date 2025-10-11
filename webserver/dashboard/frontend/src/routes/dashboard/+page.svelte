@@ -5,6 +5,7 @@
     import CachePerformance from "$lib/components/widgets/CachePerformance.svelte";
     import CacheStats from "$lib/components/widgets/CacheStats.svelte";
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
+    import RequestCoalescing from "$lib/components/widgets/RequestCoalescing.svelte";
     import ComponentMasonryGrid from "$lib/components/layout/ComponentMasonryGrid.svelte";
     import { getContext, onMount } from "svelte";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
@@ -27,6 +28,7 @@
             CacheEfficiency,
             CachePerformance,
             TotalRequests,
+            RequestCoalescing,
             CacheStats,
             DataTransfer,
             SystemInfo,
