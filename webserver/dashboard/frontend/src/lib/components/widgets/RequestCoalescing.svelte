@@ -12,12 +12,11 @@
         (metrics.data?.requests.coalesced_requests ?? 0)
     );
     let totalRequests = $derived(
-        (metrics.data?.requests.coalesced_requests ?? 0) + 
-        (metrics.data?.requests.non_coalesced_requests ?? 0)
+        totalCoalescedRequests + (metrics.data?.requests.non_coalesced_requests ?? 0)
     );
     let coalescingRate = $derived(
         totalRequests > 0 
-            ? ((metrics.data?.requests.coalesced_requests ?? 0) / totalRequests) * 100
+            ? (totalCoalescedRequests / totalRequests) * 100
             : 0,
     );
     let coalescedCacheHitRate = $derived(
