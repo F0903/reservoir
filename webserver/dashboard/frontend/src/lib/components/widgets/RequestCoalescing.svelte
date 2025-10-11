@@ -12,11 +12,9 @@
         (metrics.data?.requests.coalesced_requests ?? 0)
     );
     let coalescingRate = $derived(
-        totalCoalescedRequests > 0
-            ? ((metrics.data?.requests.coalesced_requests ?? 0) / 
-               ((metrics.data?.requests.coalesced_requests ?? 0) + 
-                (metrics.data?.requests.non_coalesced_requests ?? 0))) * 100
-            : 0,
+        ((metrics.data?.requests.coalesced_requests ?? 0) / 
+         ((metrics.data?.requests.coalesced_requests ?? 0) + 
+          (metrics.data?.requests.non_coalesced_requests ?? 0))) * 100 || 0,
     );
     let coalescedCacheHitRate = $derived(
         totalCoalescedRequests > 0
@@ -45,6 +43,14 @@
                     --metric-label-color="var(--secondary-600)"
                     --metric-value-color="var(--secondary-400)"
                 />
+                <MetricCard
+                    label="Cache Hit Rate"
+                    value={coalescedCacheHitRate.toFixed(1) + "%"}
+                    --metric-label-size="0.875rem"
+                    --metric-value-size="2rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--primary-400)"
+                />
             </div>
 
             <div class="coalescing-chart">
@@ -55,12 +61,12 @@
                         datasets: [
                             {
                                 label: "Cache Hits",
-                                data: [metrics!.data!.requests.coalesced_cache_hits],
+                                data: [metrics.data?.requests.coalesced_cache_hits ?? 0],
                                 backgroundColor: "var(--secondary-400)",
                             },
                             {
                                 label: "Cache Misses",
-                                data: [metrics!.data!.requests.coalesced_cache_misses],
+                                data: [metrics.data?.requests.coalesced_cache_misses ?? 0],
                                 backgroundColor: "var(--tertiary-400)",
                             },
                         ],
