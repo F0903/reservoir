@@ -1,18 +1,18 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
     import ErrorBox from "./ErrorBox.svelte";
-    import type { Loadable } from "$lib/utils/loadable";
 
-    let { state, loadable, children }: { state?: any; loadable: Loadable; children: Snippet } =
-        $props();
-
-    const loadState = $derived.by(() => loadable.getLoadableState());
+    let {
+        state,
+        error,
+        children,
+    }: { state: any; error?: string | undefined | null; children: Snippet } = $props();
 </script>
 
-{#if loadState.tag === "loading"}
+{#if state === null || state === undefined}
     <div class="loading-box"></div>
-{:else if loadState.tag === "error"}
-    <ErrorBox>{loadState.errorMsg}</ErrorBox>
+{:else if error}
+    <ErrorBox>{error}</ErrorBox>
 {:else if state !== null}
     {@render children()}
 {/if}

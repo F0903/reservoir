@@ -3,7 +3,6 @@ import { type FetchFn } from "$lib/api/api-methods";
 import { getAllMetrics, type Metrics } from "$lib/api/objects/metrics/metrics";
 import { log } from "$lib/utils/logger";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";
-import type { LoadableState } from "$lib/utils/loadable";
 import { patch } from "$lib/utils/patch";
 
 export class MetricsProvider {
@@ -12,18 +11,11 @@ export class MetricsProvider {
     private readonly fetchFn: FetchFn;
 
     data: Metrics | null = $state(null);
-    private state: LoadableState = $state({
-        tag: "loading",
-        errorMsg: null,
-    });
+    error: string | null = null;
 
     constructor(settings: SettingsProvider, fetchFn: FetchFn = fetch) {
         this.settings = settings;
         this.fetchFn = fetchFn;
-    }
-
-    getLoadableState(): LoadableState {
-        return this.state;
     }
 
     // Start the metrics refresh interval
@@ -57,16 +49,17 @@ export class MetricsProvider {
         log.debug("Refreshing metrics...");
 
         try {
-            this.state = { tag: "loading", errorMsg: null };
+            this.error = null;
             const newData = await getAllMetrics(this.fetchFn);
             if (this.data === null) {
+                log.debug("Metrics data was null, replacing with new data");
                 this.data = newData;
             } else {
+                log.debug("Patching existing metrics data with new data");
                 patch(this.data, newData);
             }
-            this.state = { tag: "ok", errorMsg: null };
         } catch (error) {
-            this.state = { tag: "error", errorMsg: error as string };
+            this.error = String(error);
         }
 
         log.debug("Metrics refreshed");

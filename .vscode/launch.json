@@ -19,7 +19,6 @@
       "preLaunchTask": "setup-frontend"
     },
     {
-      // Used for starting the frontend in dev mode seperately.
       "name": "Debug Proxy with Dashboard disabled",
       "type": "go",
       "request": "launch",
@@ -34,19 +33,36 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Debug Dashboard",
+      "name": "Run Dashboard Dev Server",
       "cwd": "${workspaceFolder}/webserver/dashboard/frontend",
       "type": "node-terminal",
       "command": "pnpm run dev",
       "request": "launch"
+    },
+    {
+      "name": "Launch Dashboard in Firefox",
+      "type": "firefox",
+      "request": "launch",
+      "firefoxExecutable": "${env:FirefoxPath}",
+      "url": "http://localhost:5173",
+      "timeout": 120,
     }
   ],
   "compounds": [
     {
+      "name": "Debug Dashboard",
+      "configurations": [
+        "Run Dashboard Dev Server",
+        "Launch Dashboard in Firefox"
+      ],
+      "stopAll": true
+    },
+    {
       "name": "Debug Proxy + Dashboard",
       "configurations": [
         "Debug Proxy with Dashboard disabled",
-        "Debug Dashboard"
+        "Run Dashboard Dev Server",
+        "Launch Dashboard in Firefox"
       ],
       "stopAll": true
     }

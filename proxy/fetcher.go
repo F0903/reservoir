@@ -129,6 +129,7 @@ func (f *fetcher) handleCacheMiss(req *http.Request, key cache.CacheKey) (fetchR
 		slog.Error("Error fetching upstream after cache miss", "url", req.URL, "error", err)
 		return fetchResult{}, err
 	}
+
 	cachable, err := f.handleUpstreamResponse(req, upFetch.Direct.Response, key)
 	if err != nil {
 		slog.Error("Error handling upstream response after cache miss", "url", req.URL, "error", err)
@@ -224,6 +225,7 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 	shouldCoalesce := clientHd.Range.IsNone() && req.Method == http.MethodGet
 	if !shouldCoalesce {
 		slog.Debug("Request can't be coalesced, fetching upstream...")
+		metrics.Global.Requests.NonCoalescedRequests.Increment()
 		return f.fetchUpstream(req)
 	}
 
@@ -235,11 +237,32 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 		return fetchResult{}, err
 	}
 
+	// If shared is true, this means the request was coalesced.
+	// Meaning that the result is potentially being shared with other requests.
+
+	if shared {
+		metrics.Global.Requests.CoalescedRequests.Increment()
+	}
+
 	fetched = fetchedObj.(fetchResult)
+
 	switch fetched.Type {
 	case fetchTypeCached:
 		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
 		fetched.Cached.Coalesced = shared
+
+		// Track coalesced cache hits/misses
+		if shared {
+			switch fetched.Cached.Status {
+			case hitStatusHit:
+				metrics.Global.Requests.CoalescedCacheHits.Increment()
+			case hitStatusRevalidated:
+				metrics.Global.Requests.CoalescedCacheRevalidations.Increment()
+			case hitStatusMiss:
+				metrics.Global.Requests.CoalescedCacheMisses.Increment()
+			}
+		}
+
 		fetched.Cached.Entry, err = f.cache.Get(key)
 		if err != nil {
 			if errors.Is(err, cache.ErrCacheMiss) {

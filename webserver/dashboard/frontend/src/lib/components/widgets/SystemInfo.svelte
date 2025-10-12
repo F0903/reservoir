@@ -7,7 +7,7 @@
     import Widget from "./base/Widget.svelte";
     import Poller from "./utils/Poller.svelte";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
 
     let currentUptime: string = $state("N/A");
 
@@ -28,7 +28,7 @@
 </script>
 
 <Widget title="System Metrics">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <Poller pollFn={updateUptime} pollInterval={1000}>
             <div class="metrics">
                 <MetricCard label="Uptime" value={currentUptime} --metric-value-size="1.1rem" />

@@ -6,7 +6,7 @@
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
 
-    let metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getContext("metrics") as MetricsProvider;
 
     let totalCacheRequests = $derived(
         (metrics.data?.cache.cache_hits ?? 0) + (metrics.data?.cache.cache_misses ?? 0),
@@ -19,7 +19,7 @@
 </script>
 
 <Widget title="Cache Efficiency">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <div class="efficiency-display">
             <MetricCard
                 label="Hit Rate"
