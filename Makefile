@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := build
 
 # Build the entire project
-build: build-proxy setup-frontend
+build: build-frontend build-proxy
 
 build-proxy:
 	go build
