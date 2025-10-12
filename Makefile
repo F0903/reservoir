@@ -2,15 +2,15 @@
 .DEFAULT_GOAL := build
 
 # Build the entire project
-build: setup-frontend
-	go build
+build: build-proxy setup-frontend
 
-# Build frontend and generate CSP
-setup-frontend: build-frontend generate-csp
+build-proxy:
+	go build
 
 # Build the Svelte frontend
 build-frontend:
 	cd webserver/dashboard/frontend && pnpm install && pnpm run build
+	$(MAKE) generate-csp
 
 # Remove build artifacts
 clean:

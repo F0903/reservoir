@@ -104,7 +104,7 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 		}
 	}
 
-	if hd.Expires.IsSome() {
+	if !ignoreCacheControl && hd.Expires.IsSome() {
 		expires := hd.Expires.ForceUnwrap()
 		if expires.Before(time.Now()) {
 			return false // If the Expires header is in the past, do not cache

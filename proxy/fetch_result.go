@@ -17,11 +17,13 @@ type fetchInfo struct {
 	Status         hitStatus
 }
 
+// Represents a fetch that was not served from cache, but returned directly from the origin server.
 type directFetchResult struct {
 	fetchInfo
 	Response *http.Response
 }
 
+// Represents a fetch that was served from cache. Possibly revalidated from origin.
 type cachedFetchResult struct {
 	fetchInfo
 	Entry     *cache.Entry[cachedRequestInfo]
@@ -43,4 +45,14 @@ func (f *fetchResult) getFetchInfo() fetchInfo {
 		return f.Cached.fetchInfo
 	}
 	return fetchInfo{}
+}
+
+func (f *fetchResult) getFetchInfoRef() *fetchInfo {
+	switch f.Type {
+	case fetchTypeDirect:
+		return &f.Direct.fetchInfo
+	case fetchTypeCached:
+		return &f.Cached.fetchInfo
+	}
+	return nil
 }

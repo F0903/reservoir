@@ -153,7 +153,7 @@ func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
 		hitStatus: fetchInfo.Status,
 		fwdReason: fwdReason,
 		fwdStatus: fwdStatus,
-		stored:    !fetched.Cached.Coalesced && (isMiss || isRevalidated) && fetched.Direct.Response.StatusCode == http.StatusOK,
+		stored:    fetched.Type == fetchTypeCached && fetched.Cached.fetchInfo.Status == hitStatusMiss,
 	}
 
 	return cacheStatus

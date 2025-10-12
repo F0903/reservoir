@@ -16,7 +16,7 @@
         "--log-to-stdout"
       ],
       "console": "integratedTerminal",
-      "preLaunchTask": "setup-frontend"
+      "preLaunchTask": "build-frontend"
     },
     {
       "name": "Debug Proxy with Dashboard disabled",
@@ -31,6 +31,7 @@
         "--log-to-stdout"
       ],
       "console": "integratedTerminal"
+      // We don't need to call the build script; go debug will build automatically
     },
     {
       "name": "Run Dashboard Dev Server",
