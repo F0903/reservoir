@@ -9,7 +9,7 @@
 </script>
 
 <Widget title="Cache Performance">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <Chart
             type="doughnut"
             data={{

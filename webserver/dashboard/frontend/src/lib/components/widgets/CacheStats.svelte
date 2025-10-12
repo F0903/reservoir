@@ -18,7 +18,7 @@
 </script>
 
 <Widget title="Cache Statistics">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <div class="metrics-grid">
             <MetricCard label="Cache Entries" value={cacheEntries.toLocaleString()} />
             <MetricCard label="Cache Hits" value={totalCacheHits.toLocaleString()} />

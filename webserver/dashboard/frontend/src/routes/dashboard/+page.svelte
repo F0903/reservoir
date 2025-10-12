@@ -29,9 +29,9 @@
             CachePerformance,
             TotalRequests,
             RequestCoalescing,
-            CacheStats,
             DataTransfer,
             SystemInfo,
+            CacheStats,
         ]}
     />
 </main>

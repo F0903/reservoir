@@ -17,7 +17,7 @@
 </script>
 
 <Widget title="Data Transfer">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <Card --card-background="var(--primary-600)" --card-padding="1rem">
             <div class="primary-metric">
                 <div class="primary-metric-value">

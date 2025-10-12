@@ -1,3 +1,5 @@
+import { log } from "./logger";
+
 // Treat functions and arrays specially; otherwise recurse through objects.
 type AnyFunction = (..._args: unknown[]) => unknown;
 type AnyArray<T = unknown> = Array<T>;
@@ -86,7 +88,10 @@ export function patch<T extends Record<string, unknown>>(
 
         // Recurse into plain objects when both sides are plain and recurse enabled
         if (options.recurse && isPlain(bValue) && isPlain(aValue)) {
-            if (patch(aRec, bRec, options)) changed = true;
+            if (patch(aRec, bRec, options)) {
+                changed = true;
+                log.debug(`(patch) Recursed patch returned changes at key ${toKey}`);
+            }
             continue;
         }
 
@@ -96,6 +101,7 @@ export function patch<T extends Record<string, unknown>>(
                 if (!arraysEqual(aValue, bValue, compare)) {
                     toRec[toKey] = bValue;
                     changed = true;
+                    log.debug(`(patch) Replaced array at key ${toKey}`);
                 }
             } else {
                 // index-wise shallow patch up to min length; replace if length differs
@@ -105,20 +111,24 @@ export function patch<T extends Record<string, unknown>>(
                     if (!compare(aValue[i], bValue[i])) {
                         aValue[i] = bValue[i];
                         localChanged = true;
+                        log.debug(`(patch) Patched array item at key ${toKey}[${i}]`);
                     }
                 }
                 if (aValue.length > bValue.length) {
                     aValue.length = bValue.length; // truncate if longer
-                    localChanged = true;
                 } else if (aValue.length < bValue.length) {
                     // push remaining items from other if shorter
                     const diff = bValue.length - aValue.length;
                     for (let i = 0; i < diff; i++) {
                         aValue.push(bValue[minLen + i]);
+                        log.debug(`(patch) Pushed array item at key ${toKey}[${minLen + i}]`);
                     }
                 }
 
-                if (localChanged) changed = true;
+                if (localChanged) {
+                    changed = true;
+                    log.debug(`(patch) Making array as changed...`);
+                }
             }
             continue;
         }
@@ -126,8 +136,10 @@ export function patch<T extends Record<string, unknown>>(
         if (!compare(aValue, bValue)) {
             toRec[toKey] = bValue;
             changed = true;
+            log.debug(`(patch) Updated key ${toKey}`);
         }
     }
 
+    log.debug(`(patch) Finished patching, changed=${changed}`);
     return changed;
 }

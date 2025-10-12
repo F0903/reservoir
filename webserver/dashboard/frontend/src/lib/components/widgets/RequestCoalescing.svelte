@@ -34,7 +34,7 @@
 </script>
 
 <Widget title="Request Coalescing">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <div class="coalescing-display">
             <div class="metrics-row">
                 <MetricCard

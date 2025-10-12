@@ -9,7 +9,7 @@
 </script>
 
 <Widget title="HTTP/HTTPS Requests">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <Chart
             type="doughnut"
             data={{

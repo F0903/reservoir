@@ -19,7 +19,7 @@
 </script>
 
 <Widget title="Cache Efficiency">
-    <Loadable state={metrics.data} loadable={metrics}>
+    <Loadable state={metrics.data} error={metrics.error}>
         <div class="efficiency-display">
             <MetricCard
                 label="Hit Rate"
