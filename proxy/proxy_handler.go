@@ -15,6 +15,7 @@ import (
 	"reservoir/proxy/certs"
 	"reservoir/proxy/headers"
 	"reservoir/proxy/responder"
+	"reservoir/utils/httplistener"
 	"reservoir/utils/typeutils"
 	"time"
 )
@@ -38,13 +39,21 @@ type cachedRequestInfo struct {
 	Header       http.Header
 }
 
-type proxyHandler struct {
+type Proxy struct {
 	ca    certs.CertAuthority
 	cache *cache.FileCache[cachedRequestInfo]
 	fetch fetcher
 }
 
-func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*proxyHandler, error) {
+func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
+	listener := httplistener.New(address, p)
+	listener.ListenWithCancel(errChan, ctx)
+}
+
+// Creates a new MITM proxy. It should be passed the filenames
+// for the certificate and private key of a certificate authority trusted by the
+// client's machine.
+func NewProxy(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
 	cfgLock := config.Global.Immutable()
 
 	var cacheCleanupInterval time.Duration
@@ -53,14 +62,14 @@ func newCachingMitmProxyHandler(cacheDir string, ca certs.CertAuthority, ctx con
 	})
 
 	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, ctx)
-	return &proxyHandler{
+	return &Proxy{
 		ca:    ca,
 		cache: cache,
 		fetch: newFetcher(cache),
 	}, nil
 }
 
-func (p *proxyHandler) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
+func (p *Proxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 	r := responder.NewHTTPResponder(w)
 	if proxyReq.Method == http.MethodConnect {
 		if err := p.handleCONNECT(r, proxyReq); err != nil {
@@ -92,7 +101,7 @@ func finalizeAndRespond(r responder.Responder, resp io.Reader, status int, req *
 	return nil
 }
 
-func (p *proxyHandler) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[cachedRequestInfo], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
+func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[cachedRequestInfo], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	rangeHeader := clientHd.Range.ForceUnwrap() // hd.Range will always be Some here
 	start, end, err := rangeHeader.SliceSize(cached.Metadata.FileSize)
 	if err != nil {
@@ -139,7 +148,7 @@ func (p *proxyHandler) handleRangeRequest(r responder.Responder, req *http.Reque
 	return finalizeAndRespond(r, sections, http.StatusPartialContent, req)
 }
 
-func (p *proxyHandler) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
+func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
 	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
@@ -194,7 +203,7 @@ func (p *proxyHandler) processRequest(r responder.Responder, req *http.Request, 
 	}
 }
 
-func (p *proxyHandler) handleHTTP(r responder.Responder, proxyReq *http.Request) error {
+func (p *Proxy) handleHTTP(r responder.Responder, proxyReq *http.Request) error {
 	slog.Info("Handling HTTP request", "host", proxyReq.Host, "remote_addr", proxyReq.RemoteAddr)
 	metrics.Global.Requests.HTTPProxyRequests.Increment()
 
@@ -206,7 +215,7 @@ func (p *proxyHandler) handleHTTP(r responder.Responder, proxyReq *http.Request)
 	return p.processRequest(r, proxyReq, key, clientHd)
 }
 
-func (p *proxyHandler) handleCONNECT(r responder.Responder, proxyReq *http.Request) error {
+func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) error {
 	slog.Info("Handling CONNECT request", "url", proxyReq.URL, "remote_addr", proxyReq.RemoteAddr)
 
 	metrics.Global.Requests.HTTPSProxyRequests.Increment()

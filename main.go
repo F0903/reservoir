@@ -34,7 +34,7 @@ func startProxy(errChan chan error, ctx context.Context) error {
 		return fmt.Errorf("failed to create CA: %v", err)
 	}
 
-	proxy, err := proxy.New(cacheDir, ca, ctx)
+	proxy, err := proxy.NewProxy(cacheDir, ca, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy: %v", err)
 	}
