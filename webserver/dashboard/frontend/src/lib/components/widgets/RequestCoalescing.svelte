@@ -7,102 +7,97 @@
     import Loadable from "../ui/Loadable.svelte";
 
     const metrics = getContext("metrics") as MetricsProvider;
-
-    let totalCoalescedRequests = $derived(metrics.data?.requests.coalesced_requests ?? 0);
-    let totalRequests = $derived(
-        totalCoalescedRequests + (metrics.data?.requests.non_coalesced_requests ?? 0),
-    );
-    let coalescingRate = $derived(
-        totalRequests > 0 ? (totalCoalescedRequests / totalRequests) * 100 : 0,
-    );
-    let coalescedHits = $derived(metrics.data?.requests.coalesced_cache_hits ?? 0);
-    let coalescedRevalidations = $derived(
-        metrics.data?.requests.coalesced_cache_revalidations ?? 0,
-    );
-    let coalescedMisses = $derived(metrics.data?.requests.coalesced_cache_misses ?? 0);
-    let resolvedCoalescedRequests = $derived(
-        coalescedHits + coalescedRevalidations + coalescedMisses,
-    );
-    let coalescedCacheHitRate = $derived(
-        resolvedCoalescedRequests > 0 ? (coalescedHits / resolvedCoalescedRequests) * 100 : 0,
-    );
-    let coalescedRevalidationRate = $derived(
-        resolvedCoalescedRequests > 0
-            ? (coalescedRevalidations / resolvedCoalescedRequests) * 100
-            : 0,
-    );
 </script>
 
 <Widget title="Request Coalescing">
     <Loadable state={metrics.data} error={metrics.error}>
-        <div class="coalescing-display">
-            <div class="metrics-row">
-                <MetricCard
-                    label="Coalescing Rate"
-                    value={coalescingRate.toFixed(1) + "%"}
-                    --metric-label-size="0.875rem"
-                    --metric-value-size="2rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-400)"
-                />
-                <MetricCard
-                    label="Coalesced Requests"
-                    value={totalCoalescedRequests.toString()}
-                    --metric-label-size="0.875rem"
-                    --metric-value-size="2rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--secondary-400)"
-                />
-                <MetricCard
-                    label="Cache Hit Rate"
-                    value={coalescedCacheHitRate.toFixed(1) + "%"}
-                    --metric-label-size="0.875rem"
-                    --metric-value-size="2rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--primary-400)"
-                />
-                <MetricCard
-                    label="Revalidation Rate"
-                    value={coalescedRevalidationRate.toFixed(1) + "%"}
-                    --metric-label-size="0.875rem"
-                    --metric-value-size="2rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--primary-500)"
-                />
-            </div>
+        {#snippet children(data)}
+            {@const totalCoalescedRequests = data.requests.coalesced_requests}
+            {@const totalRequests = totalCoalescedRequests + data.requests.non_coalesced_requests}
+            {@const coalescingRate =
+                totalRequests > 0 ? (totalCoalescedRequests / totalRequests) * 100 : 0}
+            {@const coalescedHits = data.requests.coalesced_cache_hits}
+            {@const coalescedRevalidations = data.requests.coalesced_cache_revalidations}
+            {@const coalescedMisses = data.requests.coalesced_cache_misses}
+            {@const resolvedCoalescedRequests =
+                coalescedHits + coalescedRevalidations + coalescedMisses}
+            {@const coalescedCacheHitRate =
+                resolvedCoalescedRequests > 0
+                    ? (coalescedHits / resolvedCoalescedRequests) * 100
+                    : 0}
+            {@const coalescedRevalidationRate =
+                resolvedCoalescedRequests > 0
+                    ? (coalescedRevalidations / resolvedCoalescedRequests) * 100
+                    : 0}
+            <div class="coalescing-display">
+                <div class="metrics-row">
+                    <MetricCard
+                        label="Coalescing Rate"
+                        value={coalescingRate.toFixed(1) + "%"}
+                        --metric-label-size="0.875rem"
+                        --metric-value-size="2rem"
+                        --metric-label-color="var(--secondary-600)"
+                        --metric-value-color="var(--tertiary-400)"
+                    />
+                    <MetricCard
+                        label="Coalesced Requests"
+                        value={totalCoalescedRequests.toString()}
+                        --metric-label-size="0.875rem"
+                        --metric-value-size="2rem"
+                        --metric-label-color="var(--secondary-600)"
+                        --metric-value-color="var(--secondary-400)"
+                    />
+                    <MetricCard
+                        label="Cache Hit Rate"
+                        value={coalescedCacheHitRate.toFixed(1) + "%"}
+                        --metric-label-size="0.875rem"
+                        --metric-value-size="2rem"
+                        --metric-label-color="var(--secondary-600)"
+                        --metric-value-color="var(--primary-400)"
+                    />
+                    <MetricCard
+                        label="Revalidation Rate"
+                        value={coalescedRevalidationRate.toFixed(1) + "%"}
+                        --metric-label-size="0.875rem"
+                        --metric-value-size="2rem"
+                        --metric-label-color="var(--secondary-600)"
+                        --metric-value-color="var(--primary-500)"
+                    />
+                </div>
 
-            <div class="coalescing-chart">
-                <Chart
-                    type="bar"
-                    data={{
-                        labels: ["Coalesced Requests"],
-                        datasets: [
-                            {
-                                label: "Cache Hits",
-                                data: [coalescedHits],
-                                backgroundColor: "var(--secondary-400)",
+                <div class="coalescing-chart">
+                    <Chart
+                        type="bar"
+                        data={{
+                            labels: ["Coalesced Requests"],
+                            datasets: [
+                                {
+                                    label: "Cache Hits",
+                                    data: [coalescedHits],
+                                    backgroundColor: "var(--secondary-400)",
+                                },
+                                {
+                                    label: "Revalidations",
+                                    data: [coalescedRevalidations],
+                                    backgroundColor: "var(--primary-500)",
+                                },
+                                {
+                                    label: "Cache Misses",
+                                    data: [coalescedMisses],
+                                    backgroundColor: "var(--tertiary-400)",
+                                },
+                            ],
+                        }}
+                        options={{
+                            scales: {
+                                x: { stacked: true },
+                                y: { stacked: true },
                             },
-                            {
-                                label: "Revalidations",
-                                data: [coalescedRevalidations],
-                                backgroundColor: "var(--primary-500)",
-                            },
-                            {
-                                label: "Cache Misses",
-                                data: [coalescedMisses],
-                                backgroundColor: "var(--tertiary-400)",
-                            },
-                        ],
-                    }}
-                    options={{
-                        scales: {
-                            x: { stacked: true },
-                            y: { stacked: true },
-                        },
-                    }}
-                ></Chart>
+                        }}
+                    ></Chart>
+                </div>
             </div>
-        </div>
+        {/snippet}
     </Loadable>
 </Widget>
 

@@ -7,27 +7,30 @@
     import { formatBytesToLargest } from "$lib/utils/bytestring";
 
     const metrics = getContext("metrics") as MetricsProvider;
-
-    let cacheEntries = $derived(metrics.data?.cache.cache_entries ?? 0);
-    let totalCacheHits = $derived(metrics.data?.cache.cache_hits ?? 0);
-    let totalCacheMisses = $derived(metrics.data?.cache.cache_misses ?? 0);
-    let totalCacheErrors = $derived(metrics.data?.cache.cache_errors ?? 0);
-    let totalBytesCached = $derived(metrics.data?.cache.bytes_cached ?? 0);
-    let totalCleanupRuns = $derived(metrics.data?.cache.cleanup_runs ?? 0);
-    let totalBytesCleaned = $derived(metrics.data?.cache.bytes_cleaned ?? 0);
 </script>
 
 <Widget title="Cache Statistics">
     <Loadable state={metrics.data} error={metrics.error}>
-        <div class="metrics-grid">
-            <MetricCard label="Cache Entries" value={cacheEntries.toLocaleString()} />
-            <MetricCard label="Cache Hits" value={totalCacheHits.toLocaleString()} />
-            <MetricCard label="Cache Misses" value={totalCacheMisses.toLocaleString()} />
-            <MetricCard label="Cache Errors" value={totalCacheErrors.toLocaleString()} />
-            <MetricCard label="Bytes Cached" value={formatBytesToLargest(totalBytesCached)} />
-            <MetricCard label="Cleanup Runs" value={totalCleanupRuns.toLocaleString()} />
-            <MetricCard label="Bytes Cleaned" value={formatBytesToLargest(totalBytesCleaned)} />
-        </div>
+        {#snippet children(data)}
+            <div class="metrics-grid">
+                <MetricCard
+                    label="Cache Entries"
+                    value={data.cache.cache_entries.toLocaleString()}
+                />
+                <MetricCard label="Cache Hits" value={data.cache.cache_hits.toLocaleString()} />
+                <MetricCard label="Cache Misses" value={data.cache.cache_misses.toLocaleString()} />
+                <MetricCard label="Cache Errors" value={data.cache.cache_errors.toLocaleString()} />
+                <MetricCard
+                    label="Bytes Cached"
+                    value={formatBytesToLargest(data.cache.bytes_cached)}
+                />
+                <MetricCard label="Cleanup Runs" value={data.cache.cleanup_runs.toLocaleString()} />
+                <MetricCard
+                    label="Bytes Cleaned"
+                    value={formatBytesToLargest(data.cache.bytes_cleaned)}
+                />
+            </div>
+        {/snippet}
     </Loadable>
 </Widget>
 

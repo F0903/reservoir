@@ -10,19 +10,20 @@
 
 <Widget title="HTTP/HTTPS Requests">
     <Loadable state={metrics.data} error={metrics.error}>
-        <Chart
-            type="doughnut"
-            data={{
-                labels: ["HTTP Proxy Requests", "HTTPS Proxy Requests"],
-                datasets: [
-                    {
-                        data: [
-                            metrics.data!.requests.http_proxy_requests,
-                            metrics.data!.requests.https_proxy_requests,
-                        ],
-                    },
-                ],
-            }}
-        ></Chart>
+        {#snippet children(data)}
+            {@const httpProxyRequests = data.requests.http_proxy_requests}
+            {@const httpsProxyRequests = data.requests.https_proxy_requests}
+            <Chart
+                type="doughnut"
+                data={{
+                    labels: ["HTTP Proxy Requests", "HTTPS Proxy Requests"],
+                    datasets: [
+                        {
+                            data: [httpProxyRequests, httpsProxyRequests],
+                        },
+                    ],
+                }}
+            ></Chart>
+        {/snippet}
     </Loadable>
 </Widget>

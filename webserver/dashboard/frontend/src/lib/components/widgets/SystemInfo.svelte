@@ -6,33 +6,31 @@
     import Loadable from "../ui/Loadable.svelte";
     import Widget from "./base/Widget.svelte";
     import Poller from "./utils/Poller.svelte";
+    import type { Metrics } from "$lib/api/objects/metrics/metrics";
 
     const metrics = getContext("metrics") as MetricsProvider;
 
-    let currentUptime: string = $state("N/A");
+    let startTime: Date | null = $state(null);
+    let uptime = $state("N/A");
 
-    function updateUptime() {
-        if (!metrics) {
+    function updateUptime(data: Metrics) {
+        if (!startTime) {
+            startTime = new Date(data.system.start_time);
             return;
         }
 
-        if (!metrics.data) {
-            currentUptime = "N/A";
-            return;
-        }
-
-        // There are much more efficient ways of doing this, but cant be bothered
-        const startTime = metrics.data.system.start_time;
-        currentUptime = formatTimeSinceDate(new Date(startTime));
+        uptime = formatTimeSinceDate(startTime);
     }
 </script>
 
 <Widget title="System Metrics">
     <Loadable state={metrics.data} error={metrics.error}>
-        <Poller pollFn={updateUptime} pollInterval={1000}>
-            <div class="metrics">
-                <MetricCard label="Uptime" value={currentUptime} --metric-value-size="1.1rem" />
-            </div>
-        </Poller>
+        {#snippet children(data)}
+            <Poller pollFn={() => updateUptime(data)} pollInterval={1000}>
+                <div class="metrics">
+                    <MetricCard label="Uptime" value={uptime} --metric-value-size="1.1rem" />
+                </div>
+            </Poller>
+        {/snippet}
     </Loadable>
 </Widget>

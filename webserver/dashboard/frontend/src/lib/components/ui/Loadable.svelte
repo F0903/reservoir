@@ -1,4 +1,4 @@
-<script lang="ts">
+<script lang="ts" generics="T">
     import type { Snippet } from "svelte";
     import ErrorBox from "./ErrorBox.svelte";
 
@@ -6,7 +6,11 @@
         state,
         error,
         children,
-    }: { state: any; error?: string | undefined | null; children: Snippet } = $props();
+    }: {
+        state: T | null | undefined;
+        error?: string | undefined | null;
+        children: Snippet<[data: NonNullable<T>]>;
+    } = $props();
 </script>
 
 {#if state === null || state === undefined}
@@ -14,7 +18,7 @@
 {:else if error}
     <ErrorBox>{error}</ErrorBox>
 {:else if state !== null}
-    {@render children()}
+    {@render children(state)}
 {/if}
 
 <style>

@@ -7,41 +7,39 @@
     import { formatBytesToLargest } from "$lib/utils/bytestring";
 
     const metrics = getContext("metrics") as MetricsProvider;
-
-    let totalBytesServed = $derived(metrics.data?.requests.bytes_served ?? 0);
-    let totalRequests = $derived(
-        (metrics.data?.requests.http_proxy_requests ?? 0) +
-            (metrics.data?.requests.https_proxy_requests ?? 0),
-    );
-    let avgBytesPerRequest = $derived(totalRequests > 0 ? totalBytesServed / totalRequests : 0);
 </script>
 
 <Widget title="Data Transfer">
     <Loadable state={metrics.data} error={metrics.error}>
-        <Card --card-background="var(--primary-600)" --card-padding="1rem">
-            <div class="primary-metric">
-                <div class="primary-metric-value">
-                    {formatBytesToLargest(totalBytesServed)}
-                </div>
-                <div class="primary-metric-label label">Total Bytes Served</div>
-            </div>
-
-            <div class="secondary-metrics">
-                <div class="secondary-metric">
-                    <span class="secondary-metric-value">{totalRequests.toLocaleString()}</span>
-                    <span class="secondary-metric-label label">Total Requests</span>
-                </div>
-
-                {#if totalRequests > 0}
-                    <div class="secondary-metric">
-                        <span class="secondary-metric-value"
-                            >{formatBytesToLargest(avgBytesPerRequest)}</span
-                        >
-                        <span class="secondary-metric-label label">Avg per Request</span>
+        {#snippet children(data)}
+            {@const totalRequests =
+                data.requests.http_proxy_requests + data.requests.https_proxy_requests}
+            {@const avgBytesPerRequest = data.requests.bytes_served / totalRequests}
+            <Card --card-background="var(--primary-600)" --card-padding="1rem">
+                <div class="primary-metric">
+                    <div class="primary-metric-value">
+                        {formatBytesToLargest(data.requests.bytes_served)}
                     </div>
-                {/if}
-            </div>
-        </Card>
+                    <div class="primary-metric-label label">Total Bytes Served</div>
+                </div>
+
+                <div class="secondary-metrics">
+                    <div class="secondary-metric">
+                        <span class="secondary-metric-value">{totalRequests.toLocaleString()}</span>
+                        <span class="secondary-metric-label label">Total Requests</span>
+                    </div>
+
+                    {#if totalRequests > 0}
+                        <div class="secondary-metric">
+                            <span class="secondary-metric-value"
+                                >{formatBytesToLargest(avgBytesPerRequest)}</span
+                            >
+                            <span class="secondary-metric-label label">Avg per Request</span>
+                        </div>
+                    {/if}
+                </div>
+            </Card>
+        {/snippet}
     </Loadable>
 </Widget>
 
