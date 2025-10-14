@@ -28,7 +28,13 @@
     });
 </script>
 
-<main>
+<main class="page-container">
     <PageTitle --pagetitle-margin-bottom="1.5rem">Log</PageTitle>
     <TextViewer bind:this={textViewer} --viewer-max-height="90%" />
 </main>
+
+<style>
+    .page-container {
+        height: 100%;
+    }
+</style>
