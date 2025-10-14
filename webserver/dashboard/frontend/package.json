@@ -1,7 +1,7 @@
 {
     "name": "reservoir-dashboard",
     "private": true,
-    "version": "0.1.0",
+    "version": "0.5.0",
     "type": "module",
     "scripts": {
         "dev": "vite dev",
@@ -17,7 +17,7 @@
         "@eslint/compat": "^1.4.0",
         "@eslint/js": "^9.37.0",
         "@sveltejs/adapter-auto": "^6.1.1",
-        "@sveltejs/kit": "^2.44.0",
+        "@sveltejs/kit": "^2.46.5",
         "@sveltejs/vite-plugin-svelte": "^6.2.1",
         "eslint": "^9.37.0",
         "eslint-config-prettier": "^10.1.8",
@@ -25,12 +25,12 @@
         "globals": "^16.4.0",
         "prettier": "^3.6.2",
         "prettier-plugin-svelte": "^3.4.0",
-        "svelte": "^5.39.9",
-        "svelte-check": "^4.3.2",
+        "svelte": "^5.39.13",
+        "svelte-check": "^4.3.3",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.46.0",
-        "vite": "^7.1.9",
-        "vite-plugin-devtools-json": "^0.2.1"
+        "typescript-eslint": "^8.46.1",
+        "vite": "^7.1.10",
+        "vite-plugin-devtools-json": "^1.0.0"
     },
     "pnpm": {
         "onlyBuiltDependencies": [
@@ -40,8 +40,8 @@
     "dependencies": {
         "@fontsource-variable/chivo-mono": "^5.2.8",
         "@fontsource-variable/open-sans": "^5.2.7",
-        "@lucide/svelte": "^0.525.0",
+        "@lucide/svelte": "^0.545.0",
         "@sveltejs/adapter-static": "^3.0.10",
-        "chart.js": "^4.5.0"
+        "chart.js": "^4.5.1"
     }
 }

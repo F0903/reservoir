@@ -1,4 +1,3 @@
-.PHONY: generate-csp build-frontend build clean
 .DEFAULT_GOAL := build
 
 # Build the entire project
@@ -20,3 +19,5 @@ clean:
 # Generate Content Security Policy (CSP) header with script hashes
 generate-csp:
 	go generate ./webserver/dashboard/csp
+
+.PHONY: generate-csp build-frontend build clean
