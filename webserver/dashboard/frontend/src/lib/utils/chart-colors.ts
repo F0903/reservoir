@@ -1,6 +1,6 @@
 // https://karlynelson.com/posts/chartjs-custom-color-palette-responsive/
 
-import { Chart, DoughnutController, PolarAreaController, type ChartDataset } from "chart.js";
+import { type Chart, DoughnutController, PolarAreaController, type ChartDataset } from "chart.js";
 
 const COLORS = [
     "hsla(188, 34%, 43%)",
