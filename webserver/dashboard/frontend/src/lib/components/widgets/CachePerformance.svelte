@@ -25,13 +25,6 @@
                         },
                     ],
                 }}
-                options={{
-                    plugins: {
-                        legend: {
-                            position: "bottom",
-                        },
-                    },
-                }}
             ></Chart>
         {/snippet}
     </Loadable>

@@ -74,17 +74,14 @@
                                 {
                                     label: "Cache Hits",
                                     data: [coalescedHits],
-                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "Revalidations",
                                     data: [coalescedRevalidations],
-                                    backgroundColor: "var(--primary-500)",
                                 },
                                 {
                                     label: "Cache Misses",
                                     data: [coalescedMisses],
-                                    backgroundColor: "var(--tertiary-400)",
                                 },
                             ],
                         }}

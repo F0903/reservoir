@@ -56,7 +56,7 @@
     }
 </script>
 
-<div class="page-container">
+<main class="page-container">
     <div class="change-password-container">
         <h1 class="title">Change Password</h1>
         {#if data.required}
@@ -88,7 +88,7 @@
             </div>
         </Form>
     </div>
-</div>
+</main>
 
 <style>
     .required-message {

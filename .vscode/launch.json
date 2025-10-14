@@ -31,7 +31,6 @@
         "--log-to-stdout"
       ],
       "console": "integratedTerminal"
-      // We don't need to call the build script; go debug will build automatically
     },
     {
       "name": "Run Dashboard Dev Server",
@@ -47,6 +46,13 @@
       "firefoxExecutable": "${env:FirefoxPath}",
       "url": "http://localhost:5173",
       "timeout": 120,
+      "reAttach": true,
+      "pathMappings": [
+        {
+          "url": "http://localhost:5173/src",
+          "path": "${workspaceFolder}/webserver/dashboard/frontend/src"
+        }
+      ]
     }
   ],
   "compounds": [

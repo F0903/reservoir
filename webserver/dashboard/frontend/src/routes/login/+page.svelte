@@ -56,7 +56,7 @@
     }
 </script>
 
-<div class="page-container">
+<main class="page-container">
     <div class="login-container">
         <Form onSubmit={onLogin}>
             <h1>Login</h1>
@@ -82,7 +82,7 @@
             </div>
         </Form>
     </div>
-</div>
+</main>
 
 <style>
     .bottom-section {

@@ -326,27 +326,29 @@
     }
 </script>
 
-<PageTitle>Settings</PageTitle>
-{#if settings.proxySettings.needsRestart}
-    <span class="restart-warning"
-        >Changes have been made that require a restart to take effect.</span
-    >
-{/if}
-<div class="inputs">
-    {#each inputSections as section, i}
-        {#each section as input, j}
-            <SettingInput
-                bind:this={inputComponents[i][j]}
-                {...input}
-                {onChange}
-                disabled={inputsDisabled}
-            />
+<main>
+    <PageTitle>Settings</PageTitle>
+    {#if settings.proxySettings.needsRestart}
+        <span class="restart-warning"
+            >Changes have been made that require a restart to take effect.</span
+        >
+    {/if}
+    <div class="inputs">
+        {#each inputSections as section, i}
+            {#each section as input, j}
+                <SettingInput
+                    bind:this={inputComponents[i][j]}
+                    {...input}
+                    {onChange}
+                    disabled={inputsDisabled}
+                />
+            {/each}
+            {#if i < inputSections.length - 1}
+                <VerticalSpacer --spacer-color="var(--secondary-700)" />
+            {/if}
         {/each}
-        {#if i < inputSections.length - 1}
-            <VerticalSpacer --spacer-color="var(--secondary-700)" />
-        {/if}
-    {/each}
-</div>
+    </div>
+</main>
 
 <style>
     .inputs {

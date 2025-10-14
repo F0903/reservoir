@@ -1,10 +1,10 @@
 <script lang="ts">
     import Chart from "chart.js/auto";
     import { onDestroy, onMount } from "svelte";
-    import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
+    import type { ChartConfiguration, ChartData, ChartDataset, ChartType } from "chart.js";
     import { customChartColors } from "$lib/utils/chart-colors";
     import { log } from "$lib/utils/logger";
-    import { merge } from "chart.js/helpers";
+    import { patch } from "$lib/utils/patch";
 
     // Register the custom color plugin
     Chart.register(customChartColors);
@@ -15,17 +15,35 @@
         options = {},
     }: { type: ChartType; data: ChartData; options?: ChartConfiguration["options"] } = $props();
 
-    let canvas: HTMLCanvasElement;
-    let chart: Chart;
+    const css = getComputedStyle(document.documentElement);
 
-    const defaultOptions: ChartConfiguration["options"] | {} = {
+    const defaultOptions: ChartConfiguration["options"] & {
+        plugins?: {
+            customChartColors?: {
+                enabled?: boolean;
+            };
+        };
+    } = {
         responsive: true,
         maintainAspectRatio: false,
         animation: {
             duration: 1000,
             easing: "easeInOutQuart",
         },
-        color: "hsla(210, 21%, 93%, 1)",
+        color: css.getPropertyValue("--secondary-600"),
+        elements: {
+            arc: {
+                borderWidth: 1.5,
+                borderColor: css.getPropertyValue("--text-400"),
+                hoverBorderWidth: 0,
+            },
+            bar: {
+                borderWidth: 1.5,
+                borderColor: css.getPropertyValue("--text-400"),
+                hoverBorderWidth: 0,
+                borderSkipped: "start",
+            },
+        },
         plugins: {
             customChartColors: {
                 enabled: true,
@@ -33,11 +51,12 @@
             legend: {
                 labels: {
                     textAlign: "center",
-                    color: "hsla(210, 21%, 93%, 1)",
+                    color: css.getPropertyValue("--text-400"),
                     padding: 10,
                     usePointStyle: true,
                     pointStyle: "rectRounded",
                     font: {
+                        weight: 550,
                         size: 14,
                     },
                 },
@@ -45,6 +64,8 @@
             },
         },
     };
+
+    const defaultDonutOptions: ChartConfiguration["options"] = {};
 
     const defaultBarOptions: ChartConfiguration["options"] = {
         scales: {
@@ -71,22 +92,33 @@
         },
     };
 
+    let canvas: HTMLCanvasElement;
+    let chart: Chart;
+
     onMount(() => {
         let processedOptions = defaultOptions;
-        if (type === "bar") {
-            processedOptions = merge(processedOptions, defaultBarOptions);
+        switch (type) {
+            case "bar":
+                patch(processedOptions, defaultBarOptions);
+                break;
+            case "doughnut":
+                patch(processedOptions, defaultDonutOptions);
+                break;
+
+            default:
+                break;
         }
-        processedOptions = merge(processedOptions, options || {});
+        patch(processedOptions, options || {});
 
         chart = new Chart(canvas, {
             type: type,
             data,
             options: processedOptions,
         });
-    });
 
-    onDestroy(() => {
-        chart?.destroy();
+        return () => {
+            chart.destroy();
+        };
     });
 
     $effect(() => {
@@ -113,5 +145,8 @@
         background-color: var(--primary-300); /* Gunmetal background */
         border-radius: 8px; /* Optional: rounded corners */
         padding: 10px; /* Optional: some padding */
+
+        display: block;
+        width: 100% !important; /* For some reason, it will only automatically resize with !important set. */
     }
 </style>

@@ -32,17 +32,23 @@
         source?: string,
         lineno?: number,
         colno?: number,
-        error?: Error,
     ) {
-        let message = "";
-        if (eventOrMessage instanceof Event) {
-            log.debug("Unhandled error parameter was event.");
+        let message = null;
+        if (eventOrMessage instanceof ErrorEvent) {
+            log.debug("Unhandled error event caught: ", eventOrMessage);
+            eventOrMessage.preventDefault();
+            message = eventOrMessage.message;
+        } else if (eventOrMessage instanceof Event) {
+            log.debug(
+                "Unhandled error caught, parameter was event, but not ErrorEvent: ",
+                eventOrMessage,
+            );
+            eventOrMessage.preventDefault();
         } else {
-            message = eventOrMessage;
+            message = String(eventOrMessage);
+            log.error("Unhandled error caught: ", message, source, lineno, colno);
         }
-
-        message ??= error?.message ?? "An unexpected error occurred.";
-        log.error("Unhandled error caught: ", message, source, lineno, colno, error);
+        message ??= "An unexpected error occurred.";
 
         toast.show({
             type: "error",

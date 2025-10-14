@@ -35,17 +35,14 @@
                                 {
                                     label: "Hits",
                                     data: [data.cache.cache_hits],
-                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "Misses",
                                     data: [data.cache.cache_misses],
-                                    backgroundColor: "var(--tertiary-400)",
                                 },
                                 {
                                     label: "Errors",
                                     data: [data.cache.cache_errors],
-                                    backgroundColor: "var(--primary-200)",
                                 },
                             ],
                         }}

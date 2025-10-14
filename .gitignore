@@ -16,3 +16,6 @@ ssl/
 # Directory for files used by the executable
 # This is where reservoir will store its cache and other data.
 var/
+
+# IDE files to ignore
+.copilot_todo

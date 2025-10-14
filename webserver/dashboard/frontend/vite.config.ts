@@ -2,7 +2,7 @@ import devtoolsJson from "vite-plugin-devtools-json";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vite";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     server: {
         open: false,
         port: 5173, // Use default Vite port to avoid conflict with Go API
@@ -18,4 +18,7 @@ export default defineConfig({
         },
     },
     plugins: [sveltekit(), devtoolsJson()],
-});
+    build: {
+        sourcemap: mode === "development",
+    },
+}));

@@ -5,7 +5,7 @@ type AnyFunction = (..._args: unknown[]) => unknown;
 type AnyArray<T = unknown> = Array<T>;
 type AnyROArray<T = unknown> = ReadonlyArray<T>;
 
-// Utility type for merge
+// Utility type for merge/patch
 export type DeepPartial<T> = T extends AnyFunction
     ? T
     : T extends AnyROArray<infer U>

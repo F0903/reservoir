@@ -6,7 +6,7 @@
     import CacheStats from "$lib/components/widgets/CacheStats.svelte";
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
     import RequestCoalescing from "$lib/components/widgets/RequestCoalescing.svelte";
-    import ComponentMasonryGrid from "$lib/components/layout/ComponentMasonryGrid.svelte";
+    import ComponentGrid from "$lib/components/layout/ComponentGrid.svelte";
     import { getContext, onMount } from "svelte";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
 
@@ -23,7 +23,7 @@
 </script>
 
 <main class="dashboard">
-    <ComponentMasonryGrid
+    <ComponentGrid
         components={[
             CacheEfficiency,
             CachePerformance,
@@ -41,7 +41,7 @@
         padding: 1.5rem;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: var(--mobile-cutoff)) {
         .dashboard {
             padding: 0;
         }
