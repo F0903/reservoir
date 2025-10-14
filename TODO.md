@@ -10,5 +10,4 @@ A '(?)' at the end of a line indicates a possible future feature or idea.
 - Rewrite caching to store in memory, and evict to disk when necessary
 - More tests
 - Mobile support
-- URL Pattern-Based Rules (?)
 - Content-Type Specific Handling (?)
