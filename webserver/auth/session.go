@@ -65,12 +65,14 @@ func GetSession(sid string) (*Session, bool) {
 }
 
 func CreateSession(userId int64) *Session {
+	slog.Debug("Creating new user session...", "user_id", userId)
 	sid := rand.Text()
+	now := time.Now()
 	sess := &Session{
 		ID:        sid,
 		UserID:    userId,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(defaultLifetime),
+		CreatedAt: now,
+		ExpiresAt: now.Add(defaultLifetime),
 	}
 
 	sessionStore.Set(sid, sess)
@@ -85,10 +87,13 @@ func SessionFromRequest(r *http.Request) (sess *Session, ok bool) {
 		return nil, false
 	}
 
+	slog.Debug("Getting session from cookie...", "session_id", sid)
 	sess, ok = GetSession(sid.Value)
 	if !ok {
 		return nil, false
 	}
+	slog.Debug("Got session from cookie", "session_id", sid, "expires_at", sess.ExpiresAt)
+
 	return sess, true
 }
 

@@ -27,7 +27,7 @@ func (c *Credentials) Authenticate() (*models.User, error) {
 		return nil, err
 	}
 	if user == nil {
-		return nil, nil
+		return nil, ErrInvalidCredentials
 	}
 
 	passwordMatch := user.PasswordHash.VerifyArgon2id(c.Password)
