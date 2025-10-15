@@ -115,12 +115,16 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.FileSize)
 
 		if !p.retryOnInvalidRange {
+			slog.Error("Sending 416 Range Not Satisfiable due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
+
 			r.SetHeader("Accept-Ranges", "bytes")
 			r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.FileSize))
 			r.WriteError("invalid Range header", http.StatusRequestedRangeNotSatisfiable)
 
 			return ErrRangeNotSatisfiable
 		}
+
+		slog.Info("Retrying request without Range header due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 		clientHd.Range.Remove(req.Header)
 		fetched, err := p.fetch.fetchUpstream(req, clientHd, key)
