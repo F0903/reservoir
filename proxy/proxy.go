@@ -208,7 +208,7 @@ func (p *Proxy) handleHTTP(r responder.Responder, proxyReq *http.Request) error 
 	metrics.Global.Requests.HTTPProxyRequests.Increment()
 
 	clientHd := headers.ParseHeaderDirective(proxyReq.Header)
-	clientHd.ConditionalHeaders.StripFromHeader(proxyReq.Header) // Remove clients conditionals so we don't forward them to upstream.
+	clientHd.ConditionalHeaders.StripFromHeader(proxyReq.Header)
 
 	key := cache.MakeFromRequest(proxyReq)
 

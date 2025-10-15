@@ -16,21 +16,12 @@ type conditionalHeaders struct {
 	IfRange           typeutils.Optional[typeutils.Either[eTag, time.Time]]
 }
 
-// Strips the conditionals present in conditionalHeaders from the given HTTP header map.
+// Strips the conditionals (except If-Range) present in conditionalHeaders from the given HTTP header map.
 func (ch *conditionalHeaders) StripFromHeader(header http.Header) {
-	if ch.IfModifiedSince.IsSome() {
-		header.Del("If-Modified-Since")
-	}
-	if ch.IfUnmodifiedSince.IsSome() {
-		header.Del("If-Unmodified-Since")
-	}
-	if ch.IfNoneMatch.IsSome() {
-		header.Del("If-None-Match")
-	}
-	if ch.IfMatch.IsSome() {
-		header.Del("If-Match")
-	}
-	if ch.IfRange.IsSome() {
-		header.Del("If-Range")
-	}
+	header.Del("If-Modified-Since")
+	header.Del("If-Unmodified-Since")
+	header.Del("If-None-Match")
+	header.Del("If-Match")
+
+	// We need to keep If-Range for Range requests
 }
