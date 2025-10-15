@@ -3,9 +3,11 @@ package dashboard
 import (
 	"embed"
 	"errors"
-	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
+	"strings"
+	"time"
 )
 
 var (
@@ -14,6 +16,13 @@ var (
 
 //go:embed frontend/build/*
 var frontend embed.FS
+var buildFS = func() fs.FS {
+	fsys, err := fs.Sub(frontend, "frontend/build")
+	if err != nil {
+		panic(ErrFrontendNotFound)
+	}
+	return fsys
+}()
 
 type Dashboard struct{}
 
@@ -21,12 +30,31 @@ func New() *Dashboard {
 	return &Dashboard{}
 }
 
-func (d *Dashboard) RegisterHandlers(mux *http.ServeMux) error {
-	frontendDist, err := fs.Sub(frontend, "frontend/build")
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrFrontendNotFound, err)
+func (d *Dashboard) ServeDashboard(w http.ResponseWriter, r *http.Request) {
+	fName := strings.TrimPrefix(r.URL.Path, "/")
+	if fName == "" {
+		fName = "index.html"
 	}
-	mux.Handle("/", http.FileServer(http.FS(frontendDist)))
+
+	// Try to open the requested file, if it doesn't exist serve index.html (for SPA routing)
+	if f, err := buildFS.Open(fName); err == nil {
+		defer f.Close()
+		http.ServeContent(w, r, fName, time.Time{}, f.(io.ReadSeeker))
+		return
+	}
+
+	index, err := buildFS.Open("index.html")
+	if err != nil {
+		http.Error(w, "frontend missing index.html", http.StatusInternalServerError)
+		return
+	}
+	defer index.Close()
+
+	http.ServeContent(w, r, fName, time.Time{}, index.(io.ReadSeeker))
+}
+
+func (d *Dashboard) RegisterHandlers(mux *http.ServeMux) error {
+	mux.HandleFunc("/", d.ServeDashboard)
 
 	return nil
 }
