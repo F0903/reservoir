@@ -269,7 +269,7 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, clientHd *headers.Heade
 
 // Will deduplicate cachable requests and otherwise return the bypassed upstream response.
 // IMPORTANT: Remember to close data streams!
-func (f *fetcher) DedupFetch(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
+func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
 	slog.Debug("Attempting to dedup fetch...")
 
 	shouldCoalesce := !clientHd.Range.IsPresent() && req.Method == http.MethodGet

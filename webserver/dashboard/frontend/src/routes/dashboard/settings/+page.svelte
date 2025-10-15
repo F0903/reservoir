@@ -111,6 +111,15 @@
                 tooltip:
                     "If true, the proxy will retry requests that receive a 416 Range Not Satisfiable response without the Range header.",
             },
+            {
+                InputComponent: Toggle,
+                get: () => settings.proxySettings.fields.retry_on_invalid_range,
+                commit: async (val: boolean) => await sendPatch("retry_on_invalid_range", val),
+                label: "Retry on Invalid Range",
+                pattern: boolPattern,
+                tooltip:
+                    "If true, the proxy will retry requests where the client sends an invalid Range header without the Range header.",
+            },
         ],
         // Webserver section
         [

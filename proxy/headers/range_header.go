@@ -146,5 +146,8 @@ func (r rangeHeader) String() string {
 	if r.start == -1 {
 		return "bytes=-" + strconv.FormatInt(r.end, 10)
 	}
+	if r.end == -1 {
+		return "bytes=" + strconv.FormatInt(r.start, 10) + "-"
+	}
 	return fmt.Sprintf("bytes=%d-%d", r.start, r.end)
 }

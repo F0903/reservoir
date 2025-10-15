@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"io"
 	"net/http"
 	"reservoir/cache"
 )
+
+//TODO: Consider reviewing this approach
 
 type fetchType int
 
@@ -55,4 +58,14 @@ func (f *fetchResult) getFetchInfoRef() *fetchInfo {
 		return &f.Cached.fetchInfo
 	}
 	return nil
+}
+
+func (f *fetchResult) getResponse() (data io.ReadCloser, header http.Header, status int) {
+	switch f.Type {
+	case fetchTypeDirect:
+		return f.Direct.Response.Body, f.Direct.Response.Header, f.Direct.UpstreamStatus
+	case fetchTypeCached:
+		return f.Cached.Entry.Data, f.Cached.Entry.Metadata.Object.Header, f.Cached.UpstreamStatus
+	}
+	return nil, nil, 0
 }

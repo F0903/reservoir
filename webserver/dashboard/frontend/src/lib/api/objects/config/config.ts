@@ -16,6 +16,7 @@ export type Config = {
     cache_cleanup_interval: string;
     upstream_default_https: boolean;
     retry_on_range_416: boolean;
+    retry_on_invalid_range: boolean;
     log_level: string;
     log_file: string;
     log_file_max_size: number;

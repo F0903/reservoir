@@ -40,9 +40,10 @@ type cachedRequestInfo struct {
 }
 
 type Proxy struct {
-	ca    certs.CertAuthority
-	cache *cache.FileCache[cachedRequestInfo]
-	fetch fetcher
+	ca                  certs.CertAuthority
+	cache               *cache.FileCache[cachedRequestInfo]
+	fetch               fetcher
+	retryOnInvalidRange bool
 }
 
 func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
@@ -61,11 +62,17 @@ func NewProxy(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*Pr
 		cacheCleanupInterval = c.CacheCleanupInterval.Read().Cast()
 	})
 
+	var retryOnInvalidRange bool
+	cfgLock.Read(func(c *config.Config) {
+		retryOnInvalidRange = c.RetryOnInvalidRange.Read()
+	})
+
 	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, ctx)
 	return &Proxy{
-		ca:    ca,
-		cache: cache,
-		fetch: newFetcher(cache),
+		ca:                  ca,
+		cache:               cache,
+		fetch:               newFetcher(cache),
+		retryOnInvalidRange: retryOnInvalidRange,
 	}, nil
 }
 
@@ -107,11 +114,26 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	if err != nil {
 		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.FileSize)
 
-		r.SetHeader("Accept-Ranges", "bytes")
-		r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.FileSize))
-		r.WriteError("invalid Range header", http.StatusRequestedRangeNotSatisfiable)
+		if !p.retryOnInvalidRange {
+			r.SetHeader("Accept-Ranges", "bytes")
+			r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.FileSize))
+			r.WriteError("invalid Range header", http.StatusRequestedRangeNotSatisfiable)
 
-		return ErrRangeNotSatisfiable
+			return ErrRangeNotSatisfiable
+		}
+
+		clientHd.Range.Remove(req.Header)
+		fetched, err := p.fetch.fetchUpstream(req, clientHd, key)
+		if err != nil {
+			slog.Error("Error fetching resource without Range header", "url", req.URL, "key", key, "error", err)
+			return err
+		}
+
+		data, header, status := fetched.getResponse()
+		defer data.Close()
+
+		r.SetHeaders(header)
+		return finalizeAndRespond(r, data, status, req)
 	}
 
 	if clientHd.IfRange.IsPresent() {
@@ -151,7 +173,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
-	fetched, err := p.fetch.DedupFetch(req, key, clientHd)
+	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)
 		return err
