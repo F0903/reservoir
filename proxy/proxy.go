@@ -102,7 +102,7 @@ func finalizeAndRespond(r responder.Responder, resp io.Reader, status int, req *
 }
 
 func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[cachedRequestInfo], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
-	rangeHeader := clientHd.Range.ForceUnwrap() // hd.Range will always be Some here
+	rangeHeader := clientHd.Range.Value()
 	start, end, err := rangeHeader.SliceSize(cached.Metadata.FileSize)
 	if err != nil {
 		slog.Error("Error parsing Range header", "url", req.URL, "key", key, "error", err)
@@ -114,8 +114,8 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 		return ErrRangeNotSatisfiable
 	}
 
-	if ifRangeOpt := clientHd.ConditionalHeaders.IfRange; ifRangeOpt.IsSome() {
-		ifRange := ifRangeOpt.ForceUnwrap()
+	if clientHd.IfRange.IsPresent() {
+		ifRange := clientHd.IfRange.Value()
 		if ifRange.IsLeft() {
 			// IfRange is ETag
 			etagIfRange := ifRange.ForceUnwrapLeft()
@@ -151,7 +151,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
-	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
+	fetched, err := p.fetch.DedupFetch(req, key, clientHd)
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)
 		return err
@@ -172,7 +172,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	case fetchTypeCached:
 		defer fetched.Cached.Entry.Data.Close()
 
-		if clientHd.Range.IsSome() {
+		if clientHd.Range.IsPresent() {
 			if err := p.handleRangeRequest(r, req, fetched.Cached.Entry, key, clientHd); err != nil {
 				slog.Error("Error handling Range request", "url", req.URL, "key", key, "error", err)
 				if errors.Is(err, ErrIfRangeMismatch) {
@@ -208,7 +208,7 @@ func (p *Proxy) handleHTTP(r responder.Responder, proxyReq *http.Request) error 
 	metrics.Global.Requests.HTTPProxyRequests.Increment()
 
 	clientHd := headers.ParseHeaderDirective(proxyReq.Header)
-	clientHd.ConditionalHeaders.StripFromHeader(proxyReq.Header)
+	clientHd.StripRegularConditionals(proxyReq.Header)
 
 	key := cache.MakeFromRequest(proxyReq)
 

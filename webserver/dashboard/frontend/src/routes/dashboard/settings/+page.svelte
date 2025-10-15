@@ -102,6 +102,15 @@
                 tooltip:
                     "If true, the proxy will always send HTTPS instead of HTTP to the upstream server.",
             },
+            {
+                InputComponent: Toggle,
+                get: () => settings.proxySettings.fields.retry_on_range_416,
+                commit: async (val: boolean) => await sendPatch("retry_on_range_416", val),
+                label: "Retry on Range 416",
+                pattern: boolPattern,
+                tooltip:
+                    "If true, the proxy will retry requests that receive a 416 Range Not Satisfiable response without the Range header.",
+            },
         ],
         // Webserver section
         [

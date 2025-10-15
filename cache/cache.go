@@ -15,8 +15,8 @@ type Cache[ObjectData any] interface {
 	// Retrieves an entry from the cache by its input key.
 	Get(key CacheKey) (*Entry[ObjectData], error)
 
-	// Stores an entry in the cache with the specified input key.
-	Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) error
+	// Stores an entry in the cache with the specified input key, and returns the cached entry.
+	Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error)
 
 	// Removes an entry from the cache by its input key.
 	Delete(key CacheKey) error

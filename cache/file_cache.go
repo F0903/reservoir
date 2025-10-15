@@ -278,7 +278,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) error {
+func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
 	lock := c.getLock(key)
 	lock.Lock()
 	defer lock.Unlock()
@@ -288,7 +288,7 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Failed to create cache file", "key", key.Hex, "error", err)
-		return fmt.Errorf("%w: failed to create cache file '%s'", ErrCacheFileCreate, fileName)
+		return nil, fmt.Errorf("%w: failed to create cache file '%s'", ErrCacheFileCreate, fileName)
 	}
 	// We don't close file here since we are returning it in the Entry.
 
@@ -296,13 +296,13 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Failed to write cache file", "key", key.Hex, "error", err)
-		return fmt.Errorf("%w: failed to write cache file '%s'", ErrCacheFileWrite, fileName)
+		return nil, fmt.Errorf("%w: failed to write cache file '%s'", ErrCacheFileWrite, fileName)
 	}
 
 	if fileSize == 0 {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Cache file is empty", "key", key.Hex, "file_size", fileSize)
-		return fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
+		return nil, fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
 	}
 
 	meta := &EntryMetadata[ObjectData]{
@@ -319,10 +319,18 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 
 	slog.Info("Successfully cached data", "key", key.Hex, "size", fileSize)
 
-	// Check if cache size exceeded limit and evict if necessary
-	go c.ensureCacheSize()
+	slog.Debug("Seeking to the beginning of written cache file...", "key", key.Hex)
+	_, err = file.Seek(0, io.SeekStart)
+	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
+		slog.Error("Failed to seek to start of cache file", "key", key.Hex, "error", err)
+		return nil, fmt.Errorf("%w: failed to seek to start of cache file '%s'", ErrCacheFileRead, fileName)
+	}
 
-	return nil
+	return &Entry[ObjectData]{
+		Data:     file,
+		Metadata: meta,
+	}, nil
 }
 
 func (c *FileCache[ObjectData]) Delete(key CacheKey) error {

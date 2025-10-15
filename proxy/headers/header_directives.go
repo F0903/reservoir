@@ -10,80 +10,126 @@ import (
 )
 
 var (
-	ErrParseMaxAge = errors.New("failed to parse max-age")
+	ErrParseMaxAge      = errors.New("failed to parse max-age")
+	ErrHeaderNotPresent = errors.New("header value is not present")
 )
 
-type HeaderDirectives struct {
-	ConditionalHeaders conditionalHeaders
-	CacheControl       typeutils.Optional[cacheControl]
-	Range              typeutils.Optional[rangeHeader]
-	Expires            typeutils.Optional[time.Time]
+type eTag = string
+
+type Header[T any] struct {
+	name  string
+	value *T
 }
 
-func parseIfRange(value string) typeutils.Optional[typeutils.Either[eTag, time.Time]] {
-	if value == "" {
-		return typeutils.None[typeutils.Either[eTag, time.Time]]()
+func NewHeader[T any](name string, value *T) Header[T] {
+	return Header[T]{name: name, value: value}
+}
+
+func (h *Header[T]) IsPresent() bool {
+	return h.value != nil
+}
+
+// Removes the matching header from the given HTTP header map and sets the value of this Header to nil.
+func (h *Header[T]) Remove(headers http.Header) {
+	if h.value == nil {
+		return
 	}
 
-	if t, err := time.Parse(http.TimeFormat, value); err == nil {
-		timeIfRange := typeutils.Right[eTag](&t)
-		return typeutils.Some(&timeIfRange)
-	}
+	delete(headers, h.name)
+	h.value = nil
+	slog.Debug("Removed header from request:", "header", h.name)
+}
 
-	etagIfRange := typeutils.Left[eTag, time.Time](&value)
-	return typeutils.Some(&etagIfRange)
+func (h *Header[T]) Value() T {
+	return *h.value
+}
+
+type HeaderDirectives struct {
+	CacheControl      Header[cacheControl]
+	Expires           Header[time.Time]
+	Range             Header[rangeHeader]
+	IfModifiedSince   Header[time.Time]
+	IfUnmodifiedSince Header[time.Time]
+	IfNoneMatch       Header[eTag]
+	IfMatch           Header[eTag]
+	IfRange           Header[typeutils.Either[eTag, time.Time]]
 }
 
 func ParseHeaderDirective(header http.Header) *HeaderDirectives {
-	hd := &HeaderDirectives{}
+	hd := &HeaderDirectives{
+		CacheControl:      NewHeader[cacheControl]("Cache-Control", nil),
+		Expires:           NewHeader[time.Time]("Expires", nil),
+		Range:             NewHeader[rangeHeader]("Range", nil),
+		IfModifiedSince:   NewHeader[time.Time]("If-Modified-Since", nil),
+		IfUnmodifiedSince: NewHeader[time.Time]("If-Unmodified-Since", nil),
+		IfNoneMatch:       NewHeader[eTag]("If-None-Match", nil),
+		IfMatch:           NewHeader[eTag]("If-Match", nil),
+		IfRange:           NewHeader[typeutils.Either[eTag, time.Time]]("If-Range", nil),
+	}
 	for key, values := range header {
 		value := values[0] // Header.Get also uses the first value, so we do the same here
 		switch key {
 		case "If-Modified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.ConditionalHeaders.IfModifiedSince = typeutils.Some(&t)
+				hd.IfModifiedSince.value = &t
 			} else {
 				slog.Error("Error parsing If-Modified-Since header", "error", err)
 			}
 		case "If-Unmodified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.ConditionalHeaders.IfUnmodifiedSince = typeutils.Some(&t)
+				hd.IfUnmodifiedSince.value = &t
 			} else {
 				slog.Error("Error parsing If-Unmodified-Since header", "error", err)
 			}
 		case "If-None-Match":
 			if value != "" {
-				hd.ConditionalHeaders.IfNoneMatch = typeutils.Some(&value)
+				hd.IfNoneMatch.value = &value
 			}
 		case "If-Match":
 			if value != "" {
-				hd.ConditionalHeaders.IfMatch = typeutils.Some(&value)
+				hd.IfMatch.value = &value
 			}
 		case "If-Range":
 			if value != "" {
-				hd.ConditionalHeaders.IfRange = parseIfRange(value)
+				if t, err := time.Parse(http.TimeFormat, value); err == nil {
+					timeIfRange := typeutils.Right[eTag](&t)
+					hd.IfRange.value = &timeIfRange
+				}
+
+				etagIfRange := typeutils.Left[eTag, time.Time](&value)
+				hd.IfRange.value = &etagIfRange
 			}
 		case "Range":
 			if rh, err := parseRangeHeader(value); err == nil {
-				hd.Range = typeutils.Some(&rh)
+				hd.Range.value = &rh
 			} else {
 				slog.Error("Error parsing Range header", "error", err)
 			}
 		case "Cache-Control":
 			if cc, err := parseCacheControl(value); err == nil {
-				hd.CacheControl = typeutils.Some(cc)
+				hd.CacheControl.value = cc
 			} else {
 				slog.Error("Error parsing Cache-Control header", "error", err)
 			}
 		case "Expires":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.Expires = typeutils.Some(&t)
+				hd.Expires.value = &t
 			} else {
 				slog.Error("Error parsing Expires header", "error", err)
 			}
 		}
 	}
 	return hd
+}
+
+// Strips the conditionals (except If-Range) present in HeaderDirectives from the given HTTP header map.
+func (hd *HeaderDirectives) StripRegularConditionals(header http.Header) {
+	hd.IfModifiedSince.Remove(header)
+	hd.IfUnmodifiedSince.Remove(header)
+	hd.IfNoneMatch.Remove(header)
+	hd.IfMatch.Remove(header)
+
+	// We need to keep If-Range for Range requests
 }
 
 func (hd *HeaderDirectives) ShouldCache() bool {
@@ -93,8 +139,8 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 		ignoreCacheControl = c.IgnoreCacheControl.Read()
 	})
 
-	if !ignoreCacheControl && hd.CacheControl.IsSome() {
-		cc := hd.CacheControl.ForceUnwrap()
+	if !ignoreCacheControl && hd.CacheControl.IsPresent() {
+		cc := hd.CacheControl.value
 		if cc.noCache {
 			return false // No caching allowed
 		}
@@ -104,14 +150,14 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 		}
 	}
 
-	if !ignoreCacheControl && hd.Expires.IsSome() {
-		expires := hd.Expires.ForceUnwrap()
+	if !ignoreCacheControl && hd.Expires.IsPresent() {
+		expires := hd.Expires.value
 		if expires.Before(time.Now()) {
 			return false // If the Expires header is in the past, do not cache
 		}
 	}
 
-	if hd.Range.IsSome() {
+	if hd.Range.IsPresent() {
 		return false // Do not cache responses to Range requests
 	}
 
@@ -129,14 +175,14 @@ func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
 	})
 
 	if !forceDefaultCacheMaxAge {
-		if hd.CacheControl.IsSome() {
-			cc := hd.CacheControl.ForceUnwrap()
+		if hd.CacheControl.IsPresent() {
+			cc := hd.CacheControl.value
 			if cc.maxAge > 0 {
 				return time.Now().Add(cc.maxAge)
 			}
 		}
-		if hd.Expires.IsSome() {
-			return hd.Expires.ForceUnwrap()
+		if hd.Expires.IsPresent() {
+			return *hd.Expires.value
 		}
 	}
 
