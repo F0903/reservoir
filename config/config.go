@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const configVersion = 7
+const configVersion = 8
 
 var (
 	ErrConfigFileOpen        = errors.New("config file open failed")
