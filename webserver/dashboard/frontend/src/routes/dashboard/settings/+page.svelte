@@ -118,7 +118,7 @@
                 label: "Retry on Invalid Range",
                 pattern: boolPattern,
                 tooltip:
-                    "If true, the proxy will retry requests where the client sends an invalid Range header without the Range header.",
+                    "If true, the proxy will retry requests where the client sends an invalid Range header without the Range header. (not recommended)",
             },
         ],
         // Webserver section

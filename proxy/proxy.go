@@ -127,7 +127,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 		slog.Info("Retrying request without Range header due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 		clientHd.Range.Remove(req.Header)
-		fetched, err := p.fetch.fetchUpstream(req, clientHd, key)
+		fetched, err := p.fetch.dedupFetch(req, key, clientHd)
 		if err != nil {
 			slog.Error("Error fetching resource without Range header", "url", req.URL, "key", key, "error", err)
 			return err

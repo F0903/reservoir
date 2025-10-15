@@ -32,7 +32,7 @@ type Config struct {
 	CaKey                   ConfigProp[string]            `json:"ca_key"`                      // Path to CA private key file.
 	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
 	RetryOnRange416         ConfigProp[bool]              `json:"retry_on_range_416"`          // If true, the proxy will retry a request without the Range header if the upstream responds with a 416 Range Not Satisfiable.
-	RetryOnInvalidRange     ConfigProp[bool]              `json:"retry_on_invalid_range"`      // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header.
+	RetryOnInvalidRange     ConfigProp[bool]              `json:"retry_on_invalid_range"`      // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header. (not recommended)
 	WebserverListen         ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
 	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
 	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
@@ -77,7 +77,7 @@ func newDefault() *Config {
 		CaKey:                   NewConfigProp("ssl/ca.key"),
 		UpstreamDefaultHttps:    NewConfigProp(true),
 		RetryOnRange416:         NewConfigProp(true),
-		RetryOnInvalidRange:     NewConfigProp(true),
+		RetryOnInvalidRange:     NewConfigProp(false),
 		WebserverListen:         NewConfigProp("localhost:8080"),
 		DashboardDisabled:       NewConfigProp(false),
 		ApiDisabled:             NewConfigProp(false),
