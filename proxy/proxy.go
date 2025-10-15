@@ -105,7 +105,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	rangeHeader := clientHd.Range.Value()
 	start, end, err := rangeHeader.SliceSize(cached.Metadata.FileSize)
 	if err != nil {
-		slog.Error("Error parsing Range header", "url", req.URL, "key", key, "error", err)
+		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.FileSize)
 
 		r.SetHeader("Accept-Ranges", "bytes")
 		r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.FileSize))

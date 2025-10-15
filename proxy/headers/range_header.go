@@ -2,7 +2,9 @@ package headers
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 )
 
@@ -138,4 +140,11 @@ func (r rangeHeader) SliceSize(dataSize int64) (start int64, end int64, err erro
 	}
 
 	return start, end, validateRange(start, end, dataSize)
+}
+
+func (r rangeHeader) String() string {
+	if r.start == -1 {
+		return "bytes=-" + strconv.FormatInt(r.end, 10)
+	}
+	return fmt.Sprintf("bytes=%d-%d", r.start, r.end)
 }
