@@ -13,8 +13,8 @@ type cacheControl struct {
 	maxAge  time.Duration
 }
 
-func parseCacheControl(ccHeader string) (*cacheControl, error) {
-	cc := &cacheControl{}
+func parseCacheControl(ccHeader string) (cacheControl, error) {
+	cc := cacheControl{}
 	// Parse the Cache-Control header for max-age directive
 	for directive := range strings.SplitSeq(ccHeader, ",") {
 		directive = strings.TrimSpace(directive)
@@ -25,7 +25,7 @@ func parseCacheControl(ccHeader string) (*cacheControl, error) {
 			maxAge, err := strconv.ParseInt(after, 10, 64)
 			if err != nil {
 				slog.Error("Failed to parse max-age", "raw", directive, "error", err)
-				return nil, fmt.Errorf("%w: %v", ErrParseMaxAge, err)
+				return cacheControl{}, fmt.Errorf("%w: %v", ErrParseMaxAge, err)
 			}
 			if maxAge < 1 {
 				cc.noCache = true // If max-age is less than 1, treat it as no-cache

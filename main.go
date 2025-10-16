@@ -19,15 +19,10 @@ import (
 )
 
 func startProxy(errChan chan error, ctx context.Context) error {
-	cfgLock := config.Global.Immutable()
-
-	var proxyListen, caCert, caKey, cacheDir string
-	cfgLock.Read(func(c *config.Config) {
-		proxyListen = c.ProxyListen.Read()
-		caCert = c.CaCert.Read()
-		caKey = c.CaKey.Read()
-		cacheDir = c.CacheDir.Read()
-	})
+	proxyListen := config.Global.ProxyListen.Read()
+	caCert := config.Global.CaCert.Read()
+	caKey := config.Global.CaKey.Read()
+	cacheDir := config.Global.CacheDir.Read()
 
 	ca, err := certs.NewPrivateCA(caCert, caKey)
 	if err != nil {
@@ -45,16 +40,9 @@ func startProxy(errChan chan error, ctx context.Context) error {
 }
 
 func startWebServer(errChan chan error, ctx context.Context) error {
-	cfgLock := config.Global.Immutable()
-
-	var webserverListen string
-	var dashboardDisabled bool
-	var apiDisabled bool
-	cfgLock.Read(func(c *config.Config) {
-		webserverListen = c.WebserverListen.Read()
-		dashboardDisabled = c.DashboardDisabled.Read()
-		apiDisabled = c.ApiDisabled.Read()
-	})
+	webserverListen := config.Global.WebserverListen.Read()
+	dashboardDisabled := config.Global.DashboardDisabled.Read()
+	apiDisabled := config.Global.ApiDisabled.Read()
 
 	if apiDisabled && !dashboardDisabled {
 		panic("API cannot be disabled while dashboard is enabled")
@@ -93,7 +81,7 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 }
 
 func main() {
-	config.ParseFlags()
+	config.OverrideGlobalConfigFromFlags()
 	logging.Init()
 
 	// Channel to handle OS signals for graceful shutdown

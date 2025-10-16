@@ -15,36 +15,14 @@ import (
 )
 
 type fetcher struct {
-	cache                cache.Cache[cachedRequestInfo]
-	group                singleflight.Group
-	defaultCacheMaxAge   time.Duration
-	upstreamDefaultHttps bool
-	retryOnRange416      bool
+	cache cache.Cache[cachedRequestInfo]
+	group singleflight.Group
 }
 
 func newFetcher(cache cache.Cache[cachedRequestInfo]) fetcher {
-	cfgLock := config.Global.Immutable()
-	var defaultCacheMaxAge time.Duration
-	cfgLock.Read(func(c *config.Config) {
-		defaultCacheMaxAge = c.DefaultCacheMaxAge.Read().Cast()
-	})
-
-	var upstreamDefaultHttps bool
-	cfgLock.Read(func(c *config.Config) {
-		upstreamDefaultHttps = c.UpstreamDefaultHttps.Read()
-	})
-
-	var retryOnRange416 bool
-	cfgLock.Read(func(c *config.Config) {
-		retryOnRange416 = c.RetryOnRange416.Read()
-	})
-
 	return fetcher{
-		cache:                cache,
-		group:                singleflight.Group{},
-		defaultCacheMaxAge:   defaultCacheMaxAge,
-		upstreamDefaultHttps: upstreamDefaultHttps,
-		retryOnRange416:      retryOnRange416,
+		cache: cache,
+		group: singleflight.Group{},
 	}
 }
 
@@ -60,7 +38,7 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 	slog.Info("Revalidating cache metadata...", "url", req.URL, "key", key)
 	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 		// Update the metadata to reflect that the cached response is still valid.
-		maxAge := f.defaultCacheMaxAge
+		maxAge := config.Global.DefaultCacheMaxAge.Read().Cast()
 		meta.Expires = time.Now().Add(maxAge)
 	})
 	if err != nil {
@@ -116,7 +94,7 @@ func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, key 
 	resp.Body.Close()
 
 	retryReq := req.Clone(req.Context())
-	clientHd.Range.Remove(retryReq.Header)
+	clientHd.Range.SyncRemove(retryReq.Header)
 
 	retryResp, err := f.sendRequestToUpstream(retryReq)
 	if err != nil {
@@ -148,7 +126,7 @@ func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response,
 
 func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, error) {
 	slog.Info("Sending request to upstream", "url", req.URL)
-	resp, err := sendRequestToTarget(req, f.upstreamDefaultHttps)
+	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps.Read())
 	slog.Info("Received response from upstream", "url", req.URL, "status", resp.Status)
 	if err != nil {
 		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err)

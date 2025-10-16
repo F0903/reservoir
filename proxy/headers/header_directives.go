@@ -18,30 +18,30 @@ type eTag = string
 
 type Header[T any] struct {
 	name  string
-	value *T
+	value typeutils.Optional[T]
 }
 
-func NewHeader[T any](name string, value *T) Header[T] {
+func NewHeader[T any](name string, value typeutils.Optional[T]) Header[T] {
 	return Header[T]{name: name, value: value}
 }
 
 func (h *Header[T]) IsPresent() bool {
-	return h.value != nil
+	return h.value.IsSome()
 }
 
 // Removes the matching header from the given HTTP header map and sets the value of this Header to nil.
-func (h *Header[T]) Remove(headers http.Header) {
-	if h.value == nil {
+func (h *Header[T]) SyncRemove(headers http.Header) {
+	if h.value.IsNone() {
 		return
 	}
 
 	delete(headers, h.name)
-	h.value = nil
+	h.value = typeutils.None[T]()
 	slog.Debug("Removed header from request:", "header", h.name)
 }
 
 func (h *Header[T]) Value() T {
-	return *h.value
+	return h.value.ForceUnwrap()
 }
 
 type HeaderDirectives struct {
@@ -57,63 +57,64 @@ type HeaderDirectives struct {
 
 func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 	hd := &HeaderDirectives{
-		CacheControl:      NewHeader[cacheControl]("Cache-Control", nil),
-		Expires:           NewHeader[time.Time]("Expires", nil),
-		Range:             NewHeader[rangeHeader]("Range", nil),
-		IfModifiedSince:   NewHeader[time.Time]("If-Modified-Since", nil),
-		IfUnmodifiedSince: NewHeader[time.Time]("If-Unmodified-Since", nil),
-		IfNoneMatch:       NewHeader[eTag]("If-None-Match", nil),
-		IfMatch:           NewHeader[eTag]("If-Match", nil),
-		IfRange:           NewHeader[typeutils.Either[eTag, time.Time]]("If-Range", nil),
+		CacheControl:      NewHeader("Cache-Control", typeutils.None[cacheControl]()),
+		Expires:           NewHeader("Expires", typeutils.None[time.Time]()),
+		Range:             NewHeader("Range", typeutils.None[rangeHeader]()),
+		IfModifiedSince:   NewHeader("If-Modified-Since", typeutils.None[time.Time]()),
+		IfUnmodifiedSince: NewHeader("If-Unmodified-Since", typeutils.None[time.Time]()),
+		IfNoneMatch:       NewHeader("If-None-Match", typeutils.None[eTag]()),
+		IfMatch:           NewHeader("If-Match", typeutils.None[eTag]()),
+		IfRange:           NewHeader("If-Range", typeutils.None[typeutils.Either[eTag, time.Time]]()),
 	}
 	for key, values := range header {
 		value := values[0] // Header.Get also uses the first value, so we do the same here
 		switch key {
 		case "If-Modified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.IfModifiedSince.value = &t
+				hd.IfModifiedSince.value = typeutils.Some(t)
 			} else {
 				slog.Error("Error parsing If-Modified-Since header", "error", err, "value", value)
 			}
 		case "If-Unmodified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.IfUnmodifiedSince.value = &t
+				hd.IfUnmodifiedSince.value = typeutils.Some(t)
 			} else {
 				slog.Error("Error parsing If-Unmodified-Since header", "error", err, "value", value)
 			}
 		case "If-None-Match":
 			if value != "" {
-				hd.IfNoneMatch.value = &value
+				hd.IfNoneMatch.value = typeutils.Some(value)
 			}
 		case "If-Match":
 			if value != "" {
-				hd.IfMatch.value = &value
+				hd.IfMatch.value = typeutils.Some(value)
 			}
 		case "If-Range":
 			if value != "" {
 				if t, err := time.Parse(http.TimeFormat, value); err == nil {
-					timeIfRange := typeutils.Right[eTag](&t)
-					hd.IfRange.value = &timeIfRange
+					timeIfRange := typeutils.Right[eTag](t)
+					hd.IfRange.value = typeutils.Some(timeIfRange)
+					continue
 				}
 
-				etagIfRange := typeutils.Left[eTag, time.Time](&value)
-				hd.IfRange.value = &etagIfRange
+				etagIfRange := typeutils.Left[eTag, time.Time](value)
+				hd.IfRange.value = typeutils.Some(etagIfRange)
 			}
 		case "Range":
 			if rh, err := parseRangeHeader(value); err == nil {
-				hd.Range.value = &rh
+				hd.Range.value = typeutils.Some(rh)
 			} else {
 				slog.Error("Error parsing Range header", "error", err, "value", value)
 			}
 		case "Cache-Control":
 			if cc, err := parseCacheControl(value); err == nil {
-				hd.CacheControl.value = cc
+				hd.CacheControl.value = typeutils.Some(cc)
 			} else {
 				slog.Error("Error parsing Cache-Control header", "error", err, "value", value)
 			}
 		case "Expires":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
-				hd.Expires.value = &t
+				hd.Expires.value = typeutils.Some(t)
 			} else {
 				slog.Error("Error parsing Expires header", "error", err, "value", value)
 			}
@@ -124,23 +125,19 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 
 // Strips the conditionals (except If-Range) present in HeaderDirectives from the given HTTP header map.
 func (hd *HeaderDirectives) StripRegularConditionals(header http.Header) {
-	hd.IfModifiedSince.Remove(header)
-	hd.IfUnmodifiedSince.Remove(header)
-	hd.IfNoneMatch.Remove(header)
-	hd.IfMatch.Remove(header)
+	hd.IfModifiedSince.SyncRemove(header)
+	hd.IfUnmodifiedSince.SyncRemove(header)
+	hd.IfNoneMatch.SyncRemove(header)
+	hd.IfMatch.SyncRemove(header)
 
 	// We need to keep If-Range for Range requests
 }
 
 func (hd *HeaderDirectives) ShouldCache() bool {
-	cfgLock := config.Global.Immutable()
-	var ignoreCacheControl bool
-	cfgLock.Read(func(c *config.Config) {
-		ignoreCacheControl = c.IgnoreCacheControl.Read()
-	})
+	ignoreCacheControl := config.Global.IgnoreCacheControl.Read()
 
 	if !ignoreCacheControl && hd.CacheControl.IsPresent() {
-		cc := hd.CacheControl.value
+		cc := hd.CacheControl.Value()
 		if cc.noCache {
 			return false // No caching allowed
 		}
@@ -151,7 +148,7 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 	}
 
 	if !ignoreCacheControl && hd.Expires.IsPresent() {
-		expires := hd.Expires.value
+		expires := hd.Expires.Value()
 		if expires.Before(time.Now()) {
 			return false // If the Expires header is in the past, do not cache
 		}
@@ -165,24 +162,18 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 }
 
 func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
-	cfgLock := config.Global.Immutable()
-
-	var forceDefaultCacheMaxAge bool
-	var defaultCacheMaxAge time.Duration
-	cfgLock.Read(func(c *config.Config) {
-		forceDefaultCacheMaxAge = c.ForceDefaultCacheMaxAge.Read()
-		defaultCacheMaxAge = c.DefaultCacheMaxAge.Read().Cast()
-	})
+	forceDefaultCacheMaxAge := config.Global.ForceDefaultCacheMaxAge.Read()
+	defaultCacheMaxAge := config.Global.DefaultCacheMaxAge.Read().Cast()
 
 	if !forceDefaultCacheMaxAge {
 		if hd.CacheControl.IsPresent() {
-			cc := hd.CacheControl.value
+			cc := hd.CacheControl.Value()
 			if cc.maxAge > 0 {
 				return time.Now().Add(cc.maxAge)
 			}
 		}
 		if hd.Expires.IsPresent() {
-			return *hd.Expires.value
+			return hd.Expires.Value()
 		}
 	}
 

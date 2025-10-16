@@ -2,10 +2,10 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
+	"reservoir/config/flags"
+	"reservoir/utils"
 	"reservoir/utils/assertedpath"
-	"reservoir/utils/writesynced"
 )
 
 var (
@@ -14,70 +14,33 @@ var (
 
 var configPath = assertedpath.Assert("var/config.json")
 
-var Global *writesynced.WriteSynced[Config] = func() *writesynced.WriteSynced[Config] {
+// ! NEVER COPY THIS!
+var Global *Config = func() *Config {
 	cfg, err := loadOrDefault(configPath.Path)
 	if err != nil {
 		slog.Error("Failed to load global config", "error", err)
 		panic(err)
 	}
-	return writesynced.New(*cfg)
+	return cfg
 }()
 
-type UpdateStatus int
-
-const (
-	UpdateStatusFailed UpdateStatus = iota
-	UpdateStatusSuccess
-	UpdateStatusRestartRequired
-)
-
-// UpdateAndVerify applies the provided function to the global config, verifies it, and persists it.
-// If verification or persistence fails, it reverts to the old config.
-func UpdateAndVerify(f func(*Config)) error {
-	if f == nil {
-		slog.Error("Update function is nil, skipping config update")
-		return nil
-	}
-
-	cfgLock := Global.Mutable()
-	cfg := cfgLock.Get()
-	defer cfgLock.UnGet()
-
-	old := *cfg
-	f(cfg)
-
-	if err := cfg.verify(); err != nil {
-		slog.Error("Updated global config failed verification", "error", err)
-		cfg = &old // Revert to old config on error
-		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
-	}
-
-	if err := cfg.persist(); err != nil {
-		slog.Error("Failed to persist updated global config", "error", err)
-		cfg = &old // Revert to old config on error
-		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
-	}
-
-	slog.Debug("Global config updated successfully", "new_config", cfg, "old_config", old)
-	return nil
-}
-
-func UpdatePartialFromJSON(updates map[string]any) (UpdateStatus, error) {
-	slog.Debug("Updating global config with partial JSON", "updates", updates)
-
-	if updates == nil {
-		slog.Error("UpdatePartialFromJSON called with nil updates")
-		return UpdateStatusFailed, nil
-	}
-
-	UpdateAndVerify(func(cfg *Config) {
-		setPropsFromMap(cfg, updates)
+func OverrideGlobalConfigFromFlags() {
+	fl := flags.New()
+	fl.AddString("listen", ":9999", "The address and port that the proxy will listen on").OnSet(func(val flags.FlagValue) { Global.ProxyListen.Overwrite(val.AsString()) })
+	fl.AddString("ca-cert", "ssl/ca.crt", "Path to CA certificate file").OnSet(func(val flags.FlagValue) { Global.CaCert.Overwrite(val.AsString()) })
+	fl.AddString("ca-key", "ssl/ca.key", "Path to CA private key file").OnSet(func(val flags.FlagValue) { Global.CaKey.Overwrite(val.AsString()) })
+	fl.AddString("cache-dir", "var/cache/", "Path to cache directory").OnSet(func(val flags.FlagValue) { Global.CacheDir.Overwrite(val.AsString()) })
+	fl.AddString("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on").OnSet(func(val flags.FlagValue) { Global.WebserverListen.Overwrite(val.AsString()) })
+	fl.AddBool("no-dashboard", false, "Disable the dashboard. The API must also be enabled if the dashboard is enabled.").OnSet(func(val flags.FlagValue) { Global.DashboardDisabled.Overwrite(val.AsBool()) })
+	fl.AddBool("no-api", false, "Disable the API").OnSet(func(val flags.FlagValue) { Global.ApiDisabled.Overwrite(val.AsBool()) })
+	fl.AddString("log-level", "", "Set the logging level (DEBUG, INFO, WARN, ERROR)").OnSet(func(val flags.FlagValue) {
+		level := utils.StringToLogLevel(val.AsString())
+		Global.LogLevel.Overwrite(level)
 	})
-
-	status := UpdateStatusSuccess
-	if IsRestartNeeded() {
-		slog.Info("Restart is required after updating global config")
-		status = UpdateStatusRestartRequired
-	}
-	return status, nil
+	fl.AddString("log-file", "", "Set the log file path").OnSet(func(val flags.FlagValue) { Global.LogFile.Overwrite(val.AsString()) })
+	fl.AddString("log-file-max-size", "", "Set the log file max size").OnSet(func(val flags.FlagValue) { Global.LogFileMaxSize.Overwrite(val.AsBytesize()) })
+	fl.AddInt("log-file-max-backups", 3, "Set the log file max backups").OnSet(func(val flags.FlagValue) { Global.LogFileMaxBackups.Overwrite(val.AsInt()) })
+	fl.AddBool("log-file-compress", true, "Set the log file compress").OnSet(func(val flags.FlagValue) { Global.LogFileCompress.Overwrite(val.AsBool()) })
+	fl.AddBool("log-to-stdout", false, "Enable logging to stdout").OnSet(func(val flags.FlagValue) { Global.LogToStdout.Overwrite(val.AsBool()) })
+	fl.Parse()
 }

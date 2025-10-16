@@ -5,11 +5,11 @@ type Either[L any, R any] struct {
 	right Optional[R]
 }
 
-func Left[L any, R any](value *L) Either[L, R] {
+func Left[L any, R any](value L) Either[L, R] {
 	return Either[L, R]{left: Some(value)}
 }
 
-func Right[L any, R any](value *R) Either[L, R] {
+func Right[L any, R any](value R) Either[L, R] {
 	return Either[L, R]{right: Some(value)}
 }
 

@@ -34,8 +34,13 @@ func (o *Overwritable[T]) Set(value T) {
 	o.ClearOverwrite()
 }
 
+// Sets the value without clearing any overwrite.
+func (o *Overwritable[T]) SetNoClear(value T) {
+	o.value = value
+}
+
 func (o *Overwritable[T]) Overwrite(value T) {
-	o.overwritten = Some(&value)
+	o.overwritten = Some(value)
 }
 
 func (o *Overwritable[T]) IsOverwritten() bool {

@@ -113,13 +113,7 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 		return
 	}
 
-	cfgLock := config.Global.Immutable()
-
-	var logFilePath string
-	cfgLock.Read(func(c *config.Config) {
-		logFilePath = c.LogFile.Read()
-	})
-
+	logFilePath := config.Global.LogFile.Read()
 	if logFilePath == "" {
 		http.Error(w, "No Log File Configured", http.StatusNotFound)
 		return

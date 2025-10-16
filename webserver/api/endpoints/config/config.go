@@ -33,10 +33,7 @@ func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	cfgLock := config.Global.Immutable()
-	cfg := cfgLock.Copy()
-
-	responseJson, err := json.Marshal(cfg)
+	responseJson, err := json.Marshal(config.Global)
 	if err != nil {
 		slog.Error("Error marshaling config to JSON", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

@@ -10,48 +10,58 @@ var (
 )
 
 type Optional[T any] struct {
-	value *T
+	value T
+	some  bool
 }
 
-func Some[T any](value *T) Optional[T] {
-	return Optional[T]{value: value}
+func Some[T any](value T) Optional[T] {
+	return Optional[T]{value: value, some: true}
 }
 
 func None[T any]() Optional[T] {
-	return Optional[T]{value: nil}
+	var zero T
+	return Optional[T]{value: zero, some: false}
 }
 
 func (o Optional[T]) IsSome() bool {
-	return o.value != nil
+	return o.some
 }
 
 func (o Optional[T]) IsNone() bool {
-	return o.value == nil
+	return !o.some
+}
+
+func (o Optional[T]) Get() (val T, ok bool) {
+	if !o.some {
+		var zero T
+		return zero, false
+	}
+	return o.value, true
 }
 
 func (o Optional[T]) Unwrap() (T, error) {
-	if o.value == nil {
+	if !o.some {
 		return *new(T), ErrorUnwrapNone
 	}
-	return *o.value, nil
+	return o.value, nil
 }
 
 func (o Optional[T]) UnwrapOr(defaultValue T) T {
-	if o.value == nil {
+	if !o.some {
 		return defaultValue
 	}
-	return *o.value
+	return o.value
 }
 
 func (o Optional[T]) ForceUnwrap() T {
-	if o.value == nil {
+	if !o.some {
 		panic(ErrorUnwrapNone)
 	}
-	return *o.value
+	return o.value
 }
 
 func (o Optional[T]) MarshalJSON() ([]byte, error) {
-	if o.value == nil {
+	if !o.some {
 		return []byte("null"), nil
 	}
 	return json.Marshal(o.value)
@@ -59,7 +69,7 @@ func (o Optional[T]) MarshalJSON() ([]byte, error) {
 
 func (o *Optional[T]) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
-		o.value = nil
+		o.some = false
 		return nil
 	}
 
@@ -67,6 +77,9 @@ func (o *Optional[T]) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &value); err != nil {
 		return err
 	}
-	o.value = &value
+
+	o.value = value
+	o.some = true
+
 	return nil
 }

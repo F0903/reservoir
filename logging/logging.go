@@ -38,18 +38,10 @@ func OpenLogFileRead() (*os.File, error) {
 func appendLogFileWriter(writers *[]io.Writer) io.Writer {
 	slog.Info("Initializing log file writer...")
 
-	cfgLock := config.Global.Immutable()
-
-	var logFilePath string
-	var logFileMaxSize int
-	var logFileMaxBackups int
-	var logFileCompress bool
-	cfgLock.Read(func(c *config.Config) {
-		logFilePath = c.LogFile.Read()
-		logFileMaxSize = int(c.LogFileMaxSize.Read().MegaBytes())
-		logFileMaxBackups = c.LogFileMaxBackups.Read()
-		logFileCompress = c.LogFileCompress.Read()
-	})
+	logFilePath := config.Global.LogFile.Read()
+	logFileMaxSize := int(config.Global.LogFileMaxSize.Read().MegaBytes())
+	logFileMaxBackups := config.Global.LogFileMaxBackups.Read()
+	logFileCompress := config.Global.LogFileCompress.Read()
 
 	if logFilePath == "" {
 		slog.Info("Log file logging is disabled, skipping log file writer initialization")
@@ -69,18 +61,14 @@ func SetLogLevel(level slog.Level) {
 }
 
 func Init() {
-	cfgLock := config.Global.Immutable()
+	logToStdOut := config.Global.LogToStdout.Read()
 
-	var logToStdOut bool
-	cfgLock.Read(func(c *config.Config) {
-		logToStdOut = c.LogToStdout.Read()
+	logLevel.Set(config.Global.LogLevel.Read())
 
-		// Subscribe to log level changes
-		c.LogLevel.OnChange(func(newLevel slog.Level) {
-			logLevel.Set(newLevel)
-			slog.Info("Log level changed by configuration", "new_level", newLevel)
-		})
-		logLevel.Set(c.LogLevel.Read())
+	// Subscribe to log level changes
+	config.Global.LogLevel.OnChange(func(newLevel slog.Level) {
+		logLevel.Set(newLevel)
+		slog.Info("Log level changed by configuration", "new_level", newLevel)
 	})
 
 	slog.Info("Initializing logging...")

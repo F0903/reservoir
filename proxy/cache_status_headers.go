@@ -35,7 +35,7 @@ type cacheStatus struct {
 	stored    bool
 }
 
-func makeCacheStatusHeader(cached typeutils.Optional[cache.Entry[cachedRequestInfo]], cacheStatus cacheStatus) string {
+func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[cachedRequestInfo]], cacheStatus cacheStatus) string {
 	slog.Debug("Making Cache-Status header...", "cached", cached, "cacheStatus", cacheStatus)
 
 	params := make([]string, 0, 6)
@@ -111,7 +111,7 @@ func getCurrentAge(originalHead http.Header, storedAt time.Time) int {
 	return currentAge
 }
 
-func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.Optional[cache.Entry[cachedRequestInfo]], cacheStatus cacheStatus) {
+func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.Optional[*cache.Entry[cachedRequestInfo]], cacheStatus cacheStatus) {
 	cacheStatusHeader := makeCacheStatusHeader(cached, cacheStatus)
 	r.AddHeader("Cache-Status", cacheStatusHeader)
 	slog.Debug("Cache-Status header set:", "cache_status", cacheStatusHeader)
@@ -140,13 +140,13 @@ func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
 	fwdReason := typeutils.None[fwdReason]()
 	if isRevalidated {
 		fwdReasonNum := fwdReasonStale
-		fwdReason = typeutils.Some(&fwdReasonNum)
+		fwdReason = typeutils.Some(fwdReasonNum)
 	}
 
 	fwdStatus := typeutils.None[int]()
 	if isRevalidated || isMiss {
 		fwdStatusNum := fetchInfo.UpstreamStatus
-		fwdStatus = typeutils.Some(&fwdStatusNum)
+		fwdStatus = typeutils.Some(fwdStatusNum)
 	}
 
 	cacheStatus := cacheStatus{

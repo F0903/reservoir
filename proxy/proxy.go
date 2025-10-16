@@ -40,10 +40,9 @@ type cachedRequestInfo struct {
 }
 
 type Proxy struct {
-	ca                  certs.CertAuthority
-	cache               *cache.FileCache[cachedRequestInfo]
-	fetch               fetcher
-	retryOnInvalidRange bool
+	ca    certs.CertAuthority
+	cache *cache.FileCache[cachedRequestInfo]
+	fetch fetcher
 }
 
 func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
@@ -55,24 +54,12 @@ func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) 
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
 func NewProxy(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
-	cfgLock := config.Global.Immutable()
-
-	var cacheCleanupInterval time.Duration
-	cfgLock.Read(func(c *config.Config) {
-		cacheCleanupInterval = c.CacheCleanupInterval.Read().Cast()
-	})
-
-	var retryOnInvalidRange bool
-	cfgLock.Read(func(c *config.Config) {
-		retryOnInvalidRange = c.RetryOnInvalidRange.Read()
-	})
-
+	cacheCleanupInterval := config.Global.CacheCleanupInterval.Read().Cast()
 	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, ctx)
 	return &Proxy{
-		ca:                  ca,
-		cache:               cache,
-		fetch:               newFetcher(cache),
-		retryOnInvalidRange: retryOnInvalidRange,
+		ca:    ca,
+		cache: cache,
+		fetch: newFetcher(cache),
 	}, nil
 }
 
@@ -114,7 +101,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	if err != nil {
 		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.FileSize)
 
-		if !p.retryOnInvalidRange {
+		if !config.Global.RetryOnInvalidRange.Read() {
 			slog.Error("Sending 416 Range Not Satisfiable due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 			r.SetHeader("Accept-Ranges", "bytes")
@@ -126,7 +113,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 
 		slog.Info("Retrying request without Range header due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
-		clientHd.Range.Remove(req.Header)
+		clientHd.Range.SyncRemove(req.Header)
 		fetched, err := p.fetch.dedupFetch(req, key, clientHd)
 		if err != nil {
 			slog.Error("Error fetching resource without Range header", "url", req.URL, "key", key, "error", err)
@@ -190,7 +177,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		r.SetHeaders(fetched.Direct.Response.Header)
 		if fetched.Direct.UpstreamStatus >= 200 && fetched.Direct.UpstreamStatus < 300 {
 			r.SetHeader("Accept-Ranges", "bytes")
-			addCacheHeaders(r, req, typeutils.None[cache.Entry[cachedRequestInfo]](), fetchResultToCacheStatus(fetched))
+			addCacheHeaders(r, req, typeutils.None[*cache.Entry[cachedRequestInfo]](), fetchResultToCacheStatus(fetched))
 		}
 
 		return finalizeAndRespond(r, fetched.Direct.Response.Body, fetched.Direct.UpstreamStatus, req)

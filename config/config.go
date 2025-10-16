@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
-	"reservoir/config/flags"
-	"reservoir/utils"
 	"reservoir/utils/bytesize"
 	"reservoir/utils/duration"
 	"time"
@@ -55,13 +53,9 @@ func (c *Config) setRestartNeededProps() {
 	c.ProxyListen.SetRequiresRestart()
 	c.CaCert.SetRequiresRestart()
 	c.CaKey.SetRequiresRestart()
-	c.RetryOnRange416.SetRequiresRestart()
-	c.RetryOnInvalidRange.SetRequiresRestart()
 	c.WebserverListen.SetRequiresRestart()
 	c.DashboardDisabled.SetRequiresRestart()
 	c.ApiDisabled.SetRequiresRestart()
-	c.CacheDir.SetRequiresRestart()
-	c.DefaultCacheMaxAge.SetRequiresRestart()
 	c.LogFile.SetRequiresRestart()
 	c.LogFileMaxSize.SetRequiresRestart()
 	c.LogFileMaxBackups.SetRequiresRestart()
@@ -168,87 +162,120 @@ func loadOrDefault(path string) (*Config, error) {
 	return cfg, nil
 }
 
+type stagedProp interface {
+	CommitStaged()
+}
+
 // Dynamically sets the properties of the Config struct based on the provided map.
 // This allows for partial updates to the config without needing to know the exact structure of the Config struct.
-func setPropsFromMap(cfg *Config, updates map[string]any) {
-	t := reflect.TypeOf(*cfg)
-	v := reflect.ValueOf(cfg).Elem()
+func setPropsFromMap(cfg *Config, updates map[string]any) (stagedProps []stagedProp, err error) {
+	configT := reflect.TypeOf(*cfg)
+	configV := reflect.ValueOf(cfg).Elem()
+
+	stagedProps = make([]stagedProp, 0, 1)
 
 	// This could definitely be optimized, but for the current usage, this should be more than sufficient.
 	for key, value := range updates {
 		slog.Debug("Processing update", "key", key, "value", value)
 
-		for i := 0; i < t.NumField(); i++ {
-			fieldT := t.Field(i)
+		for i := 0; i < configT.NumField(); i++ {
+			propT := configT.Field(i)
 
-			fieldJsonName, ok := fieldT.Tag.Lookup("json")
-			if !ok || fieldJsonName != key {
-				slog.Debug("Skipping field, was not match", "field", fieldT.Name, "json_name", fieldJsonName)
-				continue
-			}
-			fieldV := v.Field(i)
-
-			slog.Debug("Found matching field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
-
-			if !fieldV.CanSet() {
-				slog.Error("Cannot set field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+			// Match the JSON tag to the key
+			propJsonName, ok := propT.Tag.Lookup("json")
+			if !ok || propJsonName != key {
+				slog.Debug("Skipping field, was not match", "field", propT.Name, "json_name", propJsonName)
 				continue
 			}
 
-			if !fieldV.CanAddr() {
-				slog.Error("Cannot get address of field", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
+			propV := configV.Field(i)
+			slog.Debug("Found matching field", "field", propT.Name, "type", propT.Type, "field_value", propV)
+
+			if !propV.CanSet() {
+				slog.Error("Cannot set field", "field", propT.Name, "type", propT.Type, "field_value", propV)
 				continue
 			}
-			fieldVAddr := fieldV.Addr()
 
+			if !propV.CanAddr() {
+				slog.Error("Cannot get address of field", "field", propT.Name, "type", propT.Type, "field_value", propV)
+				continue
+			}
+			propVAddr := propV.Addr()
+
+			unmarshalJson := propVAddr.MethodByName("UnmarshalJSON")
+			if unmarshalJson.IsZero() {
+				slog.Error("UnmarshalJSON method was not found!", "field", propT.Name, "type", propT.Type, "field_value", propV)
+				continue
+			}
+
+			// Marshal the value back to JSON, so we can unmarshal again to handle all the different conversions.
 			valueBytes, err := json.Marshal(value)
 			if err != nil {
-				slog.Error("Failed to marshal value to JSON", "field", fieldT.Name, "error", err)
+				slog.Error("Failed to marshal value to JSON", "field", propT.Name, "error", err)
 				continue
 			}
 
-			unmarshalJson := fieldVAddr.MethodByName("UnmarshalJSON")
-			if unmarshalJson.IsZero() {
-				slog.Error("UnmarshalJSON method was not found!", "field", fieldT.Name, "type", fieldT.Type, "field_value", fieldV)
-				continue
-			}
 			returns := unmarshalJson.Call([]reflect.Value{reflect.ValueOf(valueBytes)})
 			result := returns[0]
 			if !result.IsNil() {
 				err := result.Interface().(error)
-				slog.Error("UnmarshalJSON failed", "field", fieldT.Name, "error", err)
+				slog.Error("UnmarshalJSON failed", "field", propT.Name, "error", err)
 				continue
 			}
 
-			slog.Debug("Field updated successfully", "field", fieldT.Name, "type", fieldT.Type, "new_value", value)
+			stagedProps = append(stagedProps, propVAddr.Interface().(stagedProp))
+
+			slog.Debug("Field updated successfully", "field", propT.Name, "type", propT.Type, "new_value", value)
 			break // We found the field, no need to continue
 		}
 	}
+
+	return stagedProps, nil
 }
 
-func (c *Config) OverrideFromFlags() {
-	fl := flags.New()
-	fl.AddString("listen", ":9999", "The address and port that the proxy will listen on").OnSet(func(val flags.FlagValue) { c.ProxyListen.Overwrite(val.AsString()) })
-	fl.AddString("ca-cert", "ssl/ca.crt", "Path to CA certificate file").OnSet(func(val flags.FlagValue) { c.CaCert.Overwrite(val.AsString()) })
-	fl.AddString("ca-key", "ssl/ca.key", "Path to CA private key file").OnSet(func(val flags.FlagValue) { c.CaKey.Overwrite(val.AsString()) })
-	fl.AddString("cache-dir", "var/cache/", "Path to cache directory").OnSet(func(val flags.FlagValue) { c.CacheDir.Overwrite(val.AsString()) })
-	fl.AddString("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on").OnSet(func(val flags.FlagValue) { c.WebserverListen.Overwrite(val.AsString()) })
-	fl.AddBool("no-dashboard", false, "Disable the dashboard. The API must also be enabled if the dashboard is enabled.").OnSet(func(val flags.FlagValue) { c.DashboardDisabled.Overwrite(val.AsBool()) })
-	fl.AddBool("no-api", false, "Disable the API").OnSet(func(val flags.FlagValue) { c.ApiDisabled.Overwrite(val.AsBool()) })
-	fl.AddString("log-level", "", "Set the logging level (DEBUG, INFO, WARN, ERROR)").OnSet(func(val flags.FlagValue) {
-		level := utils.StringToLogLevel(val.AsString())
-		c.LogLevel.Overwrite(level)
-	})
-	fl.AddString("log-file", "", "Set the log file path").OnSet(func(val flags.FlagValue) { c.LogFile.Overwrite(val.AsString()) })
-	fl.AddString("log-file-max-size", "", "Set the log file max size").OnSet(func(val flags.FlagValue) { c.LogFileMaxSize.Overwrite(val.AsBytesize()) })
-	fl.AddInt("log-file-max-backups", 3, "Set the log file max backups").OnSet(func(val flags.FlagValue) { c.LogFileMaxBackups.Overwrite(val.AsInt()) })
-	fl.AddBool("log-file-compress", true, "Set the log file compress").OnSet(func(val flags.FlagValue) { c.LogFileCompress.Overwrite(val.AsBool()) })
-	fl.AddBool("log-to-stdout", false, "Enable logging to stdout").OnSet(func(val flags.FlagValue) { c.LogToStdout.Overwrite(val.AsBool()) })
-	fl.Parse()
-}
+type UpdateStatus int
 
-func ParseFlags() {
-	UpdateAndVerify(func(cfg *Config) {
-		cfg.OverrideFromFlags()
-	})
+const (
+	UpdateStatusFailed UpdateStatus = iota
+	UpdateStatusSuccess
+	UpdateStatusRestartRequired
+)
+
+func UpdatePartialFromJSON(updates map[string]any) (UpdateStatus, error) {
+	slog.Info("Updating global config with partial JSON", "updates", updates)
+
+	if updates == nil {
+		slog.Error("UpdatePartialFromJSON called with nil updates")
+		return UpdateStatusFailed, nil
+	}
+
+	slog.Debug("Setting properties from JSON map...", "updates", updates)
+	stagedProps, err := setPropsFromMap(Global, updates)
+	if err != nil {
+		slog.Error("Failed to set properties from map", "error", err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	slog.Info("Committing updated properties...", "staged_count", len(stagedProps))
+	for _, prop := range stagedProps {
+		slog.Debug("Committing property...", "prop", prop)
+		prop.CommitStaged()
+	}
+
+	if err := Global.verify(); err != nil {
+		slog.Error("Updated global config failed verification", "error", err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	if err := Global.persist(); err != nil {
+		slog.Error("Failed to persist updated global config", "error", err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	status := UpdateStatusSuccess
+	if IsRestartNeeded() {
+		slog.Info("Restart is required after updating global config")
+		status = UpdateStatusRestartRequired
+	}
+	return status, nil
 }
