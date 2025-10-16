@@ -29,11 +29,15 @@ export class APIJsonObject {
 
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
-    if (redirect.returnToLastWindow) {
+
+    // Don't redirect to login if we're already on the login page
+    const isOnLoginPage = !window.location.pathname.endsWith("/login");
+    if (redirect.returnToLastWindow && !isOnLoginPage) {
         const returnTo = window.location.pathname + window.location.search;
         log.debug("Redirecting to login from API call, will return to:", returnTo);
         params.append("return", returnTo);
     }
+
     let loginUrl = resolve(`/login`);
     if (params.size > 0) {
         loginUrl += `?${params.toString()}`;
