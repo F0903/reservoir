@@ -11,6 +11,7 @@
     import type { ToastProvider } from "$lib/providers/toast-provider.svelte";
     import { UnauthorizedError } from "$lib/api/api-methods";
     import Form from "$lib/components/ui/input/Form.svelte";
+    import { resolve } from "$app/paths";
 
     let { data }: PageProps = $props();
 
@@ -43,7 +44,9 @@
             });
 
             log.debug("Password reset successful, redirecting...");
-            await goto(returnTo, { replaceState: true, invalidateAll: true });
+            let returnToBase = resolve("/");
+            returnToBase += returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
+            await goto(returnToBase, { replaceState: true, invalidateAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {
             if (err instanceof UnauthorizedError) {

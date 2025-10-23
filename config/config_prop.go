@@ -5,50 +5,17 @@ import (
 	"fmt"
 	"reservoir/utils/atomics"
 	"reservoir/utils/event"
-	"reservoir/utils/typeutils"
 )
-
-type Commitable[T any] struct {
-	comittedValue T
-	stagedValue   typeutils.Optional[T]
-}
-
-func NewCommitable[T any](value T) Commitable[T] {
-	return Commitable[T]{comittedValue: value, stagedValue: typeutils.None[T]()}
-}
-
-func (c Commitable[T]) ref() *T {
-	return &c.comittedValue
-}
-
-func (c Commitable[T]) Value() T {
-	return c.comittedValue
-}
-
-func (c *Commitable[T]) Stage(value T) {
-	c.stagedValue = typeutils.Some(value)
-}
-
-func (c *Commitable[T]) Commit() {
-	if val, ok := c.stagedValue.Get(); ok {
-		c.comittedValue = val
-		c.stagedValue = typeutils.None[T]()
-	}
-}
-
-func (c *Commitable[T]) Uncommit() {
-	c.stagedValue = typeutils.None[T]()
-}
 
 type ConfigProp[T comparable] struct {
 	// We use Overwritable to allow overrides from the command line while still retaining and persisting the original value from the config file.
-	value           atomics.Value[Commitable[typeutils.Overwritable[T]]]
+	value           atomics.Value[commitable[overwritable[T]]]
 	onChange        event.Event[T]
 	requiresRestart bool
 }
 
 func NewConfigProp[T comparable](value T) ConfigProp[T] {
-	return ConfigProp[T]{value: atomics.NewValue(NewCommitable(typeutils.NewOverwritable(value)))}
+	return ConfigProp[T]{value: atomics.NewValue(NewCommitable(NewOverwritable(value)))}
 }
 
 func (p *ConfigProp[T]) SetRequiresRestart() {

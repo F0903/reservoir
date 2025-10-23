@@ -26,6 +26,7 @@
         "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
     const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
 
+    //TODO: tidy up typings (no explicit any)
     type InputSection = {
         InputComponent: Component<any, any, "value">;
         get: () => any;

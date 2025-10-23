@@ -1,0 +1,6 @@
+[
+  {
+    "label": "Run Frontend Development Server",
+    "command": "make dev-frontend"
+  }
+]

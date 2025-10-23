@@ -20,6 +20,7 @@ func (a *Value[T]) Store(val T) {
 	a.v.Store(val) // make sure T is a concrete type (no nil pointers unless you store nil explicitly)
 }
 
+// Load returns the value set by the most recent Store.
 func (a *Value[T]) Load() (val T, some bool) {
 	if v := a.v.Load(); v != nil {
 		return v.(T), true
@@ -43,7 +44,8 @@ func (a *Value[T]) String() string {
 	if v, some := a.Load(); some {
 		return fmt.Sprintf("%v", v)
 	}
-	return "<nil>"
+
+	return "<nil>" // This should not be able to happen, unless the "constructor" wasn't called.
 }
 
 func (a *Value[T]) UnmarshalJSON(data []byte) error {

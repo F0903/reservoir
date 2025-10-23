@@ -30,12 +30,20 @@ export class APIJsonObject {
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
 
-    // Don't redirect to login if we're already on the login page
-    const isOnLoginPage = !window.location.pathname.endsWith("/login");
-    if (redirect.returnToLastWindow && !isOnLoginPage) {
-        const returnTo = window.location.pathname + window.location.search;
-        log.debug("Redirecting to login from API call, will return to:", returnTo);
-        params.append("return", returnTo);
+    const location = window.location.pathname;
+    const isOnLoginPage = location === "/login";
+
+    if (redirect.returnToLastWindow) {
+        const windowParams = new URLSearchParams(window.location.search);
+        // If the user is on the login page, we don't want to redirect back to the login page again.
+        // Instead, we want to redirect to the page they were trying to access before they were redirected to the login page.
+        const returnTo = isOnLoginPage
+            ? windowParams.get("return")
+            : window.location.pathname + window.location.search;
+        if (returnTo) {
+            log.debug("Redirecting to login from API call, will return to:", returnTo);
+            params.append("return", returnTo);
+        }
     }
 
     let loginUrl = resolve(`/login`);

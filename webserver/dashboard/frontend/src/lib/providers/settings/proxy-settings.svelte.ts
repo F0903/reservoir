@@ -20,7 +20,7 @@ export class ProxySettings implements Settings {
             return;
         }
 
-        log.debug("Reloading proxy settings from API...", this.fields);
+        log.debug("Reloading proxy settings from API...", $state.snapshot(this.fields));
         const newData = await getConfig();
         patch(this.fields, newData);
         log.debug("Updated proxy settings from API: (snapshot)", $state.snapshot(this.fields));

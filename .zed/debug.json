@@ -1,0 +1,39 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "adapter": "Delve",
+    "label": "Debug Proxy with Defaults",
+    "request": "launch",
+    "mode": "debug",
+    "program": ".",
+    "args": ["--log-to-stdout"],
+    "console": "integratedTerminal"
+  },
+  {
+    "adapter": "Delve",
+    "label": "Debug Proxy (no embedded dashboard)",
+    "tags": ["stack:dev"],
+    "request": "launch",
+    "console": "integratedTerminal",
+    "mode": "debug",
+    "program": ".",
+    "cwd": "${ZED_WORKTREE_ROOT}",
+    "args": ["--no-dashboard", "--log-level", "DEBUG", "--log-to-stdout"],
+    "env": {},
+    "buildFlags": []
+  },
+  {
+    "adapter": "JavaScript",
+    "label": "Debug Dashboard in Chrome",
+    "tags": ["stack:dev"],
+    "type": "chrome",
+    "request": "launch",
+    "url": "http://localhost:5173/",
+    "webRoot": "${ZED_WORKTREE_ROOT}/webserver/dashboard/frontend/",
+    "pauseForSourceMap": true,
+    "timeout": 30000
+  }
+]

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { UnauthorizedError } from "$lib/api/api-methods";
     import { login } from "$lib/api/auth/auth";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
@@ -31,15 +32,25 @@
             log.debug("Password change required: ", user.password_change_required);
             if (user.password_change_required) {
                 log.debug("Login successful, password change required, redirecting...");
+
+                // We don't need SvelteURLSearchParams here, since we're not using it reactively in the UI.
+                // eslint-disable-next-line svelte/prefer-svelte-reactivity
                 const params = new URLSearchParams();
-                params.set("return", returnTo);
+
+                const pathToReturn = returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
+                params.set("return", pathToReturn);
                 params.set("required", "true");
-                await goto("/change-password?" + params.toString(), { replaceState: true });
+                let url = resolve("/change-password");
+                url += `?${params.toString()}`;
+
+                await goto(url, { replaceState: true });
                 return;
             }
 
             log.debug("Login successful, redirecting...");
-            await goto(returnTo, { replaceState: true, invalidateAll: true });
+            let returnToBase = resolve("/");
+            returnToBase += returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
+            await goto(returnToBase, { replaceState: true, invalidateAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {
             log.error("Login failed: ", err);
