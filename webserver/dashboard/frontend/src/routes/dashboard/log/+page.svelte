@@ -14,7 +14,7 @@
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            textViewer.appendText(value);
+            await textViewer.appendText(value);
         }
 
         logEvent = new EventSource("/api/log/stream");
