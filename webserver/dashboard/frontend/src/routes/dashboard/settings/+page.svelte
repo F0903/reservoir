@@ -6,11 +6,12 @@
     import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
     import type { ToastHandle, ToastProvider } from "$lib/providers/toast-provider.svelte";
     import { log } from "$lib/utils/logger";
-    import { getContext, onMount, type Component } from "svelte";
+    import { getContext, onMount, type Component, type ComponentProps } from "svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
     import { parseByteString } from "$lib/utils/bytestring";
     import { patchConfig } from "$lib/api/objects/config/config";
+    import NumberInput from "$lib/components/ui/input/NumberInput.svelte";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
@@ -18,25 +19,12 @@
     const optionalStringPattern = "^.*$";
     const stringPattern = "^.+$";
     const boolPattern = "^(true|false)$";
-    const intPattern = "^\\d+$";
-    const bytesizePattern = "^(\\d+)([BKMGT])$";
+    const bytesizePattern = "^(\\d+)([BKMGT])$"; // eg. 100B, 1K, 1M, 1G, 1T
     const durationPattern =
-        "^(?:\\+|-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$";
+        "^(?:\\+|-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$"; // eg. 100ms, 1s, 1m, 1h
     const ipPortPattern =
         "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
-    const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$"; // One of these values
-
-    //TODO: tidy up typings (no explicit any)
-    type InputSection = {
-        InputComponent: Component<any, any, "value">;
-        get: () => any;
-        valueTransform?: (val: any) => any;
-        commit: (val: any) => Promise<any>;
-        label: string;
-        pattern: string;
-        tooltip?: string;
-        [key: string]: any; // Allow additional props for the input component
-    };
+    const logLevelPattern = "^(DEBUG|INFO|WARN|ERROR)$";
 
     // Thin wrapper so we can show a toast if a restart is required
     async function sendPatch(propName: string, value: unknown) {
@@ -52,17 +40,45 @@
         }
     }
 
-    const inputSections: InputSection[][] = [
+    type InputSection<
+        C extends Component<CP, CE, "value">,
+        CP extends Record<string, unknown> = { [key: string]: unknown },
+        CE extends Record<string, unknown> = { [key: string]: unknown },
+        O = ComponentProps<C>["value"],
+    > = {
+        InputComponent: C;
+        get: () => ComponentProps<C>["value"];
+        valueTransform?: (_val: ComponentProps<C>["value"]) => O;
+        commit: (_val: O) => Promise<unknown>;
+        label: string;
+        pattern?: string;
+        tooltip?: string;
+    } & Omit<ComponentProps<C>, "value" | "label">;
+
+    type RegularInputProps<V> = {
+        label: string;
+        value: V;
+    };
+
+    type SetErrorProp = {
+        setError: (_error: string) => void;
+    };
+
+    const inputSections: (
+        | InputSection<typeof NumberInput, RegularInputProps<number>>
+        | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp>
+        | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp, number>
+        | InputSection<typeof Toggle, RegularInputProps<boolean>>
+        | InputSection<typeof Dropdown, RegularInputProps<string> & { options: string[] }>
+    )[][] = [
         // Dashboard section
         [
             {
-                InputComponent: TextInput,
+                InputComponent: NumberInput,
                 get: () => settings.dashboardSettings.fields.updateInterval,
                 commit: async (val: number) =>
                     (settings.dashboardSettings.fields.updateInterval = val),
-                valueTransform: (val: string) => parseInt(val),
                 label: "Dashboard Update Interval",
-                pattern: intPattern,
                 min: 500,
                 tooltip:
                     "The interval at which the dashboard updates its data from the API in milliseconds.",
@@ -170,7 +186,7 @@
             },
             {
                 InputComponent: TextInput,
-                get: () => settings.proxySettings.fields.max_cache_size,
+                get: () => String(settings.proxySettings.fields.max_cache_size),
                 valueTransform: (val: string) => parseByteString(val),
                 commit: async (val: number) => await sendPatch("max_cache_size", val),
                 label: "Max Cache Size",
@@ -228,7 +244,7 @@
             },
             {
                 InputComponent: TextInput,
-                get: () => settings.proxySettings.fields.log_file_max_size,
+                get: () => String(settings.proxySettings.fields.log_file_max_size),
                 valueTransform: (val: string) => parseByteString(val),
                 commit: async (val: number) => await sendPatch("log_file_max_size", val),
                 label: "Log File Max Size",
@@ -237,12 +253,10 @@
                     "The maximum size (in bytes) of the log file before it is rotated. You can use suffixes like B, K, M, G, T.",
             },
             {
-                InputComponent: TextInput,
+                InputComponent: NumberInput,
                 get: () => settings.proxySettings.fields.log_file_max_backups,
-                valueTransform: (val: string) => parseInt(val),
                 commit: async (val: number) => await sendPatch("log_file_max_backups", val),
                 label: "Log File Max Backups",
-                pattern: intPattern,
                 tooltip:
                     "The maximum number of rotated log files to keep. Older files will be deleted.",
             },
@@ -265,7 +279,12 @@
         ],
     ];
 
-    const inputComponents: SettingInput<any, any>[][] = $state(
+    type SettingInputInstance = {
+        hasChanged: () => boolean;
+        commit: () => Promise<void>;
+        reset: () => Promise<void>;
+    };
+    const inputComponents: SettingInputInstance[][] = $state(
         // Initialize a 2D array (an array for each section) to hold references to SettingInput components
         inputSections.map(() => []),
     );
@@ -353,13 +372,20 @@
         >
     {/if}
     <div class="inputs">
-        {#each inputSections as section, i}
-            {#each section as input, j}
+        {#each inputSections as section, i (section)}
+            {#each section as input, j (input.label)}
                 <SettingInput
                     bind:this={inputComponents[i][j]}
-                    {...input}
-                    {onChange}
+                    {...input as Record<string, unknown>}
+                    InputComponent={input.InputComponent as Component<
+                        Record<string, unknown>,
+                        Record<string, unknown>,
+                        "value"
+                    >}
+                    get={input.get as () => unknown}
+                    commit={input.commit as (_val: unknown) => Promise<unknown>}
                     disabled={inputsDisabled}
+                    {onChange}
                 />
             {/each}
             {#if i < inputSections.length - 1}

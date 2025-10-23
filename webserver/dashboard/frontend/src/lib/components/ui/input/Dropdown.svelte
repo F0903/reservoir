@@ -2,15 +2,15 @@
     let {
         label,
         options,
-        required = true,
         value = $bindable(),
+        required = true,
         tooltip,
         disabled = false,
     }: {
         label: string;
         options: string[];
-        required: boolean;
         value: string;
+        required?: boolean;
         tooltip?: string;
         disabled?: boolean;
     } = $props();
@@ -22,7 +22,7 @@
         {#if !required}
             <option value="" selected={value === ""}>Select an option</option>
         {/if}
-        {#each options as option}
+        {#each options as option (option)}
             <option value={option} selected={option === value}>{option}</option>
         {/each}
     </select>

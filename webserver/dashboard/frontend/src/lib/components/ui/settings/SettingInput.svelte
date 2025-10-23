@@ -1,9 +1,9 @@
-<script lang="ts" generics="C extends Component<any, any, 'value'>, O">
+<script
+    lang="ts"
+    generics="C extends Component<CP, CE, 'value'>, CP extends { value: unknown }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value'], O = V"
+>
     import { log } from "$lib/utils/logger";
-    import { type Component, type ComponentProps } from "svelte";
-
-    // Value type exposed by the InputComponent's `value` prop
-    type V = ComponentProps<C>["value"];
+    import type { Component } from "svelte";
 
     let {
         InputComponent,
@@ -11,20 +11,18 @@
         commit: commitValue,
         valueTransform,
         onChange,
-        disabled = false,
         ...restProps
     }: {
         InputComponent: C;
         get: () => V;
-        commit: (val: any) => Promise<any>;
-        valueTransform?: (val: V) => O;
-        onChange?: (different: boolean) => void;
-        disabled?: boolean;
+        commit: (_val: O) => Promise<unknown>;
+        valueTransform?: (_val: V) => O;
+        onChange?: (_different: boolean) => void;
+        [key: string]: unknown;
     } = $props();
 
-    let store: V = $state(get());
-
-    let value: V | undefined = $state();
+    let value: V = $state(get());
+    let store: V = $derived(value);
     let lastChangeValue = false;
 
     $effect(() => {
@@ -43,18 +41,22 @@
     }
 
     export async function commit() {
-        if (!hasChanged()) return;
+        if (!hasChanged() || value === undefined) return;
 
         try {
-            let valueToWrite = value;
+            let valueToWrite: O;
             if (valueTransform) {
                 valueToWrite = valueTransform(value);
                 log.debug(`Committing setting with transformed value: ${valueToWrite}`);
+            } else {
+                valueToWrite = value as O;
             }
             await commitValue(valueToWrite);
+
             log.debug("Setting committed successfully.");
         } catch (e) {
             log.error("Failed to commit setting:", e);
+
             // Error toast will be shown by global handler.
             throw e;
         }
@@ -62,8 +64,7 @@
 
     export async function reset() {
         value = await get();
-        store = value;
     }
 </script>
 
-<InputComponent bind:value {disabled} {...restProps}></InputComponent>
+<InputComponent {...restProps as CP} bind:value />

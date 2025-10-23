@@ -22,7 +22,7 @@
         boxWidthCh?: number;
         min?: number;
         max?: number;
-        onSubmit?: (event: Event) => void;
+        onSubmit?: (_event: Event) => void;
         disabled?: boolean;
         censor?: boolean;
     } = $props();

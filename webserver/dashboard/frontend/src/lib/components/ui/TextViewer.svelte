@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, tick } from "svelte";
+    import { tick } from "svelte";
 
     let {
         initialContent,
