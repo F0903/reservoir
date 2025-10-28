@@ -20,14 +20,24 @@
     "console": "integratedTerminal",
     "mode": "debug",
     "program": ".",
-    "cwd": "${ZED_WORKTREE_ROOT}",
     "args": ["--no-dashboard", "--log-level", "DEBUG", "--log-to-stdout"],
+    "cwd": "${ZED_WORKTREE_ROOT}",
     "env": {},
     "buildFlags": []
   },
   {
     "adapter": "JavaScript",
-    "label": "Debug Dashboard in Chrome",
+    "label": "Debug Dashboard Frontend (HMR)",
+    "tags": ["stack:dev"],
+    "type": "node-terminal",
+    "request": "launch",
+    "command": "pnpm run dev",
+    "cwd": "${ZED_WORKTREE_ROOT}/webserver/dashboard/frontend/",
+    "console": "integratedTerminal"
+  },
+  {
+    "adapter": "JavaScript",
+    "label": "Open Chrome Debugger",
     "tags": ["stack:dev"],
     "type": "chrome",
     "request": "launch",
