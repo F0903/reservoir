@@ -14,19 +14,6 @@ export class UnauthorizedError extends Error {
 export type LoginRedirectOptions = { returnToLastWindow: boolean };
 export const DefaultRedirectOptions: LoginRedirectOptions = { returnToLastWindow: true };
 
-export interface APIObjectConstructor<T> {
-    new (_json: Record<string, unknown>): T;
-}
-
-// Represents a raw JSON API object.
-export class APIJsonObject {
-    [key: string]: unknown;
-
-    constructor(json: Record<string, unknown>) {
-        Object.assign(this, json);
-    }
-}
-
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
 
