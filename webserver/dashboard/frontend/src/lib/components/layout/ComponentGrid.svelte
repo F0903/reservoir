@@ -1,12 +1,10 @@
-<script lang="ts">
+<script lang="ts" generics="Comp extends Component">
     import type { Component } from "svelte";
-
-    type MasonryComponent = Component<any, Record<string, any>, any>;
 
     let {
         components,
     }: {
-        components: MasonryComponent[];
+        components: Comp[];
     } = $props();
 </script>
 
