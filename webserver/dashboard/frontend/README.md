@@ -1,6 +1,6 @@
 # reservoir Dashboard
 
-This is the frontend for reservoir, which is a web interface for managing and monitoring the proxy.
+This is the frontend for reservoir, a web dashboard for configuring and monitoring the proxy.
 
 ## Development
 
@@ -8,16 +8,7 @@ Before starting the frontend, make sure you have [**Node** installed](https://no
 
 Then install the frontend dependencies by running `pnpm install` in the `frontend/` directory.
 
-### VS Code Debugging (Recommended)
-
-The easiest and recommended way to start the frontend in development mode is to use the provided VS Code launch configuration.
-
-To use it, follow these steps:
-
-1. Open the project in VS Code
-2. Open the Debug panel (Ctrl+Shift+D)
-3. Select either "Proxy + Dashboard" (recommended) or "Dashboard" (you will need to start the proxy separately)
-4. Start debugging :)
+The frontend is designed to be embedded in- and served by the proxy, therefore you **must** have the proxy running locally as well for the dashboard to pull data from, if you want to run it in development mode.
 
 ### Starting manually
 
