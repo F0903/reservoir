@@ -11,7 +11,7 @@
 </script>
 
 <div class="grid">
-    {#each components as Component}
+    {#each components as Component (Component)}
         <div class="grid-item">
             <Component />
         </div>

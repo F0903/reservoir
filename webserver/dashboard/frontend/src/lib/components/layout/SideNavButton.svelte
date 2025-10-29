@@ -1,15 +1,19 @@
-<script>
+<script lang="ts">
     import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { page } from "$app/state";
+    import type { Snippet } from "svelte";
     import Button from "../ui/input/Button.svelte";
 
-    let { url, children = undefined } = $props();
+    let { url, children = undefined }: { url: string; children?: Snippet } = $props();
 
     const isCurrent = $derived(page.url.pathname === url);
     const backgroundColor = $derived(isCurrent ? "var(--tertiary-400)" : "var(--secondary-400)");
 
     async function onClick() {
-        await goto(url);
+        let to = resolve("/");
+        to += url.startsWith("/") ? url : `/${url}`;
+        await goto(to);
     }
 </script>
 

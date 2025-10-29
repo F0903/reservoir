@@ -1,7 +1,7 @@
 <script lang="ts">
     import Chart from "chart.js/auto";
-    import { onDestroy, onMount } from "svelte";
-    import type { ChartConfiguration, ChartData, ChartDataset, ChartType } from "chart.js";
+    import { onMount } from "svelte";
+    import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
     import { customChartColors } from "$lib/utils/chart-colors";
     import { log } from "$lib/utils/logger";
     import { patch } from "$lib/utils/patch";
