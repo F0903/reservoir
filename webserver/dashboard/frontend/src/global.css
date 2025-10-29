@@ -114,6 +114,14 @@ table {
     border-spacing: 0;
 }
 
+hr {
+    display: block;
+    border: none;
+    height: 1px;
+    background-color: currentColor;
+    margin: 0;
+}
+
 #app {
     isolation: isolate;
 }
