@@ -21,7 +21,7 @@
                     label="Hit Rate"
                     value={hitRate.toFixed(1) + "%"}
                     --metric-label-size="0.875rem"
-                    --metric-value-size="2rem"
+                    --metric-value-size="1.5rem"
                     --metric-label-color="var(--secondary-600)"
                     --metric-value-color="var(--tertiary-400)"
                 />

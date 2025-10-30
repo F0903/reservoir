@@ -14,14 +14,14 @@ const unitLabels = Object.keys(ByteUnits);
 
 // Format bytes into human-readable string using the largest unit possible
 export function formatBytesToLargest(bytes: number, decimals = 2): string {
-    if (bytes === 0) return "0 Bytes";
+    if (bytes === 0) return "0B";
 
     const base = 1024;
     const dm = decimals < 0 ? 0 : decimals;
 
     const i = Math.floor(Math.log2(bytes) / 10);
 
-    return parseFloat((bytes / Math.pow(base, i)).toFixed(dm)) + " " + unitLabels[i];
+    return parseFloat((bytes / Math.pow(base, i)).toFixed(dm)) + unitLabels[i];
 }
 
 // Format bytes into human-readable string using a fixed unit

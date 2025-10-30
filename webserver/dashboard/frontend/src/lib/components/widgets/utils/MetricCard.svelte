@@ -19,14 +19,14 @@
 
 <style>
     .metric-value {
-        font-size: var(--metric-value-size, 1.5rem);
+        font-size: var(--metric-value-size, 1.1rem);
         font-weight: var(--metric-value-weight, bold);
         color: var(--metric-value-color, var(--secondary-400));
         margin-bottom: 0.25rem;
     }
 
     .metric-label {
-        font-size: var(--metric-label-size, 0.875rem);
+        font-size: var(--metric-label-size, 0.8rem);
         color: var(--metric-label-color, var(--primary-200));
         text-transform: uppercase;
         letter-spacing: 0.05em;

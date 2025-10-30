@@ -29,37 +29,30 @@
                 resolvedCoalescedRequests > 0
                     ? (coalescedRevalidations / resolvedCoalescedRequests) * 100
                     : 0}
+
             <div class="coalescing-display">
                 <div class="metrics-row">
                     <MetricCard
                         label="Coalescing Rate"
                         value={coalescingRate.toFixed(1) + "%"}
-                        --metric-label-size="0.875rem"
-                        --metric-value-size="2rem"
                         --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard
                         label="Coalesced Requests"
                         value={totalCoalescedRequests.toString()}
-                        --metric-label-size="0.875rem"
-                        --metric-value-size="2rem"
                         --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--secondary-400)"
                     />
                     <MetricCard
                         label="Cache Hit Rate"
                         value={coalescedCacheHitRate.toFixed(1) + "%"}
-                        --metric-label-size="0.875rem"
-                        --metric-value-size="2rem"
                         --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--primary-400)"
                     />
                     <MetricCard
                         label="Revalidation Rate"
                         value={coalescedRevalidationRate.toFixed(1) + "%"}
-                        --metric-label-size="0.875rem"
-                        --metric-value-size="2rem"
                         --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--primary-500)"
                     />
@@ -108,7 +101,6 @@
     .metrics-row {
         display: flex;
         gap: 1rem;
-        flex-wrap: wrap;
     }
 
     .coalescing-chart {

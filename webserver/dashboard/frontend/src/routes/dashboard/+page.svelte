@@ -6,7 +6,7 @@
     import CacheStats from "$lib/components/widgets/CacheStats.svelte";
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
     import RequestCoalescing from "$lib/components/widgets/RequestCoalescing.svelte";
-    import ComponentGrid from "$lib/components/layout/ComponentGrid.svelte";
+    import SquaredGrid from "$lib/components/layout/SquaredGrid.svelte";
     import { getContext, onMount } from "svelte";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
 
@@ -23,20 +23,25 @@
 </script>
 
 <main class="dashboard">
-    <ComponentGrid
-        components={[
-            CacheEfficiency,
-            CachePerformance,
-            TotalRequests,
-            RequestCoalescing,
-            DataTransfer,
-            SystemInfo,
-            CacheStats,
+    <SquaredGrid
+        elements={[
+            { Comp: CacheEfficiency, size: { width: 2, height: 2 } },
+            { Comp: CachePerformance, size: { width: 2, height: 2 } },
+            { Comp: TotalRequests, size: { width: 2, height: 2 } },
+            { Comp: RequestCoalescing, size: { width: 4, height: 3 } },
+            { Comp: DataTransfer, size: { width: 2, height: 2 } },
+            { Comp: SystemInfo, size: { width: 1, height: 1 } },
+            { Comp: CacheStats, size: { width: 2, height: 4 } },
         ]}
     />
 </main>
 
 <style>
+    main {
+        height: 100%;
+        width: 100%;
+    }
+
     .dashboard {
         padding: 1.5rem;
     }

@@ -23,12 +23,22 @@
     }
 </script>
 
-<Widget title="System Metrics">
+<Widget
+    title="System Info"
+    --widget-title-size="1rem"
+    --widget-padding="1.5rem 0.75rem 0.75rem 0.75rem"
+>
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
             <Poller pollFn={() => updateUptime(data)} pollInterval={1000}>
                 <div class="metrics">
-                    <MetricCard label="Uptime" value={uptime} --metric-value-size="1.1rem" />
+                    <MetricCard
+                        label="Uptime"
+                        value={uptime}
+                        --metric-value-size="clamp(0.5rem, .9rem, 2rem)"
+                        --metric-width="100%"
+                        --metric-height="100%"
+                    />
                 </div>
             </Poller>
         {/snippet}
