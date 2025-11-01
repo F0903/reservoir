@@ -20,20 +20,20 @@
     let grid: HTMLDivElement;
 
     let parentWidth: number | undefined = $state();
-    let parentHeight: number | undefined = $state();
 
     let initialized = $state(false);
 
     onMount(() => {
         if (!grid.parentElement) return;
 
+        // Set initial parent width
         parentWidth = grid.parentElement.offsetWidth;
-        parentHeight = grid.parentElement.offsetHeight;
 
         const parentObserver = new ResizeObserver((entries) => {
+            // Update parent width when resized
+
             const entry = entries[0];
             parentWidth = entry.contentRect.width;
-            parentHeight = entry.contentRect.height;
         });
         parentObserver.observe(grid.parentElement);
 
@@ -48,10 +48,9 @@
         if (!initialized) return;
 
         const columns = Math.floor(parentWidth! / (cellSize + gap));
-        const rows = Math.floor(parentHeight! / (cellSize + gap));
 
         grid.style.gridTemplateColumns = `repeat(${columns}, ${cellSize}px)`;
-        grid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+        grid.style.gridAutoRows = `${cellSize}px`;
         grid.style.gap = `${gap}px`;
     });
 </script>

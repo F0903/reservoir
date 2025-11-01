@@ -50,6 +50,13 @@
         }
         message ??= "An unexpected error occurred.";
 
+        if (message === "ResizeObserver loop completed with undelivered notifications.") {
+            log.debug(
+                "Error ignored: 'ResizeObserver loop completed with undelivered notifications.'",
+            );
+            return;
+        }
+
         toast.show({
             type: "error",
             message,

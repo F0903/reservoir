@@ -22,16 +22,19 @@
                     --metric-padding=".7rem"
                     --metric-label-color="var(--secondary-600)"
                     --metric-value-color="var(--tertiary-400)"
+                    --metric-height="100%"
                 />
                 <MetricCard
                     label="Total Requests"
                     value={totalRequests.toLocaleString()}
                     --metric-padding=".7rem"
+                    --metric-height="100%"
                 />
                 <MetricCard
                     label="Avg per Request"
                     value={formatBytesToLargest(avgBytesPerRequest ? avgBytesPerRequest : 0)}
                     --metric-padding=".7rem"
+                    --metric-height="100%"
                 />
             </div>
         {/snippet}
@@ -43,5 +46,7 @@
         display: flex;
         flex-direction: column;
         gap: 5px;
+        height: 100%;
+        min-height: 0;
     }
 </style>

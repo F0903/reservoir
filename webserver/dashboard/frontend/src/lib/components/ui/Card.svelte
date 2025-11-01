@@ -17,5 +17,8 @@
         border: var(--card-border, none);
         border-radius: var(--card-border-radius, 15px);
         background-color: var(--card-background, var(--primary-400));
+
+        display: flex;
+        flex-direction: column;
     }
 </style>

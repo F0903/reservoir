@@ -31,7 +31,7 @@
             { Comp: RequestCoalescing, size: { width: 4, height: 3 } },
             { Comp: DataTransfer, size: { width: 2, height: 2 } },
             { Comp: SystemInfo, size: { width: 1, height: 1 } },
-            { Comp: CacheStats, size: { width: 2, height: 4 } },
+            { Comp: CacheStats, size: { width: 2, height: 3 } },
         ]}
     />
 </main>

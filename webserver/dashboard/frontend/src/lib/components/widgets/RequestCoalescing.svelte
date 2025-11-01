@@ -96,6 +96,7 @@
         display: flex;
         flex-direction: column;
         gap: 1rem;
+        height: 100%;
     }
 
     .metrics-row {
@@ -104,6 +105,8 @@
     }
 
     .coalescing-chart {
+        flex-grow: 1;
+        min-height: 0;
         height: 100%;
     }
 </style>

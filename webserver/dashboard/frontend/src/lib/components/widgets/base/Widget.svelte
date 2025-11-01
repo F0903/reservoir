@@ -23,6 +23,11 @@
 </Card>
 
 <style>
+    .widget-content {
+        flex-grow: 1;
+        min-height: 0;
+    }
+
     .title {
         margin-top: -8px;
         margin-bottom: 0.5rem;

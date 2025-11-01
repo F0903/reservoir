@@ -148,5 +148,6 @@
 
         display: block;
         width: 100% !important; /* For some reason, it will only automatically resize with !important set. */
+        height: 100% !important; /* For some reason, it will only automatically resize with !important set. */
     }
 </style>
