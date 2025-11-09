@@ -16,37 +16,18 @@
                 <MetricCard
                     label="Cache Entries"
                     value={data.cache.cache_entries.toLocaleString()}
-                    --metric-label-size="0.7rem"
                 />
-                <MetricCard
-                    label="Cache Hits"
-                    value={data.cache.cache_hits.toLocaleString()}
-                    --metric-label-size="0.7rem"
-                />
-                <MetricCard
-                    label="Cache Misses"
-                    value={data.cache.cache_misses.toLocaleString()}
-                    --metric-label-size="0.7rem"
-                />
-                <MetricCard
-                    label="Cache Errors"
-                    value={data.cache.cache_errors.toLocaleString()}
-                    --metric-label-size="0.7rem"
-                />
+                <MetricCard label="Cache Hits" value={data.cache.cache_hits.toLocaleString()} />
+                <MetricCard label="Cache Misses" value={data.cache.cache_misses.toLocaleString()} />
+                <MetricCard label="Cache Errors" value={data.cache.cache_errors.toLocaleString()} />
                 <MetricCard
                     label="Bytes Cached"
                     value={formatBytesToLargest(data.cache.bytes_cached)}
-                    --metric-label-size="0.7rem"
                 />
-                <MetricCard
-                    label="Cleanup Runs"
-                    value={data.cache.cleanup_runs.toLocaleString()}
-                    --metric-label-size="0.7rem"
-                />
+                <MetricCard label="Cleanup Runs" value={data.cache.cleanup_runs.toLocaleString()} />
                 <MetricCard
                     label="Bytes Cleaned"
                     value={formatBytesToLargest(data.cache.bytes_cleaned)}
-                    --metric-label-size="0.7rem"
                 />
             </div>
         {/snippet}

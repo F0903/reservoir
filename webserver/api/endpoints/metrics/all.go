@@ -25,6 +25,8 @@ func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
+	metrics.Global.RunCollectors() // Run all collectors to make sure we get updated metrics
+
 	metricsJson, err := json.Marshal(metrics.Global)
 	if err != nil {
 		slog.Error("Error marshaling all metrics", "error", err)

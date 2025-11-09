@@ -14,7 +14,7 @@
 <Card
     --card-width="var(--widget-width, 100%)"
     --card-height="var(--widget-height, 100%)"
-    --card-padding="var(--widget-padding, 1.5rem)"
+    --card-padding="var(--widget-padding,  0.75rem)"
 >
     <h2 class="title">{title}</h2>
     <div class="widget-content">
@@ -29,7 +29,6 @@
     }
 
     .title {
-        margin-top: -8px;
         margin-bottom: 0.5rem;
 
         font-size: var(--widget-title-size, 1.2rem);

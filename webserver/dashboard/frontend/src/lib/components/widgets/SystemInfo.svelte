@@ -1,5 +1,6 @@
 <script lang="ts">
     import { formatTimeSinceDate } from "$lib/utils/dates";
+    import { formatBytesToLargest } from "$lib/utils/bytestring";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
     import { getContext } from "svelte";
     import MetricCard from "./utils/MetricCard.svelte";
@@ -14,33 +15,39 @@
     let uptime = $state("N/A");
 
     function updateUptime(data: Metrics) {
-        if (!startTime) {
+        if (!startTime && data.system.start_time) {
             startTime = new Date(data.system.start_time);
-            return;
         }
-
-        uptime = formatTimeSinceDate(startTime);
+        if (startTime) {
+            uptime = formatTimeSinceDate(startTime);
+        }
     }
 </script>
 
-<Widget
-    title="System Info"
-    --widget-title-size="1rem"
-    --widget-padding="1.5rem 0.75rem 0.75rem 0.75rem"
->
+<Widget title="System Info">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
             <Poller pollFn={() => updateUptime(data)} pollInterval={1000}>
                 <div class="metrics">
+                    <MetricCard label="Uptime" value={uptime} />
+                    <MetricCard label="Goroutines" value={data.system.num_goroutines} />
                     <MetricCard
-                        label="Uptime"
-                        value={uptime}
-                        --metric-value-size="clamp(0.5rem, .9rem, 2rem)"
-                        --metric-width="100%"
-                        --metric-height="100%"
+                        label="Mem Allocated"
+                        value={formatBytesToLargest(data.system.mem_alloc_bytes)}
                     />
                 </div>
             </Poller>
         {/snippet}
     </Loadable>
 </Widget>
+
+<style>
+    .metrics {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        gap: 0.5rem;
+        height: 100%;
+        width: 100%;
+    }
+</style>

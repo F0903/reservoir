@@ -20,5 +20,6 @@
 
         display: flex;
         flex-direction: column;
+        justify-content: var(--card-justify-content, space-around);
     }
 </style>

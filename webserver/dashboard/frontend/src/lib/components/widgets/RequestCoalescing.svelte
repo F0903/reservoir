@@ -41,20 +41,14 @@
                     <MetricCard
                         label="Coalesced Requests"
                         value={totalCoalescedRequests.toString()}
-                        --metric-label-color="var(--secondary-600)"
-                        --metric-value-color="var(--secondary-400)"
                     />
                     <MetricCard
                         label="Cache Hit Rate"
                         value={coalescedCacheHitRate.toFixed(1) + "%"}
-                        --metric-label-color="var(--secondary-600)"
-                        --metric-value-color="var(--primary-400)"
                     />
                     <MetricCard
                         label="Revalidation Rate"
                         value={coalescedRevalidationRate.toFixed(1) + "%"}
-                        --metric-label-color="var(--secondary-600)"
-                        --metric-value-color="var(--primary-500)"
                     />
                 </div>
 

@@ -17,14 +17,14 @@
             {@const hitRate =
                 totalCacheRequests > 0 ? (data.cache.cache_hits / totalCacheRequests) * 100 : 0}
             <div class="efficiency-display">
-                <MetricCard
-                    label="Hit Rate"
-                    value={hitRate.toFixed(1) + "%"}
-                    --metric-label-size="0.875rem"
-                    --metric-value-size="1.5rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-400)"
-                />
+                <div class="metric-card-container">
+                    <MetricCard
+                        label="Hit Rate"
+                        value={hitRate.toFixed(1) + "%"}
+                        --metric-label-color="var(--secondary-600)"
+                        --metric-value-color="var(--tertiary-400)"
+                    />
+                </div>
 
                 <div class="efficiency-chart">
                     <Chart

@@ -15,3 +15,8 @@ func NewMetrics() *Metrics {
 		System:   NewSystemMetrics(),
 	}
 }
+
+// Run collectors for metrics that are not event-driven, such as system stats.
+func (m *Metrics) RunCollectors() {
+	m.System.Collect()
+}

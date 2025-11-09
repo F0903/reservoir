@@ -14,6 +14,14 @@ type requestMetrics struct {
 }
 
 func NewRequestMetrics() requestMetrics {
-	// Since Go always zero-initializes structs, we can just return a new "empty" instance.
-	return requestMetrics{}
+	return requestMetrics{
+		HTTPProxyRequests:           atomics.NewInt64(0),
+		HTTPSProxyRequests:          atomics.NewInt64(0),
+		BytesServed:                 atomics.NewInt64(0),
+		CoalescedRequests:           atomics.NewInt64(0),
+		NonCoalescedRequests:        atomics.NewInt64(0),
+		CoalescedCacheHits:          atomics.NewInt64(0),
+		CoalescedCacheRevalidations: atomics.NewInt64(0),
+		CoalescedCacheMisses:        atomics.NewInt64(0),
+	}
 }

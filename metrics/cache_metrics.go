@@ -14,6 +14,14 @@ type cacheMetrics struct {
 }
 
 func NewCacheMetrics() cacheMetrics {
-	// Since Go always zero-initializes structs, we can just return a new "empty" instance.
-	return cacheMetrics{}
+	return cacheMetrics{
+		CacheHits:      atomics.NewInt64(0),
+		CacheMisses:    atomics.NewInt64(0),
+		CacheErrors:    atomics.NewInt64(0),
+		CacheEntries:   atomics.NewInt64(0),
+		BytesCached:    atomics.NewInt64(0),
+		CleanupRuns:    atomics.NewInt64(0),
+		BytesCleaned:   atomics.NewInt64(0),
+		CacheEvictions: atomics.NewInt64(0),
+	}
 }
