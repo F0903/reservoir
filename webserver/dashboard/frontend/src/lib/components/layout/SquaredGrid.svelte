@@ -2,7 +2,7 @@
     import { onMount, type Component } from "svelte";
     import type { IntRange } from "$lib/utils/type-utils";
 
-    type GridElemSize = IntRange<1, 5>;
+    type CellSpan = IntRange<1, 5>;
 
     let {
         elements,
@@ -11,7 +11,7 @@
     }: {
         elements: {
             Comp: Component;
-            size: { width: GridElemSize; height: GridElemSize };
+            span: { width: CellSpan; height: CellSpan };
         }[];
         cellSize?: number;
         gap?: number;
@@ -21,8 +21,6 @@
 
     let parentWidth: number | undefined = $state();
 
-    let initialized = $state(false);
-
     onMount(() => {
         if (!grid.parentElement) return;
 
@@ -31,13 +29,10 @@
 
         const parentObserver = new ResizeObserver((entries) => {
             // Update parent width when resized
-
             const entry = entries[0];
             parentWidth = entry.contentRect.width;
         });
         parentObserver.observe(grid.parentElement);
-
-        initialized = true;
 
         return () => {
             parentObserver.disconnect();
@@ -45,10 +40,9 @@
     });
 
     $effect(() => {
-        if (!initialized) return;
-
         const columns = Math.floor(parentWidth! / (cellSize + gap));
 
+        // Explicitly set the amount of columns, and use gridAutoRows which can then automatically create rows as needed.
         grid.style.gridTemplateColumns = `repeat(${columns}, ${cellSize}px)`;
         grid.style.gridAutoRows = `${cellSize}px`;
         grid.style.gap = `${gap}px`;
@@ -56,16 +50,14 @@
 </script>
 
 <div class="grid" bind:this={grid}>
-    {#if initialized}
-        {#each elements as { Comp, size } (Comp)}
-            <div
-                class="grid-elem"
-                style="grid-column: span {size.width}; grid-row: span {size.height};"
-            >
-                <Comp />
-            </div>
-        {/each}
-    {/if}
+    {#each elements as { Comp, span: size } (Comp)}
+        <div
+            class="grid-elem"
+            style="grid-column: span {size.width}; grid-row: span {size.height};"
+        >
+            <Comp />
+        </div>
+    {/each}
 </div>
 
 <style>

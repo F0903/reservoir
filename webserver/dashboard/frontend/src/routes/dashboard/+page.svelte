@@ -25,13 +25,13 @@
 <main class="dashboard">
     <SquaredGrid
         elements={[
-            { Comp: CacheEfficiency, size: { width: 2, height: 2 } },
-            { Comp: CachePerformance, size: { width: 2, height: 2 } },
-            { Comp: TotalRequests, size: { width: 2, height: 2 } },
-            { Comp: RequestCoalescing, size: { width: 4, height: 3 } },
-            { Comp: DataTransfer, size: { width: 2, height: 2 } },
-            { Comp: SystemInfo, size: { width: 1, height: 1 } },
-            { Comp: CacheStats, size: { width: 2, height: 3 } },
+            { Comp: CacheEfficiency, span: { width: 2, height: 2 } },
+            { Comp: CachePerformance, span: { width: 2, height: 2 } },
+            { Comp: TotalRequests, span: { width: 2, height: 2 } },
+            { Comp: RequestCoalescing, span: { width: 4, height: 3 } },
+            { Comp: DataTransfer, span: { width: 2, height: 2 } },
+            { Comp: SystemInfo, span: { width: 1, height: 1 } },
+            { Comp: CacheStats, span: { width: 2, height: 3 } },
         ]}
     />
 </main>
