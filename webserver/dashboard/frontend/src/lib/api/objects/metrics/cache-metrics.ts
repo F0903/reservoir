@@ -9,6 +9,8 @@ export type CacheMetrics = {
     cleanup_runs: number;
     bytes_cleaned: number;
     cache_evictions: number;
+    cache_hit_latency: number;
+    cache_miss_latency: number;
 };
 
 export async function getCacheMetrics(fetchFn: FetchFn = fetch): Promise<Readonly<CacheMetrics>> {

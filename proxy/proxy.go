@@ -84,6 +84,15 @@ func finalizeAndRespond(r responder.Responder, resp io.Reader, status int, req *
 		body = http.NoBody
 	}
 
+	switch {
+	case status >= 200 && status < 300:
+		metrics.Global.Requests.StatusOKResponses.Increment()
+	case status >= 400 && status < 500:
+		metrics.Global.Requests.StatusClientErrorResponses.Increment()
+	case status >= 500 && status < 600:
+		metrics.Global.Requests.StatusServerErrorResponses.Increment()
+	}
+
 	written, err := r.Write(status, body)
 	if err != nil {
 		slog.Error("Error writing response", "url", req.URL, "error", err)
@@ -164,10 +173,22 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
+	startTime := time.Now()
 	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
+	latency := time.Since(startTime)
+
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)
 		return err
+	}
+
+	fetchInfo := fetched.getFetchInfo()
+	if fetchInfo.Status == hitStatusMiss {
+		metrics.Global.Cache.CacheMisses.Increment()
+		metrics.Global.Cache.CacheMissLatency.Add(latency.Nanoseconds())
+	} else {
+		metrics.Global.Cache.CacheHits.Increment()
+		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	}
 
 	switch fetched.Type {

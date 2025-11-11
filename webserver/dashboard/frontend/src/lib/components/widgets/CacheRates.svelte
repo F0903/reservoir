@@ -8,22 +8,24 @@
     const metrics = getContext("metrics") as MetricsProvider;
 </script>
 
-<Widget title="HTTP/HTTPS Requests">
+<Widget title="Cache Rates">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const httpProxyRequests = data.requests.http_proxy_requests}
-            {@const httpsProxyRequests = data.requests.https_proxy_requests}
             <Chart
                 type="doughnut"
                 data={{
-                    labels: ["HTTP Proxy Requests", "HTTPS Proxy Requests"],
+                    labels: ["Cache Hits", "Cache Misses", "Cache Errors"],
                     datasets: [
                         {
-                            data: [httpProxyRequests, httpsProxyRequests],
+                            data: [
+                                data.cache.cache_hits,
+                                data.cache.cache_misses,
+                                data.cache.cache_errors,
+                            ],
                         },
                     ],
                 }}
-            ></Chart>
+            />
         {/snippet}
     </Loadable>
 </Widget>

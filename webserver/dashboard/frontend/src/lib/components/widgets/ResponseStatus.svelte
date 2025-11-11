@@ -8,24 +8,30 @@
     const metrics = getContext("metrics") as MetricsProvider;
 </script>
 
-<Widget title="Cache Performance">
+<Widget title="Response Status">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
             <Chart
-                type="doughnut"
+                type="bar"
                 data={{
-                    labels: ["Cache Hits", "Cache Misses", "Cache Errors"],
+                    labels: ["2xx", "4xx", "5xx"],
                     datasets: [
                         {
+                            label: "Request Status Codes",
                             data: [
-                                data.cache.cache_hits,
-                                data.cache.cache_misses,
-                                data.cache.cache_errors,
+                                data.requests.status_ok_responses,
+                                data.requests.status_client_error_responses,
+                                data.requests.status_server_error_responses,
+                            ],
+                            backgroundColor: [
+                                "hsla(188, 34%, 43%)", // 2xx
+                                "hsla(188, 34%, 30%)", // 4xx
+                                "hsla(22, 70%, 44%)", // 5xx
                             ],
                         },
                     ],
                 }}
-            ></Chart>
+            />
         {/snippet}
     </Loadable>
 </Widget>

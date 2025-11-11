@@ -25,6 +25,24 @@
                     --metric-height="100%"
                 />
                 <MetricCard
+                    label="Bytes Fetched"
+                    value={formatBytesToLargest(data.requests.bytes_fetched)}
+                    --metric-padding=".7rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--tertiary-400)"
+                    --metric-height="100%"
+                />
+                <MetricCard
+                    label="Bandwidth Saved"
+                    value={formatBytesToLargest(
+                        data.requests.bytes_served - data.requests.bytes_fetched,
+                    )}
+                    --metric-padding=".7rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--tertiary-400)"
+                    --metric-height="100%"
+                />
+                <MetricCard
                     label="Total Requests"
                     value={totalRequests.toLocaleString()}
                     --metric-padding=".7rem"

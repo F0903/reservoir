@@ -14,17 +14,23 @@ function getColor(i: number) {
 }
 
 function colorizeDefaultDataset(dataset: ChartDataset, i: number) {
-    dataset.backgroundColor = getColor(i);
+    if (!dataset.backgroundColor) {
+        dataset.backgroundColor = getColor(i);
+    }
     return ++i;
 }
 
 function colorizeDoughnutDataset(dataset: ChartDataset, i: number) {
-    dataset.backgroundColor = dataset.data.map(() => getColor(i++));
+    if (!dataset.backgroundColor) {
+        dataset.backgroundColor = dataset.data.map(() => getColor(i++));
+    }
     return i;
 }
 
 function colorizePolarAreaDataset(dataset: ChartDataset, i: number) {
-    dataset.backgroundColor = dataset.data.map(() => getColor(i++));
+    if (!dataset.backgroundColor) {
+        dataset.backgroundColor = dataset.data.map(() => getColor(i++));
+    }
     return i;
 }
 

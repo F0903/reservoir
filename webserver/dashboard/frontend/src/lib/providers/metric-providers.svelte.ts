@@ -63,6 +63,6 @@ export class MetricsProvider {
         }
 
         log.debug("Metrics refreshed");
-        log.debug("Metrics data: ", this.data);
+        log.debug("Metrics data: ", $state.snapshot(this.data));
     };
 }

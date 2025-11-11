@@ -9,6 +9,7 @@ import (
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/proxy/headers"
+	"reservoir/utils/countingreader"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -67,8 +68,11 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key 
 
 	etag := resp.Header.Get("ETag")
 
+	var bytesRead int
+	reader := countingreader.New(resp.Body, &bytesRead)
+
 	maxAge := upstreamHd.GetExpiresOrDefault()
-	cached, err = f.cache.Cache(key, resp.Body, maxAge, cachedRequestInfo{
+	cached, err = f.cache.Cache(key, reader, maxAge, cachedRequestInfo{
 		ETag:         etag,
 		LastModified: lastModified,
 		Header:       resp.Header,
@@ -78,6 +82,7 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key 
 		return nil, fmt.Errorf("%w: %v", ErrCacheResponseFailed, err)
 	}
 
+	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
 	slog.Info("Successfully cached response", "status", resp.Status, "url", req.URL, "key", key, "expires_in", maxAge)
 	return cached, nil
 }
@@ -153,6 +158,13 @@ func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd 
 
 	if cached == nil {
 		slog.Info("Upstream response is not cachable, returning direct result after cache miss...", "url", req.URL, "status", resp.StatusCode)
+
+		var bytesRead int
+		countingBody := countingreader.NewReadCloser(resp.Body, &bytesRead)
+		resp.Body = countingBody
+
+		metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
+
 		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
@@ -173,6 +185,12 @@ func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, err
 		slog.Error("Error fetching upstream", "url", req.URL, "error", err)
 		return fetchResult{}, err
 	}
+
+	var bytesRead int
+	countingBody := countingreader.NewReadCloser(resp.Body, &bytesRead)
+	resp.Body = countingBody
+
+	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
 
 	slog.Info("Returning direct fetch result", "url", req.URL, "status", resp.StatusCode)
 	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}

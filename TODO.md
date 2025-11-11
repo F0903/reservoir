@@ -19,6 +19,6 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 ### Current Tasks:
 
 #### Metrics Refactor
-- [ ] Enhance Request Metrics: Break down total requests by status code (2xx, 4xx, 5xx).
-- [ ] Introduce Latency Tracking: Measure request duration for cache hits vs. misses.
-- [ ] Improve Data Transfer Insights: Track bytes fetched from upstream to calculate bandwidth savings.
+- [x] Enhance Request Metrics: Break down total requests by status code (2xx, 4xx, 5xx).
+- [x] Introduce Latency Tracking: Measure request duration for cache hits vs. misses.
+- [x] Improve Data Transfer Insights: Track bytes fetched from upstream to calculate bandwidth savings.
