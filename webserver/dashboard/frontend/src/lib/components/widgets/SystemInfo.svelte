@@ -35,6 +35,14 @@
                         label="Mem Allocated"
                         value={formatBytesToLargest(data.system.mem_alloc_bytes)}
                     />
+                    <MetricCard
+                        label="Total Allocated"
+                        value={formatBytesToLargest(data.system.mem_total_alloc_bytes)}
+                    />
+                    <MetricCard
+                        label="System Memory"
+                        value={formatBytesToLargest(data.system.mem_sys_bytes)}
+                    />
                 </div>
             </Poller>
         {/snippet}

@@ -7,6 +7,9 @@ type requestMetrics struct {
 	HTTPSProxyRequests          atomics.Int64 `json:"https_proxy_requests"`
 	BytesServed                 atomics.Int64 `json:"bytes_served"`
 	BytesFetched                atomics.Int64 `json:"bytes_fetched"`
+	UpstreamRequests            atomics.Int64 `json:"upstream_requests"`
+	ClientRequestLatency        atomics.Int64 `json:"client_request_latency"`   // ns
+	UpstreamRequestLatency      atomics.Int64 `json:"upstream_request_latency"` // ns
 	CoalescedRequests           atomics.Int64 `json:"coalesced_requests"`
 	NonCoalescedRequests        atomics.Int64 `json:"non_coalesced_requests"`
 	CoalescedCacheHits          atomics.Int64 `json:"coalesced_cache_hits"`
@@ -23,6 +26,9 @@ func NewRequestMetrics() requestMetrics {
 		HTTPSProxyRequests:          atomics.NewInt64(0),
 		BytesServed:                 atomics.NewInt64(0),
 		BytesFetched:                atomics.NewInt64(0),
+		UpstreamRequests:            atomics.NewInt64(0),
+		ClientRequestLatency:        atomics.NewInt64(0),
+		UpstreamRequestLatency:      atomics.NewInt64(0),
 		CoalescedRequests:           atomics.NewInt64(0),
 		NonCoalescedRequests:        atomics.NewInt64(0),
 		CoalescedCacheHits:          atomics.NewInt64(0),

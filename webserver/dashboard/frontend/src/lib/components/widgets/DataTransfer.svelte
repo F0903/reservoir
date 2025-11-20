@@ -14,7 +14,18 @@
         {#snippet children(data)}
             {@const totalRequests =
                 data.requests.http_proxy_requests + data.requests.https_proxy_requests}
-            {@const avgBytesPerRequest = data.requests.bytes_served / totalRequests}
+            {@const avgBytesPerRequest =
+                totalRequests > 0 ? data.requests.bytes_served / totalRequests : 0}
+            {@const startTime = data.system?.start_time ? new Date(data.system.start_time) : null}
+            {@const uptimeSeconds = startTime
+                ? Math.max((Date.now() - startTime.getTime()) / 1000, 1)
+                : 0}
+            {@const servedPerSecond =
+                uptimeSeconds > 0 ? data.requests.bytes_served / uptimeSeconds : 0}
+            {@const fetchedPerSecond =
+                uptimeSeconds > 0 ? data.requests.bytes_fetched / uptimeSeconds : 0}
+            {@const requestsPerSecond = uptimeSeconds > 0 ? totalRequests / uptimeSeconds : 0}
+
             <div class="cards">
                 <MetricCard
                     label="Bytes Served"
@@ -43,6 +54,28 @@
                     --metric-height="100%"
                 />
                 <MetricCard
+                    label="Served Throughput"
+                    value={`${formatBytesToLargest(servedPerSecond)}/s`}
+                    --metric-padding=".7rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--tertiary-200)"
+                    --metric-height="100%"
+                />
+                <MetricCard
+                    label="Fetched Throughput"
+                    value={`${formatBytesToLargest(fetchedPerSecond)}/s`}
+                    --metric-padding=".7rem"
+                    --metric-label-color="var(--secondary-600)"
+                    --metric-value-color="var(--tertiary-200)"
+                    --metric-height="100%"
+                />
+                <MetricCard
+                    label="Requests / s"
+                    value={requestsPerSecond.toFixed(2)}
+                    --metric-padding=".7rem"
+                    --metric-height="100%"
+                />
+                <MetricCard
                     label="Total Requests"
                     value={totalRequests.toLocaleString()}
                     --metric-padding=".7rem"
@@ -50,7 +83,7 @@
                 />
                 <MetricCard
                     label="Avg per Request"
-                    value={formatBytesToLargest(avgBytesPerRequest ? avgBytesPerRequest : 0)}
+                    value={formatBytesToLargest(avgBytesPerRequest)}
                     --metric-padding=".7rem"
                     --metric-height="100%"
                 />
@@ -61,9 +94,9 @@
 
 <style>
     .cards {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
         height: 100%;
         min-height: 0;
     }

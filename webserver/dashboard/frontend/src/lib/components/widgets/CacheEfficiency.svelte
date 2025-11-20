@@ -16,6 +16,10 @@
                 data.cache.cache_hits + data.cache.cache_misses + data.cache.cache_errors}
             {@const hitRate =
                 totalCacheRequests > 0 ? (data.cache.cache_hits / totalCacheRequests) * 100 : 0}
+            {@const missRate =
+                totalCacheRequests > 0 ? (data.cache.cache_misses / totalCacheRequests) * 100 : 0}
+            {@const errorRate =
+                totalCacheRequests > 0 ? (data.cache.cache_errors / totalCacheRequests) * 100 : 0}
             <div class="efficiency-display">
                 <div class="metric-card-container">
                     <MetricCard
@@ -24,6 +28,8 @@
                         --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--tertiary-400)"
                     />
+                    <MetricCard label="Miss Rate" value={missRate.toFixed(1) + "%"} />
+                    <MetricCard label="Error Rate" value={errorRate.toFixed(1) + "%"} />
                 </div>
 
                 <div class="efficiency-chart">
@@ -62,12 +68,20 @@
 <style>
     .efficiency-display {
         display: flex;
-        gap: 1rem;
         flex-direction: column;
+        gap: 1rem;
         height: 100%;
+        align-items: stretch;
+    }
+
+    .metric-card-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
     }
 
     .efficiency-chart {
+        flex: 1;
         min-height: 0;
     }
 </style>

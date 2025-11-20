@@ -101,7 +101,7 @@ func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, key 
 	retryReq := req.Clone(req.Context())
 	clientHd.Range.SyncRemove(retryReq.Header)
 
-	retryResp, err := f.sendRequestToUpstream(retryReq)
+	retryResp, _, err := f.sendRequestToUpstream(retryReq)
 	if err != nil {
 		slog.Error("Error fetching upstream on retry without Range header", "url", req.URL, "error", err)
 		return nil, err
@@ -129,22 +129,28 @@ func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response,
 	}
 }
 
-func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, error) {
+func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time.Duration, error) {
 	slog.Info("Sending request to upstream", "url", req.URL)
+	metrics.Global.Requests.UpstreamRequests.Increment()
+
+	startTime := time.Now()
 	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps.Read())
-	slog.Info("Received response from upstream", "url", req.URL, "status", resp.Status)
+	latency := time.Since(startTime)
+
+	metrics.Global.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
 	if err != nil {
-		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err)
-		return nil, err
+		slog.Error("Error sending request to upstream target", "url", req.URL, "error", err, "latency_ns", latency.Nanoseconds())
+		return nil, 0, err
 	}
 
-	return resp, nil
+	slog.Info("Received response from upstream", "url", req.URL, "status", resp.Status, "latency_ns", latency.Nanoseconds())
+	return resp, latency, nil
 }
 
 func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
 	slog.Debug("Fetching from upstream...")
 
-	resp, err := f.sendRequestToUpstream(req)
+	resp, upstreamLatency, err := f.sendRequestToUpstream(req)
 	if err != nil {
 		slog.Error("Error fetching upstream", "url", req.URL, "error", err)
 		return fetchResult{}, err
@@ -165,13 +171,13 @@ func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd 
 
 		metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
 
-		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}
+		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
 		return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
 	}
 
 	slog.Debug("Returning cached fetch result...")
-	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}
+	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}
 	cachedResult := cachedFetchResult{fetchInfo: fetchInfo, Entry: cached}
 	return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
 }
@@ -180,7 +186,7 @@ func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd 
 // Used for requests where you don't care about caching, and just want to pass it straight back to the client.
 func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, error) {
 	slog.Debug("Fetching directly from upstream...")
-	resp, err := f.sendRequestToUpstream(req)
+	resp, upstreamLatency, err := f.sendRequestToUpstream(req)
 	if err != nil {
 		slog.Error("Error fetching upstream", "url", req.URL, "error", err)
 		return fetchResult{}, err
@@ -193,7 +199,7 @@ func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, err
 	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
 
 	slog.Info("Returning direct fetch result", "url", req.URL, "status", resp.StatusCode)
-	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss}
+	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}
 	directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
 	return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
 }

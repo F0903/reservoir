@@ -174,6 +174,11 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
 	startTime := time.Now()
+
+	defer func() {
+		metrics.Global.Requests.ClientRequestLatency.Add(time.Since(startTime).Nanoseconds())
+	}()
+
 	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
 	latency := time.Since(startTime)
 

@@ -4,9 +4,8 @@ import (
 	"io"
 	"net/http"
 	"reservoir/cache"
+	"time"
 )
-
-//TODO: Consider reviewing this approach
 
 type fetchType int
 
@@ -16,8 +15,9 @@ const (
 )
 
 type fetchInfo struct {
-	UpstreamStatus int // Only valid if Status is hitStatusMiss or hitStatusRevalidated
-	Status         hitStatus
+	UpstreamStatus  int // Only valid if Status is hitStatusMiss or hitStatusRevalidated
+	Status          hitStatus
+	UpstreamLatency time.Duration
 }
 
 // Represents a fetch that was not served from cache, but returned directly from the origin server.

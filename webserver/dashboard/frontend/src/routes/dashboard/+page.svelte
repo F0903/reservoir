@@ -1,12 +1,13 @@
 <script lang="ts">
-    import HTTPHTTPSRequests from "$lib/components/widgets/HTTPHTTPSRequests.svelte";
-    import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
+    import CacheEfficiency from "$lib/components/widgets/CacheEfficiency.svelte";
     import CacheLatency from "$lib/components/widgets/CacheLatency.svelte";
-    import CacheRates from "$lib/components/widgets/CacheRates.svelte";
     import CacheStats from "$lib/components/widgets/CacheStats.svelte";
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
+    import RequestVolume from "$lib/components/widgets/RequestVolume.svelte";
     import RequestCoalescing from "$lib/components/widgets/RequestCoalescing.svelte";
+    import RequestLatency from "$lib/components/widgets/RequestLatency.svelte";
     import ResponseStatus from "$lib/components/widgets/ResponseStatus.svelte";
+    import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
     import SquaredGrid from "$lib/components/layout/SquaredGrid.svelte";
     import { getContext, onMount } from "svelte";
     import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
@@ -26,14 +27,15 @@
 <main class="dashboard">
     <SquaredGrid
         elements={[
-            { Comp: CacheRates, span: { width: 2, height: 2 } },
+            { Comp: CacheEfficiency, span: { width: 3, height: 2 } },
             { Comp: CacheLatency, span: { width: 2, height: 2 } },
-            { Comp: HTTPHTTPSRequests, span: { width: 2, height: 2 } },
+            { Comp: RequestLatency, span: { width: 3, height: 3 } },
+            { Comp: RequestVolume, span: { width: 3, height: 2 } },
             { Comp: ResponseStatus, span: { width: 2, height: 2 } },
             { Comp: RequestCoalescing, span: { width: 4, height: 3 } },
             { Comp: DataTransfer, span: { width: 2, height: 3 } },
-            { Comp: SystemInfo, span: { width: 1, height: 2 } },
-            { Comp: CacheStats, span: { width: 2, height: 3 } },
+            { Comp: SystemInfo, span: { width: 1, height: 3 } },
+            { Comp: CacheStats, span: { width: 3, height: 2 } },
         ]}
     />
 </main>
