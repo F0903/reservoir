@@ -12,7 +12,7 @@
 
     async function onClick() {
         let to = resolve("/");
-        to += url.startsWith("/") ? url : `/${url}`;
+        to += url.startsWith("/") ? url.substring(1) : url;
         await goto(to);
     }
 </script>
