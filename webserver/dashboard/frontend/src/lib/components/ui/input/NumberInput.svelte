@@ -7,6 +7,9 @@
         placeholder,
         tooltip,
         maxCharacters = 30,
+        // We want the behaviour the warning warns about.
+        // eslint-disable-next-line
+        // svelte-ignore state_referenced_locally
         boxWidthCh = maxCharacters,
         min,
         max,
@@ -32,7 +35,7 @@
 
 <TextInput
     {label}
-    bind:value={() => valProp.toString(), (val: unknown) => (valProp = Number(val))}
+    bind:value={() => valProp?.toString(), (val: unknown) => (valProp = Number(val))}
     pattern={intPattern}
     {placeholder}
     {tooltip}

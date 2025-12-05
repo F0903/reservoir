@@ -21,6 +21,8 @@
         [key: string]: unknown;
     } = $props();
 
+    // We want the behaviour the warning warns about.
+    // svelte-ignore state_referenced_locally
     let value: V = $state(get());
     let store: V = $derived(value);
     let lastChangeValue = false;

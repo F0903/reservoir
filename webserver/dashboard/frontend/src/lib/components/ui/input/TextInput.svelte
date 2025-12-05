@@ -6,6 +6,9 @@
         placeholder,
         tooltip,
         maxCharacters = 30,
+        // We want the behaviour the warning warns about.
+        // eslint-disable-next-line
+        // svelte-ignore state_referenced_locally
         boxWidthCh = maxCharacters,
         min,
         max,

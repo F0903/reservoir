@@ -13,6 +13,8 @@
 
     let viewer: HTMLDivElement;
 
+    // We want the behaviour the warning warns about.
+    // svelte-ignore state_referenced_locally
     let text = $state(initialContent);
 
     $effect.pre(() => {
