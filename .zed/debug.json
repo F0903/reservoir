@@ -9,7 +9,7 @@
     "request": "launch",
     "mode": "debug",
     "program": ".",
-    "args": ["--log-to-stdout"],
+    "args": ["--log-to-stdout", "--listen", "localhost:9999"],
     "console": "integratedTerminal"
   },
   {
@@ -20,7 +20,14 @@
     "console": "integratedTerminal",
     "mode": "debug",
     "program": ".",
-    "args": ["--no-dashboard", "--log-level", "DEBUG", "--log-to-stdout"],
+    "args": [
+      "--no-dashboard",
+      "--log-level",
+      "DEBUG",
+      "--log-to-stdout",
+      "--listen",
+      "localhost:9999"
+    ],
     "cwd": "${ZED_WORKTREE_ROOT}",
     "env": {},
     "buildFlags": []

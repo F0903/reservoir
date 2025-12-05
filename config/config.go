@@ -202,9 +202,9 @@ func setPropsFromMap(cfg *Config, updates map[string]any) (stagedProps []stagedP
 			}
 			propVAddr := propV.Addr()
 
-			unmarshalJson := propVAddr.MethodByName("UnmarshalJSON")
-			if unmarshalJson.IsZero() {
-				slog.Error("UnmarshalJSON method was not found!", "field", propT.Name, "type", propT.Type, "field_value", propV)
+			unmarshalJsonStaged := propVAddr.MethodByName("UnmarshalJSONStaged")
+			if unmarshalJsonStaged.IsZero() {
+				slog.Error("UnmarshalJSONStaged method was not found!", "field", propT.Name, "type", propT.Type, "field_value", propV)
 				continue
 			}
 
@@ -215,11 +215,11 @@ func setPropsFromMap(cfg *Config, updates map[string]any) (stagedProps []stagedP
 				continue
 			}
 
-			returns := unmarshalJson.Call([]reflect.Value{reflect.ValueOf(valueBytes)})
+			returns := unmarshalJsonStaged.Call([]reflect.Value{reflect.ValueOf(valueBytes)})
 			result := returns[0]
 			if !result.IsNil() {
 				err := result.Interface().(error)
-				slog.Error("UnmarshalJSON failed", "field", propT.Name, "error", err)
+				slog.Error("UnmarshalJSONStaged failed", "field", propT.Name, "error", err)
 				continue
 			}
 

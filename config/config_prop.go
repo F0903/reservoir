@@ -79,6 +79,16 @@ func (p *ConfigProp[T]) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("failed to unmarshal ConfigProp: %w", err)
 	}
 
+	p.value.Store(NewCommitable(NewOverwritable(value)))
+	return nil
+}
+
+func (p *ConfigProp[T]) UnmarshalJSONStaged(data []byte) error {
+	var value T
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("failed to unmarshal ConfigProp: %w", err)
+	}
+
 	p.Stage(value)
 	return nil
 }
