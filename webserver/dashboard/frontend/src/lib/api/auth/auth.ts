@@ -1,4 +1,4 @@
-import { apiPatch, apiPost } from "../api-methods";
+import { apiPatch, apiPost } from "../api-helpers";
 
 export type UserInfo = {
     id: number;

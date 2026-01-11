@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-methods";
+import { apiGet, type FetchFn } from "$lib/api/api-helpers";
 
 export type SystemMetrics = {
     start_time: string;

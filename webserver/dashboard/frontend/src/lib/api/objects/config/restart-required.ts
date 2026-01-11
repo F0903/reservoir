@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-methods";
+import { apiGet, type FetchFn } from "$lib/api/api-helpers";
 
 export type RestartRequiredResponse = {
     restart_required: boolean;

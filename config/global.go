@@ -2,10 +2,13 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 	"reservoir/config/flags"
 	"reservoir/utils"
 	"reservoir/utils/assertedpath"
+	"reservoir/version"
 )
 
 var (
@@ -26,6 +29,13 @@ var Global *Config = func() *Config {
 
 func OverrideGlobalConfigFromFlags() {
 	fl := flags.New()
+
+	fl.AddBool("version", false, "Print the version and exit").OnSet(func(val flags.FlagValue) {
+		if val.AsBool() {
+			fmt.Printf("Reservoir version: %s\n", version.Version)
+			os.Exit(0)
+		}
+	})
 
 	fl.AddString("listen", ":9999", "The address and port that the proxy will listen on").OnSet(func(val flags.FlagValue) {
 		Global.ProxyListen.Overwrite(val.AsString())

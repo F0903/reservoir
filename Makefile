@@ -3,8 +3,12 @@
 # Build the entire project
 build: build-frontend generate-csp build-proxy
 
+# Run all tests
+test: build-frontend generate-csp
+	go test -v ./...
+
 build-proxy:
-	go build
+	go build -ldflags "-X 'reservoir/version.Version=$(shell git describe --tags --always --dirty)'"
 
 # Generate Content Security Policy (CSP) header with script hashes
 generate-csp:

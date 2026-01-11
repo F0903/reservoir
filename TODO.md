@@ -11,6 +11,9 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 ## Dashboard
 - Log coloring / better readability
-- Mobile support
+- Mobile support 
+
+## Project Wide
+- Push based metrics instead of polling (?)
 
 ### Current Tasks:

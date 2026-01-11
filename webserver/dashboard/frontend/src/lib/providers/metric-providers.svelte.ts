@@ -1,5 +1,5 @@
 import { browser } from "$app/environment";
-import { type FetchFn } from "$lib/api/api-methods";
+import { type FetchFn } from "$lib/api/api-helpers";
 import { getAllMetrics, type Metrics } from "$lib/api/objects/metrics/metrics";
 import { log } from "$lib/utils/logger";
 import type { SettingsProvider } from "./settings/settings-provider.svelte";

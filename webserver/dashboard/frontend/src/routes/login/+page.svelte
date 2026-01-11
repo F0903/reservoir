@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import { UnauthorizedError } from "$lib/api/api-methods";
+    import { UnauthorizedError } from "$lib/api/api-helpers";
     import { login } from "$lib/api/auth/auth";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";

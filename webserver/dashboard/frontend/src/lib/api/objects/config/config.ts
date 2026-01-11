@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn, apiPatch } from "$lib/api/api-methods";
+import { apiGet, type FetchFn, apiPatch } from "$lib/api/api-helpers";
 
 export type Config = {
     config_version: number;

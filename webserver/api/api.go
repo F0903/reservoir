@@ -10,6 +10,7 @@ import (
 	"reservoir/webserver/api/endpoints/config"
 	"reservoir/webserver/api/endpoints/log"
 	"reservoir/webserver/api/endpoints/metrics"
+	"reservoir/webserver/api/endpoints/version"
 )
 
 var (
@@ -28,6 +29,7 @@ func New() *API {
 		basePath: "/api",
 		endpoints: []apitypes.Endpoint{
 			// Register all our current API endpoints here.
+			&version.VersionEndpoint{},
 			&metrics.AllMetricsEndpoint{},
 			&metrics.CacheMetricsEndpoint{},
 			&metrics.RequestsMetricsEndpoint{},

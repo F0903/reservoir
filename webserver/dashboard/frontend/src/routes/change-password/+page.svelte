@@ -9,7 +9,7 @@
     import { getContext } from "svelte";
     import type { PageProps } from "./$types";
     import type { ToastProvider } from "$lib/providers/toast-provider.svelte";
-    import { UnauthorizedError } from "$lib/api/api-methods";
+    import { UnauthorizedError } from "$lib/api/api-helpers";
     import Form from "$lib/components/ui/input/Form.svelte";
     import { resolve } from "$app/paths";
 

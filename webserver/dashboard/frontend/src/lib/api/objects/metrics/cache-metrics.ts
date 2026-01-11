@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-methods";
+import { apiGet, type FetchFn } from "$lib/api/api-helpers";
 
 export type CacheMetrics = {
     cache_hits: number;
