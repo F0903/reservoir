@@ -10,7 +10,6 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - Content-Type Specific Handling (?)
 
 ## Dashboard
-- More performance metrics
 - Log coloring / better readability
 - Mobile support
 
