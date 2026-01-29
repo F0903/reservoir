@@ -34,6 +34,11 @@
     --error-border-color: hsl(0, 100%, 70%);
     --error-text-color: var(--text-400);
 
+    --log-info-color: hsl(120, 50%, 70%);
+    --log-warn-color: hsl(45, 100%, 70%);
+    --log-error-color: hsl(0, 100%, 70%);
+    --log-debug-color: hsl(210, 20%, 60%);
+
     --mobile-cutoff: 768px;
 
     --scrollbar-thumb-color: var(--primary-200);

@@ -1,51 +1,90 @@
 <script lang="ts">
     import { tick } from "svelte";
+    import LogLine from "./LogLine.svelte";
 
     let {
-        initialContent,
+        initialContent = "",
         scrollMargin = 20,
         autoScroll = true,
+        isLogViewer = false,
     }: {
         initialContent?: string;
-        scrollMargin?: number; // The margin of which the viewer needs to be manually scrolled up to avoid auto-scroll.
-        autoScroll?: boolean; // Whether the viewer should automatically scroll to the bottom when new text is appended.
+        scrollMargin?: number;
+        autoScroll?: boolean;
+        isLogViewer?: boolean;
     } = $props();
 
     let viewer: HTMLDivElement;
 
-    // We want the behaviour the warning warns about.
-    // svelte-ignore state_referenced_locally
-    let text = $state(initialContent);
+    let lines = $state<string[]>([]);
 
-    $effect.pre(() => {
-        if (autoScroll && text) {
+    $effect(() => {
+        if (initialContent) {
+            const newLines = initialContent.split("\n").filter((l) => l.length > 0);
+            lines = [...newLines];
+        }
+    });
+
+    $effect(() => {
+        if (autoScroll && lines.length > 0) {
             scrollViewer();
         }
     });
 
     async function scrollViewer() {
-        if (viewer.scrollTop + viewer.clientHeight >= viewer.scrollHeight - scrollMargin) {
-            await tick(); // Wait for the DOM to update before scrolling
-            viewer.scrollTop = viewer.scrollHeight;
-        }
+        if (!viewer) return;
+        await tick();
+        viewer.scrollTop = viewer.scrollHeight;
     }
 
     export async function appendText(newText: string) {
-        text += newText;
+        if (!newText) return;
+
+        const newLines = newText.split("\n").filter((l) => l.length > 0);
+        lines.push(...newLines);
+
+        if (lines.length > 2000) {
+            lines = lines.slice(lines.length - 2000);
+        }
+    }
+
+    export function clear() {
+        lines = [];
     }
 </script>
 
 <div class="viewer" bind:this={viewer}>
-    <pre>{text}</pre>
+    {#if isLogViewer}
+        <div class="log-container">
+            {#each lines as line}
+                <LogLine {line} />
+            {/each}
+        </div>
+    {:else}
+        <pre>{lines.join("\n")}</pre>
+    {/if}
 </div>
 
 <style>
     .viewer {
-        border-color: var(--secondary-600);
+        border: 1px solid var(--secondary-600);
         border-radius: 12px;
         padding: 13px 15px;
         background-color: var(--primary-600);
         overflow-y: auto;
         max-height: var(--viewer-max-height, 100%);
+    }
+
+    .log-container {
+        display: flex;
+        flex-direction: column;
+    }
+
+    pre {
+        margin: 0;
+        font-family: "Chivo Mono Variable", monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+        word-break: break-all;
     }
 </style>
