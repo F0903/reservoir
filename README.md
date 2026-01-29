@@ -12,7 +12,7 @@ The dashboard is directly embedded into the executable, so the final build artif
 
 ## Requirements
 
-- Go 1.24 or newer
+- Go 1.24 or newer (latest recommended)
 - OpenSSL (for generating CA cert/key)
 
 ## Usage Guide
