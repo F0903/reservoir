@@ -24,7 +24,6 @@ func parseCacheControl(ccHeader string) (cacheControl, error) {
 			// max-age directive specifies the maximum amount of time a response is considered fresh in seconds.
 			maxAge, err := strconv.ParseInt(after, 10, 64)
 			if err != nil {
-				slog.Error("Failed to parse max-age", "raw", directive, "error", err)
 				return cacheControl{}, fmt.Errorf("%w: %v", ErrParseMaxAge, err)
 			}
 			if maxAge < 1 {

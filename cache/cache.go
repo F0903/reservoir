@@ -22,8 +22,11 @@ type Cache[ObjectData any] interface {
 	Delete(key CacheKey) error
 
 	// Retrieves the metadata of an entry in the cache.
-	GetMetadata(key CacheKey) (meta EntryMetadata[ObjectData], stale bool, err error)
+	GetMetadata(key CacheKey) (meta *EntryMetadata[ObjectData], stale bool, err error)
 
 	// Modifies the metadata of an entry in the cache.
 	UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[ObjectData])) error
+
+	// Calls any cleanup operations that might be necessary. The cache must not be used after this method is called.
+	Destroy()
 }

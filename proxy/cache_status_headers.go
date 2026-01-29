@@ -116,6 +116,17 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 	r.AddHeader("Cache-Status", cacheStatusHeader)
 	slog.Debug("Cache-Status header set:", "cache_status", cacheStatusHeader)
 
+	var xCache string
+	switch cacheStatus.hitStatus {
+	case hitStatusHit:
+		xCache = "HIT"
+	case hitStatusMiss:
+		xCache = "MISS"
+	case hitStatusRevalidated:
+		xCache = "REVALIDATED"
+	}
+	r.AddHeader("X-Cache", xCache)
+
 	r.AddHeader("Via", fmt.Sprintf("%s reservoir", req.Proto))
 
 	if cached.IsSome() {

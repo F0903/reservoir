@@ -126,6 +126,25 @@ func TestParsePHC_HashLengthMismatch(t *testing.T) {
 	}
 }
 
+func TestPHC_EdgeCases(t *testing.T) {
+	// Empty password
+	password := ""
+	ph := GenerateArgon2id(password)
+	if !ph.VerifyArgon2id(password) {
+		t.Errorf("Verify failed for empty password")
+	}
+	if ph.VerifyArgon2id("something") {
+		t.Errorf("Verify unexpectedly succeeded for non-empty password")
+	}
+
+	// Very long password
+	longPassword := strings.Repeat("a", 1024)
+	ph2 := GenerateArgon2id(longPassword)
+	if !ph2.VerifyArgon2id(longPassword) {
+		t.Errorf("Verify failed for long password")
+	}
+}
+
 // replaceLValue replaces the l=... parameter in a comma-separated params string.
 func replaceLValue(params string, newVal int) string {
 	segs := strings.Split(params, ",")

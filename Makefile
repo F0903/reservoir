@@ -4,8 +4,9 @@
 build: build-frontend generate-csp build-proxy
 
 # Run all tests
-test: build-frontend generate-csp
-	go test -v ./...
+test: generate-csp
+	#TODO make tests for frontend
+	CGO_ENABLED=1 go test -v -race -count=1 ./...
 
 build-proxy:
 	go build -ldflags "-X 'reservoir/version.Version=$(shell git describe --tags --always --dirty)'"

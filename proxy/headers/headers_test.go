@@ -3,9 +3,8 @@ package headers
 import (
 	"errors"
 	"testing"
+	"time"
 )
-
-//TODO: Expand to more than Range testing
 
 // errPanic is used to signal that ParseRange panicked so tests don't crash the run.
 var errPanic = errors.New("panic in ParseRange")
@@ -58,6 +57,7 @@ func TestParseRange(t *testing.T) {
 		{name: "start-eq-size", rangeStr: "bytes=1000-1000", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "end-eq-size", rangeStr: "bytes=0-1000", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "suffix-too-large", rangeStr: "bytes=-2000", size: size, wantErr: ErrRangeValueOutOfBounds},
+		{name: "empty-file", rangeStr: "bytes=0-0", size: 0, wantErr: ErrRangeValueOutOfBounds},
 	}
 
 	for _, tt := range tests {
@@ -74,6 +74,41 @@ func TestParseRange(t *testing.T) {
 			}
 			if gotStart != tt.start || gotEnd != tt.end {
 				t.Fatalf("got (%d,%d), want (%d,%d)", gotStart, gotEnd, tt.start, tt.end)
+			}
+		})
+	}
+}
+
+func TestParseCacheControl(t *testing.T) {
+	tests := []struct {
+		name    string
+		header  string
+		wantNo  bool
+		wantAge time.Duration
+		wantErr bool
+	}{
+		{name: "max-age", header: "max-age=60", wantNo: false, wantAge: 60 * time.Second},
+		{name: "no-cache", header: "no-cache", wantNo: true, wantAge: 0},
+		{name: "no-store", header: "no-store", wantNo: true, wantAge: 0},
+		{name: "both", header: "public, max-age=3600, no-cache", wantNo: true, wantAge: 3600 * time.Second},
+		{name: "zero-age", header: "max-age=0", wantNo: true, wantAge: 0},
+		{name: "invalid-age", header: "max-age=abc", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cc, err := parseCacheControl(tt.header)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("unexpected error state: %v", err)
+			}
+			if err != nil {
+				return
+			}
+			if cc.noCache != tt.wantNo {
+				t.Errorf("got noCache %v, want %v", cc.noCache, tt.wantNo)
+			}
+			if cc.maxAge != tt.wantAge {
+				t.Errorf("got maxAge %v, want %v", cc.maxAge, tt.wantAge)
 			}
 		})
 	}

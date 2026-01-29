@@ -2,7 +2,7 @@
 
 [![Build with SLSA](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml/badge.svg)](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml)
 
-A caching MITM (Man-in-the-Middle) HTTP(S) forward proxy with an embedded dashboard.
+A caching and coalescing MITM (Man-in-the-Middle) HTTP(S) forward proxy with an embedded dashboard.
 
 Supports caching of both HTTP and HTTPS requests by injecting a certificate to decrypt and cache the data before sending it back to the client.
 
@@ -17,10 +17,11 @@ The dashboard is directly embedded into the executable, so the final build artif
 
 ## Usage Guide
 
-To start with, you need to generate a certificate and key to be used as a certificate authority to generate new certificates for requests to HTTPS domains. This is the mechanism that allows the proxy to decrypt and cache HTTPS responses.
-The caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors relating to the untrusted cert.
+To start with, you need to generate a CA certificate and key to be used as your own makeshift certificate authority to generate new certificates for requests to HTTPS domains. This is the mechanism that allows the proxy to decrypt and cache HTTPS responses, with the caveat being that EVERY client that proxies HTTPS requests through this MUST trust this CA certificate, otherwise you will get errors relating to the untrusted cert.
 
-### Generate a CA Certificate and Key (PEM format)
+### Generate a CA Certificate and Key
+
+This generates a CA certificate with the common name (CN) "reservoir" and corresponding key, both in PEM format.
 
 ```sh
 openssl genrsa -out ca.key 2048
@@ -30,7 +31,7 @@ openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "
 ### Trust the CA Certificate
 
 - **Linux:** Add to `/usr/local/share/ca-certificates/` and run `sudo update-ca-certificates`.
-- **Windows:** Double-click `ca-cert.pem` and install it to "Trusted Root Certification Authorities".
+- **Windows:** Double-click `ca.crt`, click "Install Certificate..." and follow the wizard.
 
 ## Running the Proxy
 
@@ -42,20 +43,22 @@ Before getting started, you will need to install a few dependencies:
 
 #### Installing dependencies
 
-First off you will need to have [**Node** installed](https://nodejs.org/en/download) and **pnpm** enabled *(run the command `corepack enable pnpm`)*.
+First off you will need to have [**Node.js** installed](https://nodejs.org/en/download) and **pnpm** enabled *(run the command `corepack enable pnpm`)*.
 
 Then you need to have **GNU make** installed.
-The way to do this will vary depending on your OS. If you run a Linux distro it will be easy to install via your package manager (it might even be preinstalled).
+The way to do this will vary depending on your OS. If you use a Linux distro it will be easy to install via your package manager (it might even be preinstalled).
 
-On Windows the easiest way to do this is with [Chocolatey](https://chocolatey.org/install#individual) by running `choco install make`. Alternatively you can [install it manually here](https://gnuwin32.sourceforge.net/packages/make.htm).
+On Windows the easiest way to do this is with [Chocolatey](https://chocolatey.org/install#individual) by running `choco install make`.  
+Alternatively you can [install it manually here](https://gnuwin32.sourceforge.net/packages/make.htm).
 
 You will of course also need to have [Go installed](https://go.dev/dl/).
 
 Then you just have to build the project with **make** by running `make` in the project directory.
 
-This will automatically build both the frontend and the proxy executable.
+This will automatically build the frontend and the final proxy executable.
 
-Then simply copy the resulting executable to whereever you wish, and run as normal. If you are running it on Linux, you can also setup a systemd service for it, which is recommended.
+The resulting executable is now ready in the project root to be copied standalone to wherever you wish.   
+If you are running it on Linux, you can also setup a systemd service for it, which is recommended.
 
 ## Proxy Configuration
 

@@ -73,13 +73,13 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.IfModifiedSince.value = typeutils.Some(t)
 			} else {
-				slog.Error("Error parsing If-Modified-Since header", "error", err, "value", value)
+				slog.Debug("Error parsing If-Modified-Since header", "error", err, "value", value)
 			}
 		case "If-Unmodified-Since":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.IfUnmodifiedSince.value = typeutils.Some(t)
 			} else {
-				slog.Error("Error parsing If-Unmodified-Since header", "error", err, "value", value)
+				slog.Debug("Error parsing If-Unmodified-Since header", "error", err, "value", value)
 			}
 		case "If-None-Match":
 			if value != "" {
@@ -104,19 +104,19 @@ func ParseHeaderDirective(header http.Header) *HeaderDirectives {
 			if rh, err := parseRangeHeader(value); err == nil {
 				hd.Range.value = typeutils.Some(rh)
 			} else {
-				slog.Error("Error parsing Range header", "error", err, "value", value)
+				slog.Debug("Error parsing Range header", "error", err, "value", value)
 			}
 		case "Cache-Control":
 			if cc, err := parseCacheControl(value); err == nil {
 				hd.CacheControl.value = typeutils.Some(cc)
 			} else {
-				slog.Error("Error parsing Cache-Control header", "error", err, "value", value)
+				slog.Debug("Error parsing Cache-Control header", "error", err, "value", value)
 			}
 		case "Expires":
 			if t, err := time.Parse(http.TimeFormat, value); err == nil {
 				hd.Expires.value = typeutils.Some(t)
 			} else {
-				slog.Error("Error parsing Expires header", "error", err, "value", value)
+				slog.Debug("Error parsing Expires header", "error", err, "value", value)
 			}
 		}
 	}

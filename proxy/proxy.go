@@ -41,13 +41,17 @@ type cachedRequestInfo struct {
 
 type Proxy struct {
 	ca    certs.CertAuthority
-	cache *cache.FileCache[cachedRequestInfo]
+	cache cache.Cache[cachedRequestInfo]
 	fetch fetcher
 }
 
 func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
 	listener := httplistener.New(address, p)
 	listener.ListenWithCancel(errChan, ctx)
+}
+
+func (p *Proxy) Destroy() {
+	p.cache.Destroy()
 }
 
 // Creates a new MITM proxy. It should be passed the filenames
@@ -157,7 +161,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	}
 
 	length := end - start + 1
-	slog.Info("Serving Range request from cache", "url", req.URL, "key", key, "range_header", rangeHeader, "start", start, "end", end, "length", length)
+	slog.Debug("Serving Range request from cache", "url", req.URL, "key", key, "range_header", rangeHeader, "start", start, "end", end, "length", length)
 
 	r.SetHeaders(cached.Metadata.Object.Header)
 	r.SetHeader("Accept-Ranges", "bytes")
@@ -171,7 +175,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 }
 
 func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
-	slog.Info("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
+	slog.Debug("Processing HTTP request", "remote_addr", req.RemoteAddr, "method", req.Method, "url", req.URL)
 
 	startTime := time.Now()
 
@@ -184,6 +188,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)
+		r.WriteError("Error fetching resource", http.StatusBadGateway)
 		return err
 	}
 
@@ -233,7 +238,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		r.SetHeader("Last-Modified", fetched.Cached.Entry.Metadata.Object.LastModified.Format(http.TimeFormat))
 		addCacheHeaders(r, req, typeutils.Some(fetched.Cached.Entry), fetchResultToCacheStatus(fetched))
 
-		slog.Info("Serving cached response", "url", req.URL, "key", key)
+		slog.Debug("Serving cached response", "url", req.URL, "key", key)
 		return finalizeAndRespond(r, fetched.Cached.Entry.Data, http.StatusOK, req)
 
 	default:
@@ -243,7 +248,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 }
 
 func (p *Proxy) handleHTTP(r responder.Responder, proxyReq *http.Request) error {
-	slog.Info("Handling HTTP request", "host", proxyReq.Host, "remote_addr", proxyReq.RemoteAddr)
+	slog.Debug("Handling HTTP request", "host", proxyReq.Host, "remote_addr", proxyReq.RemoteAddr)
 	metrics.Global.Requests.HTTPProxyRequests.Increment()
 
 	clientHd := headers.ParseHeaderDirective(proxyReq.Header)
@@ -294,26 +299,35 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 	tlsConn := tls.Server(clientConn, tlsConfig)
 	defer tlsConn.Close()
 
+	if err := tlsConn.Handshake(); err != nil {
+		slog.Error("TLS handshake failed in CONNECT tunnel", "host", proxyReq.Host, "error", err)
+		return err
+	}
+
 	// Create a buffered reader for the client connection. This is required to
 	// use http package functions with this connection.
 	connReader := bufio.NewReader(tlsConn)
 	responder := responder.NewRawHTTPResponder(tlsConn)
 
-	slog.Debug("Entering request loop for CONNECT tunnel")
+	slog.Debug("Entering request loop for CONNECT tunnel", "host", proxyReq.Host)
 	for {
 		// Read next HTTP request from client.
 		req, err := http.ReadRequest(connReader)
-		if errors.Is(err, io.EOF) {
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				slog.Debug("Client closed connection in CONNECT tunnel", "host", proxyReq.Host)
+			} else {
+				slog.Error("Error reading request from client in CONNECT tunnel", "host", proxyReq.Host, "error", err)
+			}
 			break
-		} else if err != nil {
-			slog.Error("Error reading request from client", "remote_addr", proxyReq.RemoteAddr, "error", err)
-			return fmt.Errorf("%w: %v ", ErrReadRequestFailed, err)
 		}
 
+		req.Close = true
 		if err := p.handleHTTP(responder, req); err != nil {
-			slog.Error("Error processing HTTP request", "remote_addr", proxyReq.RemoteAddr, "error", err)
+			slog.Error("Error processing HTTP request in CONNECT tunnel", "host", proxyReq.Host, "error", err)
 		}
 	}
 
+	slog.Debug("Exiting CONNECT tunnel", "host", proxyReq.Host)
 	return nil
 }

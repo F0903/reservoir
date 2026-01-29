@@ -3,7 +3,6 @@ package headers
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 )
@@ -60,8 +59,6 @@ func validateRange(start, end, dataSize int64) error {
 }
 
 func parseRangeHeader(rangeStr string) (rangeHeader, error) {
-	slog.Debug("Parsing Range header", "raw", rangeStr)
-
 	splitStr := strings.SplitN(rangeStr, "=", 2)
 	if len(splitStr) != 2 {
 		return rangeHeader{}, ErrInvalidRangeFormat
@@ -119,7 +116,6 @@ func parseRangeHeader(rangeStr string) (rangeHeader, error) {
 		return rangeHeader{}, ErrMultipleRangesNotSupported
 	}
 
-	slog.Debug("Parsed Range header", "start", start, "end", end)
 	return rangeHeader{start: start, end: end}, nil
 }
 

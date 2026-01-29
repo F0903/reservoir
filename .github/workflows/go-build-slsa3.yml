@@ -30,11 +30,11 @@ jobs:
       - name: Enable pnpm
         run: corepack enable pnpm
 
-      - name: Test
-        run: make test
-
       - name: Build
         run: make
+
+      - name: Test
+        run: make test
 
       - name: Generate artifact hashes
         shell: bash

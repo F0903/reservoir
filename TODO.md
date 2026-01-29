@@ -15,5 +15,3 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 ## Project Wide
 - Push based metrics instead of polling (?)
-
-### Current Tasks:
