@@ -7,34 +7,59 @@
     import { onDestroy, onMount } from "svelte";
 
     let textViewer: TextViewer;
-    let logEvent: EventSource | undefined;
+    let logEvent: EventSource | undefined = $state(undefined);
 
     let autoScroll = $state(true);
     let paused = $state(false);
 
     onMount(async () => {
-        let textStream = await apiGetTextStream("/log");
+        const fetchHistory = async () => {
+            let textStream = await apiGetTextStream("/log");
+            const reader = textStream.getReader();
 
-        const reader = textStream.getReader();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (!paused) {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
                 await textViewer.appendText(value);
             }
-        }
+        };
 
+        await fetchHistory();
+        startLogListen();
+    });
+
+    onDestroy(() => {
+        stopLogListen();
+    });
+
+    $effect(() => {
+        console.log("Effect triggered");
+        if (paused) {
+            stopLogListen();
+        } else {
+            startLogListen();
+        }
+    });
+
+    function stopLogListen() {
+        if (!logEvent) return;
+
+        console.log("Stopping log listen");
+        logEvent.close();
+        logEvent = undefined;
+    }
+
+    function startLogListen() {
+        if (logEvent) return;
+
+        console.log("Starting log listen");
         logEvent = new EventSource("/api/log/stream");
         logEvent.onmessage = (event) => {
             if (!paused) {
                 textViewer.appendText(event.data + "\n");
             }
         };
-    });
-
-    onDestroy(() => {
-        logEvent?.close();
-    });
+    }
 
     function clearLog() {
         textViewer.clear();
@@ -49,19 +74,13 @@
                 <Toggle label="Auto-scroll" bind:value={autoScroll} --toggle-width="auto" />
                 <Toggle label="Paused" bind:value={paused} --toggle-width="auto" />
             </div>
-            <Button
-                onClick={clearLog}
-                --btn-background-color="var(--primary-450)"
-                --btn-text-color="var(--text-400)"
-            >
-                Clear
-            </Button>
+            <Button onClick={clearLog}>Clear</Button>
         </div>
     </div>
     <TextViewer
         bind:this={textViewer}
-        isLogViewer={true}
-        {autoScroll}
+        bind:autoScroll
+        syntaxHighlighting="slog"
         --viewer-max-height="calc(100% - 80px)"
     />
 </main>

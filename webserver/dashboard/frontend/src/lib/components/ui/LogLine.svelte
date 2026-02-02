@@ -47,6 +47,7 @@
 </script>
 
 <div class="log-line" data-level={parsed.level}>
+    <!-- eslint-disable-next-line -->
     {#each parsed.parts as part}
         <span class="part-{part.type}">{part.text}</span>
     {/each}
@@ -80,7 +81,7 @@
     }
 
     .part-key {
-        color: var(--tertiary-300);
+        color: var(--tertiary-600);
         font-weight: 500;
     }
 
