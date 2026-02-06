@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type EntryMetadata[ObjectData any] struct {
-	TimeWritten time.Time  `json:"time_written"`
-	LastAccess  time.Time  `json:"last_access"`
-	Expires     time.Time  `json:"expires"`
-	FileSize    int64      `json:"file_size"`
-	Object      ObjectData `json:"object"`
+type EntryMetadata[MetadataT any] struct {
+	TimeWritten time.Time `json:"time_written"`
+	LastAccess  time.Time `json:"last_access"`
+	Expires     time.Time `json:"expires"`
+	Size        int64     `json:"file_size"`
+	Object      MetadataT `json:"object"`
 }
 
 type EntryData interface {
@@ -18,8 +18,8 @@ type EntryData interface {
 	io.ReaderAt
 }
 
-type Entry[ObjectData any] struct {
+type Entry[MetadataT any] struct {
 	Data     EntryData
-	Metadata *EntryMetadata[ObjectData]
+	Metadata *EntryMetadata[MetadataT]
 	Stale    bool // Indicates if the entry is stale, meaning it has expired but is still present in the cache.
 }

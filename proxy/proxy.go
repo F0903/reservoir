@@ -110,15 +110,15 @@ func finalizeAndRespond(r responder.Responder, resp io.Reader, status int, req *
 
 func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[cachedRequestInfo], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	rangeHeader := clientHd.Range.Value()
-	start, end, err := rangeHeader.SliceSize(cached.Metadata.FileSize)
+	start, end, err := rangeHeader.SliceSize(cached.Metadata.Size)
 	if err != nil {
-		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.FileSize)
+		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.Size)
 
 		if !config.Global.RetryOnInvalidRange.Read() {
 			slog.Error("Sending 416 Range Not Satisfiable due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 			r.SetHeader("Accept-Ranges", "bytes")
-			r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.FileSize))
+			r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.Size))
 			r.WriteError("invalid Range header", http.StatusRequestedRangeNotSatisfiable)
 
 			return ErrRangeNotSatisfiable
@@ -165,7 +165,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 
 	r.SetHeaders(cached.Metadata.Object.Header)
 	r.SetHeader("Accept-Ranges", "bytes")
-	r.SetHeader("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, cached.Metadata.FileSize))
+	r.SetHeader("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, cached.Metadata.Size))
 	r.SetHeader("Content-Length", fmt.Sprintf("%d", length))
 	r.SetHeader("ETag", cached.Metadata.Object.ETag)
 	r.SetHeader("Last-Modified", cached.Metadata.Object.LastModified.Format(http.TimeFormat))

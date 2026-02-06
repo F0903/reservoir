@@ -224,7 +224,7 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 
 	cached, err := f.cache.Get(key)
 	if err != nil {
-		if errors.Is(err, cache.ErrCacheMiss) {
+		if errors.Is(err, cache.ErrCacheEntryNotFound) {
 			slog.Debug("Cache miss, will fetch from upstream.", "url", req.URL, "key", key)
 			res, err := f.handleCacheMiss(req, key, clientHd)
 			if err != nil {

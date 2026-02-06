@@ -28,37 +28,38 @@ var (
 	ErrCacheFileStat   = errors.New("cache file stat failed")
 )
 
-type FileCache[ObjectData any] struct {
+type FileCache[MetadataT any] struct {
 	rootDir  assertedpath.AssertedPath
-	locks    *syncmap.SyncMap[string, *sync.RWMutex]
-	entries  map[CacheKey]*EntryMetadata[ObjectData]
+	locks    *syncmap.SyncMap[CacheKey, *sync.RWMutex]
+	entries  map[CacheKey]*EntryMetadata[MetadataT]
 	byteSize int64
 	stopChan chan struct{}
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
-func NewFileCache[ObjectData any](rootDir string, cleanupInterval time.Duration, ctx context.Context) *FileCache[ObjectData] {
-	c := &FileCache[ObjectData]{
+func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, ctx context.Context) *FileCache[MetadataT] {
+	c := &FileCache[MetadataT]{
 		rootDir:  assertedpath.AssertDirectory(rootDir).EnsureCleared(),
-		locks:    syncmap.New[string, *sync.RWMutex](),
-		entries:  make(map[CacheKey]*EntryMetadata[ObjectData]),
+		locks:    syncmap.New[CacheKey, *sync.RWMutex](),
+		entries:  make(map[CacheKey]*EntryMetadata[MetadataT]),
 		byteSize: 0,
 		stopChan: make(chan struct{}),
 	}
+	//TODO: replace with the new janitor
 	c.startCleanupTask(cleanupInterval, ctx)
 	return c
 }
 
-func (c *FileCache[ObjectData]) Destroy() {
+func (c *FileCache[MetadataT]) Destroy() {
 	close(c.stopChan)
 }
 
 // Gets or creates a lock for the given key.
-func (c *FileCache[ObjectData]) getLock(key CacheKey) *sync.RWMutex {
-	return c.locks.GetOrSet(key.Hex, &sync.RWMutex{})
+func (c *FileCache[MetadataT]) getLock(key CacheKey) *sync.RWMutex {
+	return c.locks.GetOrSet(key, &sync.RWMutex{})
 }
 
-func (c *FileCache[ObjectData]) ensureCacheSize() {
+func (c *FileCache[MetadataT]) ensureCacheSize() {
 	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
 	if c.byteSize < maxCacheSize {
 		return
@@ -68,7 +69,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 
 	type entryForEviction struct {
 		key      CacheKey
-		meta     *EntryMetadata[ObjectData]
+		meta     *EntryMetadata[MetadataT]
 		priority int64 // Lower = evict first
 	}
 
@@ -78,7 +79,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 
 	for key, meta := range c.entries {
 		timeSinceAccess := now.Sub(meta.LastAccess).Milliseconds()
-		sizeWeight := meta.FileSize / bytesize.UnitM
+		sizeWeight := meta.Size / bytesize.UnitM
 
 		// Calculate eviction priority (highest = evict first)
 		// Factors: age since last access + file size weight
@@ -108,7 +109,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 
 		lock := c.getLock(candidate.key)
 		if lock.TryLock() {
-			slog.Info("Evicting cache entry", "key", candidate.key.Hex, "size", candidate.meta.FileSize, "last_access", candidate.meta.LastAccess)
+			slog.Info("Evicting cache entry", "key", candidate.key.Hex, "size", candidate.meta.Size, "last_access", candidate.meta.LastAccess)
 
 			if err := c.ensureRemove(candidate.key); err != nil {
 				slog.Info("Failed to evict cache entry", "key", candidate.key.Hex, "error", err)
@@ -128,7 +129,7 @@ func (c *FileCache[ObjectData]) ensureCacheSize() {
 	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)
 }
 
-func (c *FileCache[ObjectData]) cleanExpiredEntries() {
+func (c *FileCache[MetadataT]) cleanExpiredEntries() {
 	slog.Info("Cleaning up expired cache entries")
 
 	startCacheSize := c.byteSize
@@ -173,7 +174,7 @@ func (c *FileCache[ObjectData]) cleanExpiredEntries() {
 	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
 }
 
-func (c *FileCache[ObjectData]) startCleanupTask(interval time.Duration, ctx context.Context) {
+func (c *FileCache[MetadataT]) startCleanupTask(interval time.Duration, ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -198,12 +199,12 @@ func (c *FileCache[ObjectData]) startCleanupTask(interval time.Duration, ctx con
 	}()
 }
 
-func (c *FileCache[ObjectData]) addCacheSize(delta int64) {
+func (c *FileCache[MetadataT]) addCacheSize(delta int64) {
 	c.byteSize += delta
 	metrics.Global.Cache.BytesCached.Add(delta)
 }
 
-func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
+func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
 	stat, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -230,7 +231,7 @@ func (c *FileCache[ObjectData]) ensureRemoveFile(path string) error {
 }
 
 // Ensures that both the cached file, its metadata and lock are removed without acquiring a lock.
-func (c *FileCache[ObjectData]) ensureRemove(key CacheKey) error {
+func (c *FileCache[MetadataT]) ensureRemove(key CacheKey) error {
 	filePath := filepath.Join(c.rootDir.Path, key.Hex)
 
 	if fileErr := c.ensureRemoveFile(filePath); fileErr != nil {
@@ -238,13 +239,13 @@ func (c *FileCache[ObjectData]) ensureRemove(key CacheKey) error {
 		return fmt.Errorf("%w: failed to remove cached file '%s'", fileErr, filePath)
 	}
 
-	delete(c.entries, key)  // Remove the entry from the map
-	c.locks.Delete(key.Hex) // Remove the lock for this key
+	delete(c.entries, key) // Remove the entry from the map
+	c.locks.Delete(key)    // Remove the lock for this key
 
 	return nil
 }
 
-func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
+func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 	lock := c.getLock(key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
@@ -254,7 +255,7 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
 		slog.Debug("Cache miss", "key", key.Hex)
-		return nil, ErrCacheMiss
+		return nil, ErrCacheEntryNotFound
 	}
 
 	dataFile, err := os.Open(fileName)
@@ -274,14 +275,14 @@ func (c *FileCache[ObjectData]) Get(key CacheKey) (*Entry[ObjectData], error) {
 
 	metrics.Global.Cache.CacheHits.Increment()
 	slog.Debug("Successful cache hit", "key", key.Hex)
-	return &Entry[ObjectData]{
+	return &Entry[MetadataT]{
 		Data:     dataFile,
 		Metadata: entryMeta,
 		Stale:    stale,
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time.Time, objectData ObjectData) (*Entry[ObjectData], error) {
+func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
 	lock := c.getLock(key)
 	lock.Lock()
 	defer lock.Unlock()
@@ -311,12 +312,12 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 		return nil, fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrCacheFileEmpty, fileName)
 	}
 
-	meta := &EntryMetadata[ObjectData]{
+	meta := &EntryMetadata[MetadataT]{
 		TimeWritten: time.Now(),
 		LastAccess:  time.Now(),
 		Expires:     expires,
-		FileSize:    fileSize,
-		Object:      objectData,
+		Size:        fileSize,
+		Object:      metadata,
 	}
 	c.entries[key] = meta
 
@@ -333,13 +334,13 @@ func (c *FileCache[ObjectData]) Cache(key CacheKey, data io.Reader, expires time
 		return nil, fmt.Errorf("%w: failed to seek to start of cache file '%s'", ErrCacheFileRead, fileName)
 	}
 
-	return &Entry[ObjectData]{
+	return &Entry[MetadataT]{
 		Data:     file,
 		Metadata: meta,
 	}, nil
 }
 
-func (c *FileCache[ObjectData]) Delete(key CacheKey) error {
+func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
 	lock := c.getLock(key)
 	lock.Lock()
 	defer lock.Unlock()
@@ -347,7 +348,7 @@ func (c *FileCache[ObjectData]) Delete(key CacheKey) error {
 	return c.ensureRemove(key)
 }
 
-func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[ObjectData])) error {
+func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
 	lock := c.getLock(key)
 	lock.Lock()
 	defer lock.Unlock()
@@ -368,7 +369,7 @@ func (c *FileCache[ObjectData]) UpdateMetadata(key CacheKey, modifier func(*Entr
 	return nil
 }
 
-func (c *FileCache[ObjectData]) GetMetadata(key CacheKey) (meta *EntryMetadata[ObjectData], stale bool, err error) {
+func (c *FileCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error) {
 	lock := c.getLock(key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
@@ -377,7 +378,7 @@ func (c *FileCache[ObjectData]) GetMetadata(key CacheKey) (meta *EntryMetadata[O
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
 		slog.Debug("Cache miss", "key", key.Hex)
-		return nil, false, ErrCacheMiss
+		return nil, false, ErrCacheEntryNotFound
 	}
 
 	metrics.Global.Cache.CacheHits.Increment()
