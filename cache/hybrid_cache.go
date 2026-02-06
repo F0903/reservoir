@@ -12,10 +12,10 @@ type HybridCache[MetadataT any] struct {
 	mCache *MemoryCache[MetadataT]
 }
 
-func NewHybridCache[MetadataT any](memoryBudgetPercent int, rootDir string, cleanupInterval time.Duration, ctx context.Context) *HybridCache[MetadataT] {
+func NewHybridCache[MetadataT any](memoryBudgetPercent int, rootDir string, cleanupInterval time.Duration, shardCount int, ctx context.Context) *HybridCache[MetadataT] {
 	return &HybridCache[MetadataT]{
-		fCache: NewFileCache[MetadataT](rootDir, cleanupInterval, ctx),
-		mCache: NewMemoryCache[MetadataT](memoryBudgetPercent, cleanupInterval, ctx),
+		fCache: NewFileCache[MetadataT](rootDir, cleanupInterval, shardCount, ctx),
+		mCache: NewMemoryCache[MetadataT](memoryBudgetPercent, cleanupInterval, shardCount, ctx),
 	}
 }
 

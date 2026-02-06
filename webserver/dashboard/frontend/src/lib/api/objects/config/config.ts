@@ -8,12 +8,13 @@ export type Config = {
     webserver_listen: string;
     dashboard_disabled: boolean;
     api_disabled: boolean;
-    cache_dir: string;
     ignore_cache_control: boolean;
     max_cache_size: number;
     default_cache_max_age: string;
     force_default_cache_max_age: boolean;
+    cache_dir: string;
     cache_cleanup_interval: string;
+    cache_lock_shards: number;
     upstream_default_https: boolean;
     retry_on_range_416: boolean;
     retry_on_invalid_range: boolean;

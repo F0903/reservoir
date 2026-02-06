@@ -10,8 +10,6 @@ var (
 	ErrCacheEntryNotFound = errors.New("cache entry not found")
 )
 
-const CACHE_LOCK_SHARDS uint32 = 1024
-
 type Cache[MetadataT any] interface {
 	// Retrieves an entry from the cache by its input key.
 	Get(key CacheKey) (*Entry[MetadataT], error)

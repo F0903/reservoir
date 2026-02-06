@@ -23,13 +23,14 @@ func startProxy(errChan chan error, ctx context.Context) error {
 	caCert := config.Global.CaCert.Read()
 	caKey := config.Global.CaKey.Read()
 	cacheDir := config.Global.CacheDir.Read()
+	shardCount := config.Global.CacheLockShards.Read()
 
 	ca, err := certs.NewPrivateCA(caCert, caKey)
 	if err != nil {
 		return fmt.Errorf("failed to create CA: %v", err)
 	}
 
-	proxy, err := proxy.NewProxy(cacheDir, ca, ctx)
+	proxy, err := proxy.NewProxy(cacheDir, ca, shardCount, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy: %v", err)
 	}

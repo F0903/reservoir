@@ -29,14 +29,14 @@ func (m *memoryReadSeekCloser) Close() error {
 type MemoryCache[MetadataT any] struct {
 	entries   map[CacheKey]*Entry[MetadataT]
 	mu        sync.RWMutex
-	locks     [CACHE_LOCK_SHARDS]sync.RWMutex
+	locks     []sync.RWMutex
 	memoryCap int64
 	byteSize  atomics.Int64
 
 	janitor *cacheJanitor[MetadataT]
 }
 
-func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time.Duration, ctx context.Context) *MemoryCache[MetadataT] {
+func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
 	sysMem, err := mem.VirtualMemory()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
@@ -45,6 +45,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 
 	c := &MemoryCache[MetadataT]{
 		entries:   make(map[CacheKey]*Entry[MetadataT]),
+		locks:     make([]sync.RWMutex, shardCount),
 		memoryCap: memoryCap,
 		byteSize:  atomics.NewInt64(0),
 	}
@@ -72,7 +73,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 			return len(c.entries)
 		},
 		getLock: func(key CacheKey) *sync.RWMutex {
-			return getLock(&c.locks, key)
+			return getLock(c.locks, key)
 		},
 	})
 	c.janitor.start(ctx)
@@ -85,7 +86,7 @@ func (c *MemoryCache[MetadataT]) Destroy() {
 }
 
 func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock() // Using full lock to update LastAccess safely
 	defer lock.Unlock()
 
@@ -114,7 +115,7 @@ func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 }
 
 func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -154,7 +155,7 @@ func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires tim
 }
 
 func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -174,7 +175,7 @@ func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
 }
 
 func (c *MemoryCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -195,7 +196,7 @@ func (c *MemoryCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*Ent
 }
 
 func (c *MemoryCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock() // Using full lock to update LastAccess safely
 	defer lock.Unlock()
 

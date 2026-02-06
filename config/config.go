@@ -34,12 +34,13 @@ type Config struct {
 	WebserverListen         ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
 	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
 	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
-	CacheDir                ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored.
 	IgnoreCacheControl      ConfigProp[bool]              `json:"ignore_cache_control"`        // If true, the proxy will ignore Cache-Control headers from the upstream response.
 	MaxCacheSize            ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
 	DefaultCacheMaxAge      ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
 	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheDir                ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored.
 	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
+	CacheLockShards         ConfigProp[int]               `json:"cache_lock_shards"`           // The number of shards to use for per-key locking. High values increase concurrency but use more memory.
 	LogLevel                ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
 	LogFile                 ConfigProp[string]            `json:"log_file"`                    // The path to the log file. If empty, no file logging will be done.
 	LogFileMaxSize          ConfigProp[bytesize.ByteSize] `json:"log_file_max_size"`           // The maximum size of the log file.
@@ -61,6 +62,7 @@ func (c *Config) setRestartNeededProps() {
 	c.LogFileMaxBackups.SetRequiresRestart()
 	c.LogFileCompress.SetRequiresRestart()
 	c.LogToStdout.SetRequiresRestart()
+	c.CacheLockShards.SetRequiresRestart()
 }
 
 func newDefault() *Config {
@@ -81,6 +83,7 @@ func newDefault() *Config {
 		DefaultCacheMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
 		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
 		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
+		CacheLockShards:         NewConfigProp(1024),
 		LogLevel:                NewConfigProp(slog.LevelInfo),
 		LogFile:                 NewConfigProp("var/proxy.log"),
 		LogFileMaxSize:          NewConfigProp(bytesize.ParseUnchecked("500M")),

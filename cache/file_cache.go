@@ -29,16 +29,17 @@ type FileCache[MetadataT any] struct {
 	rootDir         assertedpath.AssertedPath
 	entriesMetadata map[CacheKey]*EntryMetadata[MetadataT]
 	mu              sync.RWMutex
-	locks           [CACHE_LOCK_SHARDS]sync.RWMutex
+	locks           []sync.RWMutex
 	byteSize        atomics.Int64
 	janitor         *cacheJanitor[MetadataT]
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
-func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, ctx context.Context) *FileCache[MetadataT] {
+func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
 	c := &FileCache[MetadataT]{
 		rootDir:         assertedpath.AssertDirectory(rootDir).EnsureCleared(),
 		entriesMetadata: make(map[CacheKey]*EntryMetadata[MetadataT]),
+		locks:           make([]sync.RWMutex, shardCount),
 		byteSize:        atomics.NewInt64(0),
 	}
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
@@ -65,7 +66,7 @@ func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, 
 			return c.ensureRemove(key)
 		},
 		getLock: func(key CacheKey) *sync.RWMutex {
-			return getLock(&c.locks, key)
+			return getLock(c.locks, key)
 		},
 	})
 	c.janitor.start(ctx)
@@ -119,7 +120,7 @@ func (c *FileCache[MetadataT]) ensureRemove(key CacheKey) error {
 }
 
 func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 
@@ -159,7 +160,7 @@ func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 }
 
 func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -220,7 +221,7 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 }
 
 func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -228,7 +229,7 @@ func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
 }
 
 func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -252,7 +253,7 @@ func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*Entry
 }
 
 func (c *FileCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error) {
-	lock := getLock(&c.locks, key)
+	lock := getLock(c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 

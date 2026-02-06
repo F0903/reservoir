@@ -8,9 +8,9 @@ import (
 )
 
 // Gets or creates a lock for the given key.
-func getLock(locks *[CACHE_LOCK_SHARDS]sync.RWMutex, key CacheKey) *sync.RWMutex {
+func getLock(locks []sync.RWMutex, key CacheKey) *sync.RWMutex {
 	val := utils.Hex8ToIndex(key.Hex)
-	return &locks[val%CACHE_LOCK_SHARDS]
+	return &locks[val%uint32(len(locks))]
 }
 
 func addCacheSize(byteCounter *atomics.Int64, delta int64) {

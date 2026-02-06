@@ -220,6 +220,13 @@
                 tooltip:
                     "The interval at which the cache will be cleaned up to remove expired entries.",
             },
+            {
+                InputComponent: NumberInput,
+                get: () => settings.proxySettings.fields.cache_lock_shards,
+                commit: async (val: number) => await sendPatch("cache_lock_shards", val),
+                label: "Cache Lock Shards",
+                tooltip: "The number of shards to use for locking cache entries.",
+            },
         ],
         // Logging section
         [

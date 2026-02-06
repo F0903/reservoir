@@ -57,9 +57,9 @@ func (p *Proxy) Destroy() {
 // Creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewProxy(cacheDir string, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
+func NewProxy(cacheDir string, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
 	cacheCleanupInterval := config.Global.CacheCleanupInterval.Read().Cast()
-	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, ctx)
+	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, shardCount, ctx)
 	return &Proxy{
 		ca:    ca,
 		cache: cache,
