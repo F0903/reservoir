@@ -2,8 +2,13 @@ package cache
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"maps"
+	"reservoir/metrics"
+	"reservoir/utils/atomics"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/mem"
@@ -22,47 +27,110 @@ func (m *memoryReadSeekCloser) Close() error {
 }
 
 type MemoryCache[MetadataT any] struct {
-	data         map[CacheKey]*Entry[MetadataT]
-	memoryCap    int64
-	currentUsage int64
+	entries   map[CacheKey]*Entry[MetadataT]
+	mu        sync.RWMutex
+	locks     [CACHE_LOCK_SHARDS]sync.RWMutex
+	memoryCap int64
+	byteSize  atomics.Int64
+
+	janitor *cacheJanitor[MetadataT]
 }
 
-func NewMemoryCache[MetadataT any](memoryBudgetPercent int) MemoryCache[MetadataT] {
+func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time.Duration, ctx context.Context) *MemoryCache[MetadataT] {
 	sysMem, err := mem.VirtualMemory()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
 	}
 	memoryCap := int64(sysMem.Total) * int64(memoryBudgetPercent) / 100
 
-	return MemoryCache[MetadataT]{
-		data:         make(map[CacheKey]*Entry[MetadataT]),
-		memoryCap:    memoryCap,
-		currentUsage: 0,
+	c := &MemoryCache[MetadataT]{
+		entries:   make(map[CacheKey]*Entry[MetadataT]),
+		memoryCap: memoryCap,
+		byteSize:  atomics.NewInt64(0),
 	}
+	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
+		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
+			c.mu.RLock()
+			snapshot := maps.Clone(c.entries)
+			c.mu.RUnlock()
+
+			for key, entry := range snapshot {
+				if !yield(key, entry.Metadata) {
+					break
+				}
+			}
+		},
+		removeEntry: func(key CacheKey) error {
+			return c.Delete(key)
+		},
+		getCacheSize: func() int64 {
+			return c.byteSize.Get()
+		},
+		getCacheLen: func() int {
+			c.mu.RLock()
+			defer c.mu.RUnlock()
+			return len(c.entries)
+		},
+		getLock: func(key CacheKey) *sync.RWMutex {
+			return getLock(&c.locks, key)
+		},
+	})
+	c.janitor.start(ctx)
+
+	return c
 }
 
-func (m *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
-	data, ok := m.data[key]
+func (c *MemoryCache[MetadataT]) Destroy() {
+	c.janitor.stop()
+}
+
+func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
+	lock := getLock(&c.locks, key)
+	lock.Lock() // Using full lock to update LastAccess safely
+	defer lock.Unlock()
+
+	c.mu.RLock()
+	entry, ok := c.entries[key]
+	c.mu.RUnlock()
+
 	if !ok {
+		metrics.Global.Cache.CacheMisses.Increment()
 		return nil, ErrCacheEntryNotFound
 	}
-	return data, nil
+
+	stale := false
+	if entry.Metadata.Expires.Before(time.Now()) {
+		stale = true
+	}
+
+	entry.Metadata.LastAccess = time.Now()
+	metrics.Global.Cache.CacheHits.Increment()
+
+	return &Entry[MetadataT]{
+		Data:     entry.Data,
+		Metadata: entry.Metadata,
+		Stale:    stale,
+	}, nil
 }
 
-func (m *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	if m.currentUsage >= m.memoryCap {
+func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
+	lock := getLock(&c.locks, key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	if c.byteSize.Get() >= c.memoryCap {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, ErrCacheMemoryExceeded
 	}
 
 	buf := bytes.NewBuffer(make([]byte, 0, INIT_BUFFER_SIZE))
 	count, err := buf.ReadFrom(data)
 	if err != nil {
+		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, err
 	}
 
 	memReader := &memoryReadSeekCloser{bytes.NewReader(buf.Bytes())}
-	m.currentUsage += int64(count)
-
 	now := time.Now()
 	entry := &Entry[MetadataT]{
 		Data: memReader,
@@ -70,13 +138,83 @@ func (m *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires tim
 			TimeWritten: now,
 			LastAccess:  now,
 			Expires:     expires,
-			Size:        int64(count),
+			Size:        count,
 			Object:      metadata,
 		},
 	}
-	m.data[key] = entry
+
+	c.mu.Lock()
+	c.entries[key] = entry
+	c.mu.Unlock()
+
+	addCacheSize(&c.byteSize, count)
+	metrics.Global.Cache.CacheEntries.Add(1)
+
 	return entry, nil
 }
 
-func (m *MemoryCache[MetadataT]) Destroy() {
+func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
+	lock := getLock(&c.locks, key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	c.mu.Lock()
+	entry, ok := c.entries[key]
+	if !ok {
+		c.mu.Unlock()
+		return ErrCacheEntryNotFound
+	}
+	delete(c.entries, key)
+	c.mu.Unlock()
+
+	decrementCacheSize(&c.byteSize, entry.Metadata.Size)
+	metrics.Global.Cache.CacheEntries.Sub(1)
+
+	return nil
+}
+
+func (c *MemoryCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
+	lock := getLock(&c.locks, key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	c.mu.RLock()
+	entry, ok := c.entries[key]
+	c.mu.RUnlock()
+
+	if !ok {
+		metrics.Global.Cache.CacheErrors.Increment()
+		return ErrCacheEntryNotFound
+	}
+
+	modifier(entry.Metadata)
+	entry.Metadata.LastAccess = time.Now()
+
+	metrics.Global.Cache.CacheHits.Increment()
+	return nil
+}
+
+func (c *MemoryCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error) {
+	lock := getLock(&c.locks, key)
+	lock.Lock() // Using full lock to update LastAccess safely
+	defer lock.Unlock()
+
+	c.mu.RLock()
+	entry, ok := c.entries[key]
+	c.mu.RUnlock()
+
+	if !ok {
+		metrics.Global.Cache.CacheMisses.Increment()
+		return nil, false, ErrCacheEntryNotFound
+	}
+
+	stale = false
+	if entry.Metadata.Expires.Before(time.Now()) {
+		stale = true
+	}
+
+	entry.Metadata.LastAccess = time.Now()
+	metrics.Global.Cache.CacheHits.Increment()
+
+	return entry.Metadata, stale, nil
 }

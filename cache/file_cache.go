@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"reservoir/metrics"
 	"reservoir/utils/assertedpath"
-	"reservoir/utils/syncmap"
+	"reservoir/utils/atomics"
 	"sync"
 	"time"
 )
@@ -25,40 +26,46 @@ var (
 )
 
 type FileCache[MetadataT any] struct {
-	rootDir  assertedpath.AssertedPath
-	locks    *syncmap.SyncMap[CacheKey, *sync.RWMutex]
-	entries  map[CacheKey]*EntryMetadata[MetadataT]
-	byteSize int64
-	janitor  *cacheJanitor[MetadataT]
+	rootDir         assertedpath.AssertedPath
+	entriesMetadata map[CacheKey]*EntryMetadata[MetadataT]
+	mu              sync.RWMutex
+	locks           [CACHE_LOCK_SHARDS]sync.RWMutex
+	byteSize        atomics.Int64
+	janitor         *cacheJanitor[MetadataT]
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, ctx context.Context) *FileCache[MetadataT] {
 	c := &FileCache[MetadataT]{
-		rootDir:  assertedpath.AssertDirectory(rootDir).EnsureCleared(),
-		locks:    syncmap.New[CacheKey, *sync.RWMutex](),
-		entries:  make(map[CacheKey]*EntryMetadata[MetadataT]),
-		byteSize: 0,
+		rootDir:         assertedpath.AssertDirectory(rootDir).EnsureCleared(),
+		entriesMetadata: make(map[CacheKey]*EntryMetadata[MetadataT]),
+		byteSize:        atomics.NewInt64(0),
 	}
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
-			for key, metadata := range c.entries {
+			c.mu.RLock()
+			snapshot := maps.Clone(c.entriesMetadata)
+			c.mu.RUnlock()
+
+			for key, metadata := range snapshot {
 				if !yield(key, metadata) {
-					return
+					break
 				}
 			}
 		},
 		getCacheSize: func() int64 {
-			return c.byteSize
+			return c.byteSize.Get()
 		},
 		getCacheLen: func() int {
-			return len(c.entries)
+			c.mu.RLock()
+			defer c.mu.RUnlock()
+			return len(c.entriesMetadata)
 		},
 		removeEntry: func(key CacheKey) error {
 			return c.ensureRemove(key)
 		},
 		getLock: func(key CacheKey) *sync.RWMutex {
-			return c.getLock(key)
+			return getLock(&c.locks, key)
 		},
 	})
 	c.janitor.start(ctx)
@@ -67,16 +74,6 @@ func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, 
 
 func (c *FileCache[MetadataT]) Destroy() {
 	c.janitor.stop()
-}
-
-// Gets or creates a lock for the given key.
-func (c *FileCache[MetadataT]) getLock(key CacheKey) *sync.RWMutex {
-	return c.locks.GetOrSet(key, &sync.RWMutex{})
-}
-
-func (c *FileCache[MetadataT]) addCacheSize(delta int64) {
-	c.byteSize += delta
-	metrics.Global.Cache.BytesCached.Add(delta)
 }
 
 func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
@@ -99,8 +96,8 @@ func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
 	slog.Info("Removed file", "path", path)
 	size := stat.Size()
 
-	metrics.Global.Cache.CacheEntries.Add(-1)
-	c.addCacheSize(-size)
+	metrics.Global.Cache.CacheEntries.Sub(1)
+	decrementCacheSize(&c.byteSize, size)
 
 	return nil
 }
@@ -114,25 +111,29 @@ func (c *FileCache[MetadataT]) ensureRemove(key CacheKey) error {
 		return fmt.Errorf("%w: failed to remove cached file '%s'", fileErr, filePath)
 	}
 
-	delete(c.entries, key) // Remove the entry from the map
-	c.locks.Delete(key)    // Remove the lock for this key
+	c.mu.Lock()
+	delete(c.entriesMetadata, key) // Remove the entry from the map
+	c.mu.Unlock()
 
 	return nil
 }
 
 func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
-	lock := c.getLock(key)
+	lock := getLock(&c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 
-	fileName := filepath.Join(c.rootDir.Path, key.Hex)
-	entryMeta, exists := c.entries[key]
+	c.mu.RLock()
+	entryMeta, exists := c.entriesMetadata[key]
+	c.mu.RUnlock()
+
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
 		slog.Debug("Cache miss", "key", key.Hex)
 		return nil, ErrCacheEntryNotFound
 	}
 
+	fileName := filepath.Join(c.rootDir.Path, key.Hex)
 	dataFile, err := os.Open(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
@@ -158,7 +159,7 @@ func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 }
 
 func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	lock := c.getLock(key)
+	lock := getLock(&c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -194,10 +195,13 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 		Size:        fileSize,
 		Object:      metadata,
 	}
-	c.entries[key] = meta
+
+	c.mu.Lock()
+	c.entriesMetadata[key] = meta
+	c.mu.Unlock()
 
 	metrics.Global.Cache.CacheEntries.Add(1)
-	c.addCacheSize(fileSize)
+	addCacheSize(&c.byteSize, fileSize)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
 
@@ -216,7 +220,7 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 }
 
 func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
-	lock := c.getLock(key)
+	lock := getLock(&c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -224,11 +228,14 @@ func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
 }
 
 func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
-	lock := c.getLock(key)
+	lock := getLock(&c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
-	meta, exists := c.entries[key]
+	c.mu.RLock()
+	meta, exists := c.entriesMetadata[key]
+	c.mu.RUnlock()
+
 	if !exists {
 		metrics.Global.Cache.CacheErrors.Increment()
 		slog.Error("Failed to update metadata for cache entry", "key", key.Hex, "error", ErrCacheEntryNotFound)
@@ -245,11 +252,14 @@ func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*Entry
 }
 
 func (c *FileCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error) {
-	lock := c.getLock(key)
+	lock := getLock(&c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 
-	metaPtr, exists := c.entries[key]
+	c.mu.RLock()
+	metaPtr, exists := c.entriesMetadata[key]
+	c.mu.RUnlock()
+
 	if !exists {
 		metrics.Global.Cache.CacheMisses.Increment()
 		slog.Debug("Cache miss", "key", key.Hex)
