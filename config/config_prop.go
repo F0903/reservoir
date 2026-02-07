@@ -8,7 +8,6 @@ import (
 )
 
 type ConfigProp[T comparable] struct {
-	// We use Overwritable to allow overrides from the command line while still retaining and persisting the original value from the config file.
 	value           atomics.Value[commitable[overwritable[T]]]
 	onChange        event.Event[T]
 	requiresRestart bool

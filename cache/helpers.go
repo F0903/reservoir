@@ -22,3 +22,11 @@ func decrementCacheSize(byteCounter *atomics.Int64, delta int64) {
 	byteCounter.Sub(delta)
 	metrics.Global.Cache.BytesCached.Sub(delta)
 }
+
+func incrementCacheEntries() {
+	metrics.Global.Cache.CacheEntries.Add(1)
+}
+
+func decrementCacheEntries() {
+	metrics.Global.Cache.CacheEntries.Sub(1)
+}

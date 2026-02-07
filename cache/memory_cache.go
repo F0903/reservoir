@@ -62,7 +62,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 			}
 		},
 		removeEntry: func(key CacheKey) error {
-			return c.Delete(key)
+			return c.deleteInternal(key)
 		},
 		getCacheSize: func() int64 {
 			return c.byteSize.Get()
@@ -148,8 +148,8 @@ func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires tim
 	c.entries[key] = entry
 	c.mu.Unlock()
 
-	addCacheSize(&c.byteSize, count)
-	metrics.Global.Cache.CacheEntries.Add(1)
+	incrementCacheEntries()
+	addCacheSize(&c.byteSize, int64(count))
 
 	return entry, nil
 }
@@ -159,6 +159,10 @@ func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
 	lock.Lock()
 	defer lock.Unlock()
 
+	return c.deleteInternal(key)
+}
+
+func (c *MemoryCache[MetadataT]) deleteInternal(key CacheKey) error {
 	c.mu.Lock()
 	entry, ok := c.entries[key]
 	if !ok {
@@ -168,8 +172,8 @@ func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
 	delete(c.entries, key)
 	c.mu.Unlock()
 
+	decrementCacheEntries()
 	decrementCacheSize(&c.byteSize, entry.Metadata.Size)
-	metrics.Global.Cache.CacheEntries.Sub(1)
 
 	return nil
 }

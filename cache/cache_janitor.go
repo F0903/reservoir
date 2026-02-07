@@ -175,6 +175,8 @@ func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
 
 			if err := j.cacheFns.removeEntry(candidate.key); err != nil {
 				slog.Info("Failed to evict cache entry", "key", candidate.key.Hex, "error", err)
+			} else {
+				metrics.Global.Cache.CacheEvictions.Increment()
 			}
 			evictions++
 			lock.Unlock()

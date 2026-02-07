@@ -97,7 +97,7 @@ func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
 	slog.Info("Removed file", "path", path)
 	size := stat.Size()
 
-	metrics.Global.Cache.CacheEntries.Sub(1)
+	decrementCacheEntries()
 	decrementCacheSize(&c.byteSize, size)
 
 	return nil
@@ -201,7 +201,7 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 	c.entriesMetadata[key] = meta
 	c.mu.Unlock()
 
-	metrics.Global.Cache.CacheEntries.Add(1)
+	incrementCacheEntries()
 	addCacheSize(&c.byteSize, fileSize)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
