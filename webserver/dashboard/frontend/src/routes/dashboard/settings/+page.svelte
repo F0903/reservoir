@@ -12,6 +12,7 @@
     import { parseByteString } from "$lib/utils/bytestring";
     import { patchConfig } from "$lib/api/objects/config/config";
     import NumberInput from "$lib/components/ui/input/NumberInput.svelte";
+    import PercentInput from "$lib/components/ui/input/PercentInput.svelte";
 
     const settings = getContext("settings") as SettingsProvider;
     const toast = getContext("toast") as ToastProvider;
@@ -66,6 +67,7 @@
 
     const inputSections: (
         | InputSection<typeof NumberInput, RegularInputProps<number>>
+        | InputSection<typeof PercentInput, RegularInputProps<number>>
         | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp>
         | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp, number>
         | InputSection<typeof Toggle, RegularInputProps<boolean>>
@@ -98,17 +100,17 @@
                 InputComponent: TextInput,
                 get: () => settings.proxySettings.fields.ca_cert,
                 commit: async (val: string) => await sendPatch("ca_cert", val),
-                label: "CA Certificate",
+                label: "CA Certificate Path",
                 pattern: stringPattern,
-                tooltip: "The path to the CA certificate for the proxy server.",
+                tooltip: "The app relative path to the CA certificate for the proxy server.",
             },
             {
                 InputComponent: TextInput,
                 get: () => settings.proxySettings.fields.ca_key,
                 commit: async (val: string) => await sendPatch("ca_key", val),
-                label: "CA Key",
+                label: "CA Key Path",
                 pattern: stringPattern,
-                tooltip: "The path to the CA private key for the proxy server.",
+                tooltip: "The app relative path to the CA private key for the proxy server.",
             },
             {
                 InputComponent: Toggle,
@@ -169,12 +171,27 @@
         // Cache section
         [
             {
+                InputComponent: Dropdown,
+                get: () => settings.proxySettings.fields.cache_type,
+                commit: async (val: string) => await sendPatch("cache_type", val),
+                label: "Cache Type",
+                options: ["memory", "file"],
+                tooltip: "The type of cache to use.",
+            },
+            {
                 InputComponent: TextInput,
                 get: () => settings.proxySettings.fields.cache_dir,
                 commit: async (val: string) => await sendPatch("cache_dir", val),
                 label: "Cache Directory",
                 pattern: stringPattern,
                 tooltip: "The directory where cached files are stored.",
+            },
+            {
+                InputComponent: PercentInput,
+                get: () => settings.proxySettings.fields.cache_memory_budget_percent,
+                commit: async (val: number) => await sendPatch("cache_memory_budget_percent", val),
+                label: "Cache Memory Budget (%)",
+                tooltip: "The percentage of memory to allocate to the cache.",
             },
             {
                 InputComponent: Toggle,
@@ -287,7 +304,6 @@
     ];
 
     type SettingInputInstance = {
-        hasChanged: () => boolean;
         commit: () => Promise<void>;
         reset: () => Promise<void>;
     };
@@ -328,6 +344,7 @@
     });
 
     function onChange(different: boolean) {
+        log.debug(`Input changed, different=${different}`);
         hasChanges = different;
     }
 

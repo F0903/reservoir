@@ -21,37 +21,27 @@
         [key: string]: unknown;
     } = $props();
 
-    // We want the behaviour the warning warns about.
     // svelte-ignore state_referenced_locally
-    let value: V = $state(get());
-    let store: V = $derived(value);
-    let lastChangeValue = false;
+    let inputValue: V = $state(get());
 
-    $effect(() => {
-        const change = hasChanged();
-        if (change !== lastChangeValue) {
-            lastChangeValue = change;
-            log.debug(`SettingInput change state updated: ${change}`);
-            onChange?.(change);
-        }
-    });
-
-    // Has 'value' changed from 'store'?
-    export function hasChanged() {
+    // Has 'inputValue' changed from 'get()'?
+    function hasDiverged() {
+        if (get() === undefined) return false;
+        log.debug(`Checking divergence: inputValue=${inputValue}, get()=${get()}`);
         // We use != to allow type coercion (e.g. between number and string)
-        return value != store;
+        return inputValue != get();
     }
 
     export async function commit() {
-        if (!hasChanged() || value === undefined) return;
+        if (!hasDiverged() || inputValue === undefined) return;
 
         try {
             let valueToWrite: O;
             if (valueTransform) {
-                valueToWrite = valueTransform(value);
+                valueToWrite = valueTransform(inputValue);
                 log.debug(`Committing setting with transformed value: ${valueToWrite}`);
             } else {
-                valueToWrite = value as O;
+                valueToWrite = inputValue as O;
             }
             await commitValue(valueToWrite);
 
@@ -65,8 +55,17 @@
     }
 
     export async function reset() {
-        value = await get();
+        inputValue = get();
+    }
+
+    function getValue() {
+        return inputValue;
+    }
+
+    function setValue(newValue: V) {
+        inputValue = newValue;
+        onChange?.(hasDiverged());
     }
 </script>
 
-<InputComponent {...restProps as CP} bind:value />
+<InputComponent {...restProps as CP} bind:value={getValue, setValue} />

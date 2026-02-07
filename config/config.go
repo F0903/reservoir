@@ -23,30 +23,39 @@ var (
 	ErrConfigPersist         = errors.New("config persist failed")
 )
 
+type CacheType string
+
+var (
+	CacheTypeFile   CacheType = "file"
+	CacheTypeMemory CacheType = "memory"
+)
+
 type Config struct {
-	ConfigVersion           ConfigProp[int]               `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
-	ProxyListen             ConfigProp[string]            `json:"proxy_listen"`                // The address and port that the proxy will listen on.
-	CaCert                  ConfigProp[string]            `json:"ca_cert"`                     // Path to CA certificate file.
-	CaKey                   ConfigProp[string]            `json:"ca_key"`                      // Path to CA private key file.
-	UpstreamDefaultHttps    ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
-	RetryOnRange416         ConfigProp[bool]              `json:"retry_on_range_416"`          // If true, the proxy will retry a request without the Range header if the upstream responds with a 416 Range Not Satisfiable.
-	RetryOnInvalidRange     ConfigProp[bool]              `json:"retry_on_invalid_range"`      // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header. (not recommended)
-	WebserverListen         ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
-	DashboardDisabled       ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
-	ApiDisabled             ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
-	IgnoreCacheControl      ConfigProp[bool]              `json:"ignore_cache_control"`        // If true, the proxy will ignore Cache-Control headers from the upstream response.
-	MaxCacheSize            ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
-	DefaultCacheMaxAge      ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
-	ForceDefaultCacheMaxAge ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
-	CacheDir                ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored.
-	CacheCleanupInterval    ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
-	CacheLockShards         ConfigProp[int]               `json:"cache_lock_shards"`           // The number of shards to use for per-key locking. High values increase concurrency but use more memory.
-	LogLevel                ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
-	LogFile                 ConfigProp[string]            `json:"log_file"`                    // The path to the log file. If empty, no file logging will be done.
-	LogFileMaxSize          ConfigProp[bytesize.ByteSize] `json:"log_file_max_size"`           // The maximum size of the log file.
-	LogFileMaxBackups       ConfigProp[int]               `json:"log_file_max_backups"`        // The maximum number of old log files to retain.
-	LogFileCompress         ConfigProp[bool]              `json:"log_file_compress"`           // If true, old log files will be compressed.
-	LogToStdout             ConfigProp[bool]              `json:"log_to_stdout"`               // If true, log messages will be written to stdout.
+	ConfigVersion            ConfigProp[int]               `json:"config_version"`              // Version of the config file format, used for future migrations to ensure compatibility.
+	ProxyListen              ConfigProp[string]            `json:"proxy_listen"`                // The address and port that the proxy will listen on.
+	CaCert                   ConfigProp[string]            `json:"ca_cert"`                     // Path to CA certificate file.
+	CaKey                    ConfigProp[string]            `json:"ca_key"`                      // Path to CA private key file.
+	UpstreamDefaultHttps     ConfigProp[bool]              `json:"upstream_default_https"`      // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
+	RetryOnRange416          ConfigProp[bool]              `json:"retry_on_range_416"`          // If true, the proxy will retry a request without the Range header if the upstream responds with a 416 Range Not Satisfiable.
+	RetryOnInvalidRange      ConfigProp[bool]              `json:"retry_on_invalid_range"`      // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header. (not recommended)
+	WebserverListen          ConfigProp[string]            `json:"webserver_listen"`            // The address and port that the webserver (dashboard and API) will listen on.
+	DashboardDisabled        ConfigProp[bool]              `json:"dashboard_disabled"`          // If true, the dashboard will be disabled. The API must also be enabled if the dashboard is enabled.
+	ApiDisabled              ConfigProp[bool]              `json:"api_disabled"`                // If true, the API will be disabled.
+	IgnoreCacheControl       ConfigProp[bool]              `json:"ignore_cache_control"`        // If true, the proxy will ignore Cache-Control headers from the upstream response.
+	MaxCacheSize             ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`              // The maximum size of the cache in bytes. If the cache exceeds this size, entries will be evicted.
+	DefaultCacheMaxAge       ConfigProp[duration.Duration] `json:"default_cache_max_age"`       // The default cache max age to use if the upstream response does not specify a Cache-Control or Expires header.
+	ForceDefaultCacheMaxAge  ConfigProp[bool]              `json:"force_default_cache_max_age"` // If true, always use the default cache max age even if the upstream response has a Cache-Control or Expires header.
+	CacheType                ConfigProp[CacheType]         `json:"cache_type"`                  // The type of cache to use. Supported values are "memory" and "file".
+	CacheDir                 ConfigProp[string]            `json:"cache_dir"`                   // The directory where cached files will be stored. (only valid for file-based caches)
+	CacheMemoryBudgetPercent ConfigProp[int]               `json:"cache_memory_budget_percent"` // The percentage of total memory to use for the cache. (only valid for memory-based caches)
+	CacheCleanupInterval     ConfigProp[duration.Duration] `json:"cache_cleanup_interval"`      // The interval at which the cache will be cleaned up to remove expired entries.
+	CacheLockShards          ConfigProp[int]               `json:"cache_lock_shards"`           // The number of shards to use for per-key locking. High values increase concurrency but use more memory.
+	LogLevel                 ConfigProp[slog.Level]        `json:"log_level"`                   // The log level to use for the application.
+	LogFile                  ConfigProp[string]            `json:"log_file"`                    // The path to the log file. If empty, no file logging will be done.
+	LogFileMaxSize           ConfigProp[bytesize.ByteSize] `json:"log_file_max_size"`           // The maximum size of the log file.
+	LogFileMaxBackups        ConfigProp[int]               `json:"log_file_max_backups"`        // The maximum number of old log files to retain.
+	LogFileCompress          ConfigProp[bool]              `json:"log_file_compress"`           // If true, old log files will be compressed.
+	LogToStdout              ConfigProp[bool]              `json:"log_to_stdout"`               // If true, log messages will be written to stdout.
 }
 
 // Marks all properties that require a restart to take effect as needing a restart.
@@ -62,34 +71,40 @@ func (c *Config) setRestartNeededProps() {
 	c.LogFileMaxBackups.SetRequiresRestart()
 	c.LogFileCompress.SetRequiresRestart()
 	c.LogToStdout.SetRequiresRestart()
+	c.CacheType.SetRequiresRestart()
+	c.CacheDir.SetRequiresRestart()
+	c.CacheMemoryBudgetPercent.SetRequiresRestart()
+	c.CacheCleanupInterval.SetRequiresRestart()
 	c.CacheLockShards.SetRequiresRestart()
 }
 
 func newDefault() *Config {
 	cfg := &Config{
-		ConfigVersion:           NewConfigProp(configVersion),
-		ProxyListen:             NewConfigProp(":9999"),
-		CaCert:                  NewConfigProp("ssl/ca.crt"),
-		CaKey:                   NewConfigProp("ssl/ca.key"),
-		UpstreamDefaultHttps:    NewConfigProp(true),
-		RetryOnRange416:         NewConfigProp(true),
-		RetryOnInvalidRange:     NewConfigProp(false),
-		WebserverListen:         NewConfigProp("localhost:8080"),
-		DashboardDisabled:       NewConfigProp(false),
-		ApiDisabled:             NewConfigProp(false),
-		CacheDir:                NewConfigProp("var/cache/"),
-		IgnoreCacheControl:      NewConfigProp(true), // This this is primarily targeted at caching package managers, we want to cache aggressively by default.
-		MaxCacheSize:            NewConfigProp(bytesize.ParseUnchecked("10G")),
-		DefaultCacheMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
-		ForceDefaultCacheMaxAge: NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
-		CacheCleanupInterval:    NewConfigProp(duration.Duration(90 * time.Minute)),
-		CacheLockShards:         NewConfigProp(1024),
-		LogLevel:                NewConfigProp(slog.LevelInfo),
-		LogFile:                 NewConfigProp("var/proxy.log"),
-		LogFileMaxSize:          NewConfigProp(bytesize.ParseUnchecked("500M")),
-		LogFileMaxBackups:       NewConfigProp(3),
-		LogFileCompress:         NewConfigProp(true),
-		LogToStdout:             NewConfigProp(false),
+		ConfigVersion:            NewConfigProp(configVersion),
+		ProxyListen:              NewConfigProp(":9999"),
+		CaCert:                   NewConfigProp("ssl/ca.crt"),
+		CaKey:                    NewConfigProp("ssl/ca.key"),
+		UpstreamDefaultHttps:     NewConfigProp(true),
+		RetryOnRange416:          NewConfigProp(true),
+		RetryOnInvalidRange:      NewConfigProp(false),
+		WebserverListen:          NewConfigProp("localhost:8080"),
+		DashboardDisabled:        NewConfigProp(false),
+		ApiDisabled:              NewConfigProp(false),
+		IgnoreCacheControl:       NewConfigProp(true), // This this is primarily targeted at caching package managers, we want to cache aggressively by default.
+		MaxCacheSize:             NewConfigProp(bytesize.ParseUnchecked("10G")),
+		DefaultCacheMaxAge:       NewConfigProp(duration.Duration(1 * time.Hour)),
+		ForceDefaultCacheMaxAge:  NewConfigProp(true), // Since this is again primarily targeted at caching apt repositories, we want to cache aggressively by default.
+		CacheType:                NewConfigProp(CacheTypeMemory),
+		CacheDir:                 NewConfigProp("var/cache/"),
+		CacheMemoryBudgetPercent: NewConfigProp(75),
+		CacheCleanupInterval:     NewConfigProp(duration.Duration(90 * time.Minute)),
+		CacheLockShards:          NewConfigProp(1024),
+		LogLevel:                 NewConfigProp(slog.LevelInfo),
+		LogFile:                  NewConfigProp("var/proxy.log"),
+		LogFileMaxSize:           NewConfigProp(bytesize.ParseUnchecked("500M")),
+		LogFileMaxBackups:        NewConfigProp(3),
+		LogFileCompress:          NewConfigProp(true),
+		LogToStdout:              NewConfigProp(false),
 	}
 	cfg.setRestartNeededProps()
 	return cfg

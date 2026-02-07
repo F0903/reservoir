@@ -57,13 +57,25 @@ func (p *Proxy) Destroy() {
 // Creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewProxy(cacheDir string, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
+func NewProxy(cacheType config.CacheType, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
 	cacheCleanupInterval := config.Global.CacheCleanupInterval.Read().Cast()
-	cache := cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, shardCount, ctx)
+
+	var c cache.Cache[cachedRequestInfo]
+	switch cacheType {
+	case config.CacheTypeFile:
+		cacheDir := config.Global.CacheDir.Read()
+		c = cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, shardCount, ctx)
+	case config.CacheTypeMemory:
+		memoryBudget := config.Global.CacheMemoryBudgetPercent.Read()
+		c = cache.NewMemoryCache[cachedRequestInfo](memoryBudget, cacheCleanupInterval, shardCount, ctx)
+	default:
+		return nil, fmt.Errorf("unsupported cache type: %v", cacheType)
+	}
+
 	return &Proxy{
 		ca:    ca,
-		cache: cache,
-		fetch: newFetcher(cache),
+		cache: c,
+		fetch: newFetcher(c),
 	}, nil
 }
 

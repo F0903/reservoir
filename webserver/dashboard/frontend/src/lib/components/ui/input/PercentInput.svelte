@@ -1,49 +1,47 @@
 <script lang="ts">
-    import TextInput from "./TextInput.svelte";
+    import Input from "./Input.svelte";
 
     let {
         label,
         value: valProp = $bindable(),
         placeholder,
         tooltip,
-        maxCharacters = 30,
-        // We want the behaviour the warning warns about.
-        // eslint-disable-next-line
-        // svelte-ignore state_referenced_locally
-        boxWidthCh = maxCharacters,
-        min,
-        max,
+        min = 0,
+        max = 100,
         onSubmit,
         disabled = false,
-        censor = false,
     }: {
         label: string;
         value: number;
         placeholder?: string;
         tooltip?: string;
-        maxCharacters?: number;
-        boxWidthCh?: number;
         min?: number;
         max?: number;
         onSubmit?: (_event: Event) => void;
         disabled?: boolean;
-        censor?: boolean;
     } = $props();
-
-    const intPattern = "^\\d+$";
 </script>
 
-<TextInput
+<Input
+    type="number"
     {label}
     bind:value={() => valProp?.toString(), (val: string) => (valProp = Number(val))}
-    pattern={intPattern}
     {placeholder}
     {tooltip}
-    {maxCharacters}
-    {boxWidthCh}
     {min}
     {max}
     {onSubmit}
     {disabled}
-    {censor}
-/>
+>
+    {#snippet suffixElement()}
+        <div class="percent">%</div>
+    {/snippet}
+</Input>
+
+<style>
+    .percent {
+        margin: auto;
+        padding: 0px 5px;
+        background-color: var(--primary-600);
+    }
+</style>

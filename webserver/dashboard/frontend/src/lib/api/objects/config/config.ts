@@ -12,7 +12,9 @@ export type Config = {
     max_cache_size: number;
     default_cache_max_age: string;
     force_default_cache_max_age: boolean;
+    cache_type: string;
     cache_dir: string;
+    cache_memory_budget_percent: number;
     cache_cleanup_interval: string;
     cache_lock_shards: number;
     upstream_default_https: boolean;

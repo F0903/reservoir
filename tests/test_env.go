@@ -48,6 +48,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 	config.Global.RetryOnRange416.Overwrite(false)
 	config.Global.IgnoreCacheControl.Overwrite(false)
 	config.Global.ForceDefaultCacheMaxAge.Overwrite(false)
+	config.Global.CacheType.Overwrite(config.CacheTypeMemory)
 	config.Global.CacheLockShards.Overwrite(32)
 
 	if _, ok := t.(*testing.B); ok {
@@ -59,8 +60,9 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
+	cacheType := config.Global.CacheType.Read()
 	lockShards := config.Global.CacheLockShards.Read()
-	p, err := proxy.NewProxy(cacheDir, &FakeCA{}, lockShards, ctx)
+	p, err := proxy.NewProxy(cacheType, &FakeCA{}, lockShards, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
@@ -172,13 +174,15 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 
 	config.Global.UpstreamDefaultHttps.Overwrite(true)
 	config.Global.CacheDir.Overwrite(cacheDir)
+	config.Global.CacheType.Overwrite(config.CacheTypeMemory)
 	config.Global.CacheLockShards.Overwrite(32)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
+	cacheType := config.Global.CacheType.Read()
 	lockShards := config.Global.CacheLockShards.Read()
-	p, err := proxy.NewProxy(cacheDir, ca, lockShards, ctx)
+	p, err := proxy.NewProxy(cacheType, ca, lockShards, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}

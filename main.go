@@ -19,37 +19,32 @@ import (
 )
 
 func startProxy(errChan chan error, ctx context.Context) error {
-	proxyListen := config.Global.ProxyListen.Read()
 	caCert := config.Global.CaCert.Read()
 	caKey := config.Global.CaKey.Read()
-	cacheDir := config.Global.CacheDir.Read()
-	shardCount := config.Global.CacheLockShards.Read()
-
 	ca, err := certs.NewPrivateCA(caCert, caKey)
 	if err != nil {
 		return fmt.Errorf("failed to create CA: %v", err)
 	}
 
-	proxy, err := proxy.NewProxy(cacheDir, ca, shardCount, ctx)
+	cacheType := config.Global.CacheType.Read()
+	shardCount := config.Global.CacheLockShards.Read()
+	proxy, err := proxy.NewProxy(cacheType, ca, shardCount, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy: %v", err)
 	}
 
+	proxyListen := config.Global.ProxyListen.Read()
 	slog.Info("Starting proxy server", "address", proxyListen)
 	proxy.Listen(proxyListen, errChan, ctx)
 	return nil
 }
 
 func startWebServer(errChan chan error, ctx context.Context) error {
-	webserverListen := config.Global.WebserverListen.Read()
 	dashboardDisabled := config.Global.DashboardDisabled.Read()
 	apiDisabled := config.Global.ApiDisabled.Read()
-
 	if apiDisabled && !dashboardDisabled {
 		panic("API cannot be disabled while dashboard is enabled")
-	}
-
-	if dashboardDisabled && apiDisabled {
+	} else if apiDisabled && dashboardDisabled {
 		slog.Info("Webserver is disabled by configuration, skipping startup")
 		return nil
 	}
@@ -76,6 +71,7 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 
 	auth.StartSessionGC()
 
+	webserverListen := config.Global.WebserverListen.Read()
 	slog.Info("Starting webserver", "address", webserverListen)
 	webserver.Listen(webserverListen, errChan, ctx)
 	return nil
