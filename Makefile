@@ -4,9 +4,12 @@
 build: build-proxy
 
 # Run all tests
-test: generate-csp
-	#TODO make tests for frontend
+test: test-frontend generate-csp
 	CGO_ENABLED=1 go test -v -race -count=1 ./...
+
+# Run frontend tests
+test-frontend:
+	cd webserver/dashboard/frontend && pnpm run test
 
 # The proxy build depends on the generated CSP hashes
 build-proxy: generate-csp
@@ -29,4 +32,4 @@ clean:
 	rm -f reservoir.exe
 	rm -rf webserver/dashboard/frontend/build
 
-.PHONY: build build-proxy generate-csp build-frontend dev-frontend clean
+.PHONY: build build-proxy generate-csp build-frontend dev-frontend test test-frontend clean
