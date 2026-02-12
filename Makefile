@@ -4,10 +4,13 @@
 build: build-proxy
 
 # Run all tests
-test: generate-csp test-proxy
+test: generate-csp test-proxy test-frontend
 
 test-proxy:
 	CGO_ENABLED=1 go test -v -race -count=1 ./...
+
+test-frontend:
+	cd webserver/dashboard/frontend && pnpm run test
 
 # Run all benchmarks
 bench:
