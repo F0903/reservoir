@@ -4,8 +4,9 @@
 build: build-proxy
 
 # Run all tests
-test: generate-csp
-	#TODO make tests for frontend
+test: generate-csp test-proxy
+
+test-proxy:
 	CGO_ENABLED=1 go test -v -race -count=1 ./...
 
 # The proxy build depends on the generated CSP hashes

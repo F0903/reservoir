@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -29,13 +28,39 @@ type TestEnv struct {
 	Client      *http.Client
 	Proxy       *proxy.Proxy
 	CacheDir    string
+	T           testing.TB
+	IsHttps     bool
+	CACertPool  *x509.CertPool
+}
+
+func (e *TestEnv) Start() {
+	if e.IsHttps {
+		e.Upstream.StartTLS()
+		if e.CACertPool != nil {
+			e.CACertPool.AddCert(e.Upstream.Certificate())
+		}
+	} else {
+		e.Upstream.Start()
+	}
+
+	e.ProxyServer.Start()
+
+	proxyUrl, err := url.Parse(e.ProxyServer.URL)
+	if err != nil {
+		e.T.Fatalf("Failed to parse proxy URL: %v", err)
+	}
+
+	// For non-CONNECT requests, the client uses the proxy URL
+	if transport, ok := e.Client.Transport.(*http.Transport); ok {
+		transport.Proxy = http.ProxyURL(proxyUrl)
+	}
 }
 
 func SetupTestEnv(t testing.TB) *TestEnv {
 	cacheDir := t.TempDir()
 
-	// Setup Mock Upstream
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Setup Mock Upstream (unstarted)
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=60")
 		w.Header().Set("ETag", "\"test-etag\"")
 		w.WriteHeader(http.StatusOK)
@@ -57,8 +82,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 
 	logging.Init()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	ctx := t.Context()
 
 	cacheType := config.Global.CacheType.Read()
 	lockShards := config.Global.CacheLockShards.Read()
@@ -67,17 +91,10 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
 
-	proxyServer := httptest.NewServer(p)
-
-	proxyUrl, err := url.Parse(proxyServer.URL)
-	if err != nil {
-		t.Fatalf("Failed to parse proxy URL: %v", err)
-	}
+	proxyServer := httptest.NewUnstartedServer(p)
 
 	proxyClient := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyUrl),
-		},
+		Transport: &http.Transport{},
 	}
 
 	t.Cleanup(func() {
@@ -97,6 +114,8 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		Client:      proxyClient,
 		Proxy:       p,
 		CacheDir:    cacheDir,
+		T:           t,
+		IsHttps:     false,
 	}
 }
 
@@ -163,13 +182,14 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 
 	cacheDir := t.TempDir()
 
-	// Mock HTTPS Upstream
-	// We need a server with a cert signed by our test CA, or just use httptest.NewTLSServer
-	// and make the client trust it.
-	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Mock HTTPS Upstream (unstarted)
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=60")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("https response body"))
+		_, err := w.Write([]byte("https response body"))
+		if err != nil {
+			t.Fatalf("failed to write response body: %v", err)
+		}
 	}))
 
 	config.Global.UpstreamDefaultHttps.Overwrite(true)
@@ -177,8 +197,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	config.Global.CacheType.Overwrite(config.CacheTypeMemory)
 	config.Global.CacheLockShards.Overwrite(32)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	ctx := t.Context()
 
 	cacheType := config.Global.CacheType.Read()
 	lockShards := config.Global.CacheLockShards.Read()
@@ -187,24 +206,14 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
 
-	proxyServer := httptest.NewServer(p)
-
-	proxyUrl, err := url.Parse(proxyServer.URL)
-	if err != nil {
-		t.Fatalf("Failed to parse proxy URL: %v", err)
-	}
+	proxyServer := httptest.NewUnstartedServer(p)
 
 	// Client must trust the proxy's CA for MITM
 	caCertPool := x509.NewCertPool()
 	caCertBytes, _ := os.ReadFile(certFile)
 	caCertPool.AppendCertsFromPEM(caCertBytes)
 
-	// Proxy must trust the upstream server
-	if upstream.TLS != nil {
-		caCertPool.AddCert(upstream.Certificate())
-	}
-
-	// Update default client to trust our CA (for the proxy -> upstream connection)
+	// Update DefaultTransport to trust our CA (for the proxy -> upstream connection)
 	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
 		transport.TLSClientConfig = &tls.Config{
 			RootCAs: caCertPool,
@@ -214,7 +223,6 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	proxyClient := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			Proxy: http.ProxyURL(proxyUrl),
 			TLSClientConfig: &tls.Config{
 				RootCAs: caCertPool,
 			},
@@ -224,8 +232,6 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	t.Cleanup(func() {
 		upstream.Close()
 		proxyServer.Close()
-		// Give some time for async operations to finish before stopping and cleaning up
-		time.Sleep(100 * time.Millisecond)
 		p.Destroy()
 		if transport, ok := proxyClient.Transport.(*http.Transport); ok {
 			transport.CloseIdleConnections()
@@ -238,5 +244,8 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		Client:      proxyClient,
 		Proxy:       p,
 		CacheDir:    cacheDir,
+		T:           t,
+		IsHttps:     true,
+		CACertPool:  caCertPool,
 	}
 }

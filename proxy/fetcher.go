@@ -234,10 +234,6 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 				res.Direct.Response.Body.Close()
 				return fetchResult{}, ErrNotCacheable
 			}
-			if res.Type == fetchTypeCached && res.Cached.Entry.Data != nil {
-				res.Cached.Entry.Data.Close()
-				res.Cached.Entry.Data = nil
-			}
 			return res, nil
 		}
 
@@ -249,12 +245,6 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 	if !cached.Stale {
 		slog.Debug("Cache hit, returning cached response.", "url", req.URL, "key", key)
 		fetchInfo := fetchInfo{Status: hitStatusHit}
-
-		// Close the file handle to ensure we don't pass open files through singleflight
-		if cached.Data != nil {
-			cached.Data.Close()
-			cached.Data = nil
-		}
 
 		cachedResult := cachedFetchResult{fetchInfo: fetchInfo, Entry: cached}
 		return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
@@ -285,10 +275,6 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 	if fetch.Type == fetchTypeDirect {
 		fetch.Direct.Response.Body.Close()
 		return fetchResult{}, ErrNotCacheable
-	}
-	if fetch.Type == fetchTypeCached && fetch.Cached.Entry.Data != nil {
-		fetch.Cached.Entry.Data.Close()
-		fetch.Cached.Entry.Data = nil
 	}
 
 	fetch.getFetchInfoRef().Status = hitStatusRevalidated
@@ -339,14 +325,20 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
 		fetched.Cached.Coalesced = shared
 
-		// The Entry coming from singleflight has a nil Data field (closed).
-		// We must open a fresh file handle for this request.
-		cached, err := f.cache.Get(key)
-		if err != nil {
-			slog.Error("Error getting newly cached response. Bypassing cache and fetching upstream...", "url", req.URL, "key", key, "error", err)
-			return f.fetchDirectlyFromUpstream(req)
+		// If the result is shared, we cannot share the same Data (seeker) between goroutines.
+		// We close the shared handle and each caller gets their own fresh one.
+		if shared {
+			if fetched.Cached.Entry.Data != nil {
+				fetched.Cached.Entry.Data.Close()
+			}
+
+			cached, err := f.cache.Get(key)
+			if err != nil {
+				slog.Error("Error getting newly cached response. Bypassing cache and fetching upstream...", "url", req.URL, "key", key, "error", err)
+				return f.fetchDirectlyFromUpstream(req)
+			}
+			fetched.Cached.Entry = cached
 		}
-		fetched.Cached.Entry = cached
 
 		// Track coalesced cache hits/misses
 		if shared {

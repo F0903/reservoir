@@ -8,6 +8,7 @@ import (
 
 func TestHttpsMITM(t *testing.T) {
 	env := SetupHttpsTestEnv(t)
+	env.Start()
 
 	targetURL := env.Upstream.URL + "/https-test"
 	resp, err := env.Client.Get(targetURL)

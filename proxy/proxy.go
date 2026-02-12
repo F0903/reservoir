@@ -226,6 +226,11 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		return finalizeAndRespond(r, fetched.Direct.Response.Body, fetched.Direct.UpstreamStatus, req)
 
 	case fetchTypeCached:
+		if fetched.Cached.Entry == nil || fetched.Cached.Entry.Data == nil {
+			slog.Error("fetchTypeCached: entry or data is nil", "url", req.URL)
+			r.WriteError("internal error: cache entry data is nil", http.StatusInternalServerError)
+			return fmt.Errorf("cache entry data is nil")
+		}
 		defer fetched.Cached.Entry.Data.Close()
 
 		if clientHd.Range.IsPresent() {

@@ -10,6 +10,7 @@ import (
 
 func TestBasicHTTPRequest(t *testing.T) {
 	env := SetupTestEnv(t)
+	env.Start()
 
 	targetURL := env.Upstream.URL + "/basic-test"
 	resp, err := env.Client.Get(targetURL)
@@ -42,6 +43,7 @@ func TestRangeRequests(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(content)
 	})
+	env.Start()
 
 	targetURL := env.Upstream.URL + "/range-test"
 
@@ -87,6 +89,7 @@ func TestRangeRequests(t *testing.T) {
 
 func BenchmarkProxyLatencyCold(b *testing.B) {
 	env := SetupTestEnv(b)
+	env.Start()
 
 	i := 0
 	b.ResetTimer()
@@ -104,6 +107,7 @@ func BenchmarkProxyLatencyCold(b *testing.B) {
 
 func BenchmarkProxyLatencyHot(b *testing.B) {
 	env := SetupTestEnv(b)
+	env.Start()
 	targetURL := env.Upstream.URL + "/cached-resource"
 
 	resp, _ := env.Client.Get(targetURL)
@@ -132,6 +136,7 @@ func BenchmarkThroughput(b *testing.B) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(payload)
 	})
+	env.Start()
 
 	targetURL := env.Upstream.URL + "/large-file"
 

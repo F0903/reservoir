@@ -27,6 +27,7 @@ func TestCacheExpiryAndRevalidation(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("expiry test body"))
 	})
+	env.Start()
 
 	targetURL := env.Upstream.URL + "/expiry-test"
 

@@ -26,8 +26,13 @@ func (m *memoryReadSeekCloser) Close() error {
 	return nil
 }
 
+type memoryInternalEntry[MetadataT any] struct {
+	data []byte
+	meta *EntryMetadata[MetadataT]
+}
+
 type MemoryCache[MetadataT any] struct {
-	entries   map[CacheKey]*Entry[MetadataT]
+	entries   map[CacheKey]*memoryInternalEntry[MetadataT]
 	mu        sync.RWMutex
 	locks     []sync.RWMutex
 	memoryCap int64
@@ -44,7 +49,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 	memoryCap := int64(sysMem.Total) * int64(memoryBudgetPercent) / 100
 
 	c := &MemoryCache[MetadataT]{
-		entries:   make(map[CacheKey]*Entry[MetadataT]),
+		entries:   make(map[CacheKey]*memoryInternalEntry[MetadataT]),
 		locks:     make([]sync.RWMutex, shardCount),
 		memoryCap: memoryCap,
 		byteSize:  atomics.NewInt64(0),
@@ -56,7 +61,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 			c.mu.RUnlock()
 
 			for key, entry := range snapshot {
-				if !yield(key, entry.Metadata) {
+				if !yield(key, entry.meta) {
 					break
 				}
 			}
@@ -100,16 +105,16 @@ func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 	}
 
 	stale := false
-	if entry.Metadata.Expires.Before(time.Now()) {
+	if entry.meta.Expires.Before(time.Now()) {
 		stale = true
 	}
 
-	entry.Metadata.LastAccess = time.Now()
+	entry.meta.LastAccess = time.Now()
 	metrics.Global.Cache.CacheHits.Increment()
 
 	return &Entry[MetadataT]{
-		Data:     entry.Data,
-		Metadata: entry.Metadata,
+		Data:     &memoryReadSeekCloser{bytes.NewReader(entry.data)},
+		Metadata: entry.meta,
 		Stale:    stale,
 	}, nil
 }
@@ -131,27 +136,31 @@ func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires tim
 		return nil, err
 	}
 
-	memReader := &memoryReadSeekCloser{bytes.NewReader(buf.Bytes())}
+	dataBytes := buf.Bytes()
 	now := time.Now()
-	entry := &Entry[MetadataT]{
-		Data: memReader,
-		Metadata: &EntryMetadata[MetadataT]{
-			TimeWritten: now,
-			LastAccess:  now,
-			Expires:     expires,
-			Size:        count,
-			Object:      metadata,
-		},
+	meta := &EntryMetadata[MetadataT]{
+		TimeWritten: now,
+		LastAccess:  now,
+		Expires:     expires,
+		Size:        count,
+		Object:      metadata,
+	}
+	internalEntry := &memoryInternalEntry[MetadataT]{
+		data: dataBytes,
+		meta: meta,
 	}
 
 	c.mu.Lock()
-	c.entries[key] = entry
+	c.entries[key] = internalEntry
 	c.mu.Unlock()
 
 	incrementCacheEntries()
 	addCacheSize(&c.byteSize, int64(count))
 
-	return entry, nil
+	return &Entry[MetadataT]{
+		Data:     &memoryReadSeekCloser{bytes.NewReader(dataBytes)},
+		Metadata: meta,
+	}, nil
 }
 
 func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
@@ -173,7 +182,7 @@ func (c *MemoryCache[MetadataT]) deleteInternal(key CacheKey) error {
 	c.mu.Unlock()
 
 	decrementCacheEntries()
-	decrementCacheSize(&c.byteSize, entry.Metadata.Size)
+	decrementCacheSize(&c.byteSize, entry.meta.Size)
 
 	return nil
 }
@@ -192,8 +201,8 @@ func (c *MemoryCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*Ent
 		return ErrCacheEntryNotFound
 	}
 
-	modifier(entry.Metadata)
-	entry.Metadata.LastAccess = time.Now()
+	modifier(entry.meta)
+	entry.meta.LastAccess = time.Now()
 
 	metrics.Global.Cache.CacheHits.Increment()
 	return nil
@@ -214,12 +223,12 @@ func (c *MemoryCache[MetadataT]) GetMetadata(key CacheKey) (meta *EntryMetadata[
 	}
 
 	stale = false
-	if entry.Metadata.Expires.Before(time.Now()) {
+	if entry.meta.Expires.Before(time.Now()) {
 		stale = true
 	}
 
-	entry.Metadata.LastAccess = time.Now()
+	entry.meta.LastAccess = time.Now()
 	metrics.Global.Cache.CacheHits.Increment()
 
-	return entry.Metadata, stale, nil
+	return entry.meta, stale, nil
 }

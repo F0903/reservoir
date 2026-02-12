@@ -23,6 +23,7 @@ func TestRequestCoalescing(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("response body"))
 	})
+	env.Start()
 
 	// 2. Fire Concurrent Requests
 	concurrentRequests := 20
@@ -74,6 +75,7 @@ func BenchmarkRequestCoalescing(b *testing.B) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("response body"))
 	})
+	env.Start()
 
 	// Use a client with enough connections to support concurrency
 	if transport, ok := env.Client.Transport.(*http.Transport); ok {
