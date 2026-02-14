@@ -40,7 +40,14 @@ export class DashboardSettings implements Settings {
             }
         }
 
-        const savedData = JSON.parse(configJson);
+        let savedData;
+        try {
+            savedData = JSON.parse(configJson);
+        } catch (e) {
+            log.error("Failed to parse dashboard settings from localStorage:", e);
+            return Promise.resolve();
+        }
+
         log.debug("Parsed dashboard settings from localStorage:", savedData);
         if (savedData.updateInterval == this.fields.updateInterval) {
             log.debug("No changes detected in dashboard settings.");

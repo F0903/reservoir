@@ -5,6 +5,7 @@
     import VerticalSpacer from "./VerticalSpacer.svelte";
     import { onMount } from "svelte";
     import type { ToastHandle } from "$lib/providers/toast-provider.svelte";
+    import { log } from "$lib/utils/logger";
 
     type BaseProps = {
         message: string;
@@ -53,7 +54,13 @@
     function disableAndDo(fn?: () => Promise<void>): () => Promise<void> {
         return async () => {
             disabled = true;
-            await fn?.();
+            try {
+                await fn?.();
+            } catch (e) {
+                log.error("Toast action failed:", e);
+                disabled = false; // Re-enable so user can try again or dismiss
+                return;
+            }
             props.handle.close();
         };
     }
@@ -63,7 +70,12 @@
     }
 </script>
 
-<div class="toast {props.type}" transition:fly={{ y: 500, duration: 200 }}>
+<div
+    class="toast {props.type}"
+    transition:fly={{ y: 500, duration: 200 }}
+    role={props.type === "error" ? "alert" : "status"}
+    aria-live={props.type === "error" ? "assertive" : "polite"}
+>
     <h1 class="toast-message">{props.message}</h1>
     {#if props.type === "action"}
         <VerticalSpacer
