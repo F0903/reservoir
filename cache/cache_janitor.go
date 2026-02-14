@@ -121,15 +121,8 @@ func (j *cacheJanitor[MetadataT]) cleanExpiredEntries() {
 	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
 }
 
-func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
-	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
-	startCacheSize := j.cacheFns.getCacheSize()
-	if startCacheSize < maxCacheSize {
-		return
-	}
-
-	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", startCacheSize, "max_cache_size", maxCacheSize)
-
+// Evict entries until 80% of maxCacheBytes is reached
+func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
 	type entryForEviction struct {
 		key      CacheKey
 		meta     *EntryMetadata[MetadataT]
@@ -160,7 +153,9 @@ func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
 	})
 
 	// Evict entries until we're under the limit
-	targetSize := int64(float64(maxCacheSize) * 0.8) // Evict to 80% to avoid thrashing
+	targetSize := int64(float64(maxCacheBytes) * 0.8) // Evict to 80% to avoid thrashing
+
+	startCacheSize := j.cacheFns.getCacheSize()
 
 	slog.Info("Target size for eviction", "target_size", bytesize.ByteSize(targetSize))
 	evictions := 0
@@ -191,4 +186,16 @@ func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
 	metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
 
 	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)
+}
+
+func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
+	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
+	startCacheSize := j.cacheFns.getCacheSize()
+	if startCacheSize < maxCacheSize {
+		return
+	}
+
+	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", startCacheSize, "max_cache_size", maxCacheSize)
+
+	j.evict(maxCacheSize)
 }

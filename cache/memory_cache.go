@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/atomics"
+	"reservoir/utils/bytesize"
 	"sync"
 	"time"
 
@@ -32,16 +34,17 @@ type memoryInternalEntry[MetadataT any] struct {
 }
 
 type MemoryCache[MetadataT any] struct {
-	entries   map[CacheKey]*memoryInternalEntry[MetadataT]
-	mu        sync.RWMutex
-	locks     []sync.RWMutex
-	memoryCap int64
-	byteSize  atomics.Int64
+	entries      map[CacheKey]*memoryInternalEntry[MetadataT]
+	mu           sync.RWMutex
+	locks        []sync.RWMutex
+	memoryCap    int64
+	maxCacheSize atomics.Int64
+	byteSize     atomics.Int64
 
 	janitor *cacheJanitor[MetadataT]
 }
 
-func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
+func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
 	sysMem, err := mem.VirtualMemory()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
@@ -49,11 +52,17 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, cleanupInterval time
 	memoryCap := int64(sysMem.Total) * int64(memoryBudgetPercent) / 100
 
 	c := &MemoryCache[MetadataT]{
-		entries:   make(map[CacheKey]*memoryInternalEntry[MetadataT]),
-		locks:     make([]sync.RWMutex, shardCount),
-		memoryCap: memoryCap,
-		byteSize:  atomics.NewInt64(0),
+		entries:      make(map[CacheKey]*memoryInternalEntry[MetadataT]),
+		locks:        make([]sync.RWMutex, shardCount),
+		memoryCap:    memoryCap,
+		maxCacheSize: atomics.NewInt64(maxCacheSize),
+		byteSize:     atomics.NewInt64(0),
 	}
+
+	config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+		c.maxCacheSize.Set(newSize.Bytes())
+	})
+
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
@@ -119,12 +128,23 @@ func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 	}, nil
 }
 
-func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	lock := getLock(c.locks, key)
-	lock.Lock()
-	defer lock.Unlock()
+func (c *MemoryCache[MetadataT]) cacheInternal(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT, evictIfFull bool) (*Entry[MetadataT], error) {
+	maxCacheSize := c.maxCacheSize.Get()
+	limit := c.memoryCap
+	if maxCacheSize < limit {
+		limit = maxCacheSize
+	}
 
-	if c.byteSize.Get() >= c.memoryCap {
+	if c.byteSize.Get() >= limit {
+		if evictIfFull {
+			c.janitor.evict(limit)
+			entry, err := c.cacheInternal(key, data, expires, metadata, false)
+			if err != nil {
+				return nil, err
+			}
+			return entry, nil
+		}
+
 		metrics.Global.Cache.CacheErrors.Increment()
 		return nil, ErrCacheMemoryExceeded
 	}
@@ -161,6 +181,14 @@ func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires tim
 		Data:     &memoryReadSeekCloser{bytes.NewReader(dataBytes)},
 		Metadata: meta,
 	}, nil
+}
+
+func (c *MemoryCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
+	lock := getLock(c.locks, key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	return c.cacheInternal(key, data, expires, metadata, true)
 }
 
 func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {

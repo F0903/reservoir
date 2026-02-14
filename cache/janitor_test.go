@@ -13,7 +13,7 @@ func TestCache_JanitorCleanup(t *testing.T) {
 
 	// Use very short cleanup interval for testing
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](1, cleanupInterval, 16, ctx)
+	c := NewMemoryCache[TestMeta](1, config.Global.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 
 	key := FromString("expired-key")
 	data := []byte("expired data")
@@ -56,7 +56,7 @@ func TestCache_JanitorEviction(t *testing.T) {
 	config.Global.MaxCacheSize.Overwrite(bytesize.ParseUnchecked("1K"))
 
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](1, cleanupInterval, 16, ctx)
+	c := NewMemoryCache[TestMeta](1, config.Global.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 
 	// Add 2 entries of 600 bytes each (Total 1200 > 1024)
 	data := make([]byte, 600)

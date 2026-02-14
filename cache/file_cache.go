@@ -9,9 +9,11 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/assertedpath"
 	"reservoir/utils/atomics"
+	"reservoir/utils/bytesize"
 	"sync"
 	"time"
 )
@@ -31,17 +33,24 @@ type FileCache[MetadataT any] struct {
 	mu              sync.RWMutex
 	locks           []sync.RWMutex
 	byteSize        atomics.Int64
+	maxCacheSize    atomics.Int64
 	janitor         *cacheJanitor[MetadataT]
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
-func NewFileCache[MetadataT any](rootDir string, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
+func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
 	c := &FileCache[MetadataT]{
 		rootDir:         assertedpath.AssertDirectory(rootDir).EnsureCleared(),
 		entriesMetadata: make(map[CacheKey]*EntryMetadata[MetadataT]),
 		locks:           make([]sync.RWMutex, shardCount),
 		byteSize:        atomics.NewInt64(0),
+		maxCacheSize:    atomics.NewInt64(maxCacheSize),
 	}
+
+	config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+		c.maxCacheSize.Set(newSize.Bytes())
+	})
+
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
@@ -160,6 +169,11 @@ func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 }
 
 func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
+	maxCacheSize := c.maxCacheSize.Get()
+	if c.byteSize.Get() >= maxCacheSize {
+		c.janitor.evict(maxCacheSize)
+	}
+
 	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()

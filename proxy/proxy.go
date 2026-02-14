@@ -59,15 +59,16 @@ func (p *Proxy) Destroy() {
 // client's machine.
 func NewProxy(cacheType config.CacheType, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
 	cacheCleanupInterval := config.Global.CacheCleanupInterval.Read().Cast()
+	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
 
 	var c cache.Cache[cachedRequestInfo]
 	switch cacheType {
 	case config.CacheTypeFile:
 		cacheDir := config.Global.CacheDir.Read()
-		c = cache.NewFileCache[cachedRequestInfo](cacheDir, cacheCleanupInterval, shardCount, ctx)
+		c = cache.NewFileCache[cachedRequestInfo](cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	case config.CacheTypeMemory:
 		memoryBudget := config.Global.CacheMemoryBudgetPercent.Read()
-		c = cache.NewMemoryCache[cachedRequestInfo](memoryBudget, cacheCleanupInterval, shardCount, ctx)
+		c = cache.NewMemoryCache[cachedRequestInfo](memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	default:
 		return nil, fmt.Errorf("unsupported cache type: %v", cacheType)
 	}

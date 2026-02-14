@@ -10,8 +10,8 @@ import (
 func TestMemoryCache_Basic(t *testing.T) {
 	ctx := t.Context()
 
-	// 1% memory budget, 1 min cleanup, 16 shards
-	c := NewMemoryCache[TestMeta](1, time.Minute, 16, ctx)
+	// 1% memory budget, large maxCacheSize, 1 min cleanup, 16 shards
+	c := NewMemoryCache[TestMeta](1, 1024*1024*1024, time.Minute, 16, ctx)
 
 	key := FromString("test-key")
 	data := []byte("hello world")
