@@ -21,7 +21,7 @@ func (p *ConfigProp[T]) SetRequiresRestart() {
 	p.requiresRestart = true
 }
 
-func (p ConfigProp[T]) Read() T {
+func (p *ConfigProp[T]) Read() T {
 	commit, _ := p.value.Load() // Will always be set
 	return commit.ref().Get()
 }

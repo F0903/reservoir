@@ -56,17 +56,25 @@ func appendLogFileWriter(writers *[]io.Writer) io.Writer {
 	return fileLog
 }
 
+var initialized bool
+var unsubscribe func()
+
 func SetLogLevel(level slog.Level) {
 	logLevel.Set(level)
 }
 
 func Init() {
+	if initialized {
+		return
+	}
+	initialized = true
+
 	logToStdOut := config.Global.LogToStdout.Read()
 
 	logLevel.Set(config.Global.LogLevel.Read())
 
 	// Subscribe to log level changes
-	config.Global.LogLevel.OnChange(func(newLevel slog.Level) {
+	unsubscribe = config.Global.LogLevel.OnChange(func(newLevel slog.Level) {
 		logLevel.Set(newLevel)
 		slog.Info("Log level changed by configuration", "new_level", newLevel)
 	})

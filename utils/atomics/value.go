@@ -7,21 +7,28 @@ import (
 )
 
 type Value[T any] struct {
-	v atomic.Value
+	v *atomic.Value
 }
 
 func NewValue[T any](initial T) Value[T] {
-	a := Value[T]{}
-	a.v.Store(initial)
-	return a
+	v := &atomic.Value{}
+	v.Store(initial)
+	return Value[T]{v: v}
 }
 
 func (a *Value[T]) Store(val T) {
+	if a.v == nil {
+		a.v = &atomic.Value{}
+	}
 	a.v.Store(val) // make sure T is a concrete type (no nil pointers unless you store nil explicitly)
 }
 
 // Load returns the value set by the most recent Store.
 func (a *Value[T]) Load() (val T, some bool) {
+	if a.v == nil {
+		var zero T
+		return zero, false
+	}
 	if v := a.v.Load(); v != nil {
 		return v.(T), true
 	}

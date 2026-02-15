@@ -20,6 +20,7 @@ func TestFileCache_Basic(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	c := NewFileCache[TestMeta](tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	defer c.Destroy()
 
 	key := FromString("test-key")
 	data := []byte("hello file world")

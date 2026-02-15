@@ -41,7 +41,8 @@ type MemoryCache[MetadataT any] struct {
 	maxCacheSize atomics.Int64
 	byteSize     atomics.Int64
 
-	janitor *cacheJanitor[MetadataT]
+	janitor     *cacheJanitor[MetadataT]
+	unsubscribe func()
 }
 
 func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
@@ -59,7 +60,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 		byteSize:     atomics.NewInt64(0),
 	}
 
-	config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.unsubscribe = config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	})
 
@@ -97,6 +98,9 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 
 func (c *MemoryCache[MetadataT]) Destroy() {
 	c.janitor.stop()
+	if c.unsubscribe != nil {
+		c.unsubscribe()
+	}
 }
 
 func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
