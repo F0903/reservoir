@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
             sourcemap: mode === "development",
         },
         resolve: {
-            conditions: mode === "test" ? ["browser", "svelte"] : [],
+            conditions: ["import", "module", "browser", "svelte"],
         },
         test: {
             environment: "jsdom",
