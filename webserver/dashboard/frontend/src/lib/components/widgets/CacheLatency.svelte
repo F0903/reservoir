@@ -1,11 +1,10 @@
 <script lang="ts">
     import Chart from "$lib/components/ui/Chart.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Cache Latency">

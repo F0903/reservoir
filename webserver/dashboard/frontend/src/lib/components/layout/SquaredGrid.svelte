@@ -40,7 +40,9 @@
     });
 
     $effect(() => {
-        const columns = Math.floor(parentWidth! / (cellSize + gap));
+        if (!parentWidth) return;
+
+        const columns = Math.floor(parentWidth / (cellSize + gap));
 
         // Explicitly set the amount of columns, and use gridAutoRows which can then automatically create rows as needed.
         grid.style.gridTemplateColumns = `repeat(${columns}, ${cellSize}px)`;

@@ -1,11 +1,10 @@
 <script lang="ts">
     import Chart from "$lib/components/ui/Chart.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Response Status">
@@ -24,9 +23,9 @@
                                 data.requests.status_server_error_responses,
                             ],
                             backgroundColor: [
-                                "hsla(188, 34%, 43%)", // 2xx
-                                "hsla(188, 34%, 30%)", // 4xx
-                                "hsla(22, 70%, 44%)", // 5xx
+                                "var(--success-color)", // 2xx
+                                "var(--tertiary-400)", // 4xx
+                                "var(--error-color)", // 5xx
                             ],
                         },
                     ],

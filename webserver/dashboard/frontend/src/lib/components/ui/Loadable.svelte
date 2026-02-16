@@ -13,12 +13,12 @@
     } = $props();
 </script>
 
-{#if state === null || state === undefined}
-    <div class="loading-box"></div>
-{:else if error}
+{#if error}
     <ErrorBox>{error}</ErrorBox>
-{:else if state !== null}
-    {@render children(state)}
+{:else if state === null || state === undefined}
+    <div class="loading-box"></div>
+{:else}
+    {@render children(state as NonNullable<T>)}
 {/if}
 
 <style>

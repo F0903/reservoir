@@ -1,12 +1,11 @@
 <script lang="ts">
     import Chart from "$lib/components/ui/Chart.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Request Coalescing">
@@ -35,7 +34,6 @@
                     <MetricCard
                         label="Coalescing Rate"
                         value={coalescingRate.toFixed(1) + "%"}
-                        --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard
@@ -45,6 +43,7 @@
                     <MetricCard
                         label="Cache Hit Rate"
                         value={coalescedCacheHitRate.toFixed(1) + "%"}
+                        --metric-value-color="var(--success-color)"
                     />
                     <MetricCard
                         label="Revalidation Rate"
@@ -61,14 +60,17 @@
                                 {
                                     label: "Cache Hits",
                                     data: [coalescedHits],
+                                    backgroundColor: "var(--success-color)",
                                 },
                                 {
                                     label: "Revalidations",
                                     data: [coalescedRevalidations],
+                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "Cache Misses",
                                     data: [coalescedMisses],
+                                    backgroundColor: "var(--tertiary-400)",
                                 },
                             ],
                         }}

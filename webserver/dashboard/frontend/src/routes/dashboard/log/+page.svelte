@@ -1,9 +1,10 @@
 <script lang="ts">
-    import { apiGetTextStream } from "$lib/api/api-helpers";
+    import { getLogStream } from "$lib/api/objects/log/log";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import TextViewer from "$lib/components/ui/TextViewer.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
+    import { log } from "$lib/utils/logger";
     import { onDestroy, onMount } from "svelte";
 
     let textViewer: TextViewer;
@@ -14,7 +15,7 @@
 
     onMount(async () => {
         const fetchHistory = async () => {
-            let textStream = await apiGetTextStream("/log");
+            let textStream = await getLogStream();
             const reader = textStream.getReader();
 
             while (true) {
@@ -33,7 +34,7 @@
     });
 
     $effect(() => {
-        console.log("Effect triggered");
+        log.debug("Effect triggered");
         if (paused) {
             stopLogListen();
         } else {
@@ -44,7 +45,7 @@
     function stopLogListen() {
         if (!logEvent) return;
 
-        console.log("Stopping log listen");
+        log.debug("Stopping log listen");
         logEvent.close();
         logEvent = undefined;
     }
@@ -52,7 +53,7 @@
     function startLogListen() {
         if (logEvent) return;
 
-        console.log("Starting log listen");
+        log.debug("Starting log listen");
         logEvent = new EventSource("/api/log/stream");
         logEvent.onmessage = (event) => {
             if (!paused) {

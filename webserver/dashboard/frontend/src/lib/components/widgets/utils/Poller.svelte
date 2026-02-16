@@ -16,7 +16,7 @@
         if (intervalId !== null) return;
 
         pollFn(); // Initial fetch before starting the interval
-        intervalId = setInterval(pollFn, pollInterval);
+        intervalId = window.setInterval(pollFn, pollInterval);
         log.debug(`Started polling with interval ${pollInterval} ms. Id=${intervalId}`);
     }
 
@@ -27,7 +27,7 @@
 
         log.debug(`Stopping polling. Id=${intervalId}`);
 
-        clearInterval(intervalId);
+        window.clearInterval(intervalId);
         intervalId = null;
     }
 
@@ -44,3 +44,10 @@
 <div class="poller" {@attach visible(visibilityChanged)}>
     {@render children()}
 </div>
+
+<style>
+    .poller {
+        height: 100%;
+        width: 100%;
+    }
+</style>

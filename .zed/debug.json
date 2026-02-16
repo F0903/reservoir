@@ -10,7 +10,7 @@
     "mode": "debug",
     "program": ".",
     "args": ["--log-to-stdout", "--listen", "localhost:9999"],
-    "console": "integratedTerminal"
+    "console": "integratedTerminal",
   },
   {
     "adapter": "Delve",
@@ -26,11 +26,11 @@
       "DEBUG",
       "--log-to-stdout",
       "--listen",
-      "localhost:9999"
+      "localhost:9999",
     ],
     "cwd": "${ZED_WORKTREE_ROOT}",
     "env": {},
-    "buildFlags": []
+    "buildFlags": [],
   },
   {
     "adapter": "JavaScript",
@@ -40,7 +40,7 @@
     "request": "launch",
     "command": "pnpm run dev",
     "cwd": "${ZED_WORKTREE_ROOT}/webserver/dashboard/frontend/",
-    "console": "integratedTerminal"
+    "console": "integratedTerminal",
   },
   {
     "adapter": "JavaScript",
@@ -51,6 +51,6 @@
     "url": "http://localhost:5173/",
     "webRoot": "${ZED_WORKTREE_ROOT}/webserver/dashboard/frontend/",
     "pauseForSourceMap": true,
-    "timeout": 30000
-  }
+    "timeout": 30000,
+  },
 ]

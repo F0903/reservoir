@@ -1,12 +1,11 @@
 <script lang="ts">
     import Chart from "$lib/components/ui/Chart.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Cache Efficiency">
@@ -25,11 +24,14 @@
                     <MetricCard
                         label="Hit Rate"
                         value={hitRate.toFixed(1) + "%"}
-                        --metric-label-color="var(--secondary-600)"
-                        --metric-value-color="var(--tertiary-400)"
+                        --metric-value-color="var(--success-color)"
                     />
                     <MetricCard label="Miss Rate" value={missRate.toFixed(1) + "%"} />
-                    <MetricCard label="Error Rate" value={errorRate.toFixed(1) + "%"} />
+                    <MetricCard
+                        label="Error Rate"
+                        value={errorRate.toFixed(1) + "%"}
+                        --metric-value-color="var(--log-error-color)"
+                    />
                 </div>
 
                 <div class="efficiency-chart">
@@ -41,14 +43,17 @@
                                 {
                                     label: "Hits",
                                     data: [data.cache.cache_hits],
+                                    backgroundColor: "var(--success-color)",
                                 },
                                 {
                                     label: "Misses",
                                     data: [data.cache.cache_misses],
+                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "Errors",
                                     data: [data.cache.cache_errors],
+                                    backgroundColor: "var(--error-color)",
                                 },
                             ],
                         }}

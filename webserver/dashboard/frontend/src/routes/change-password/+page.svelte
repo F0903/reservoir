@@ -1,21 +1,20 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import { changePassword } from "$lib/api/auth/auth";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import { log } from "$lib/utils/logger";
-    import { getContext } from "svelte";
     import type { PageProps } from "./$types";
-    import type { ToastProvider } from "$lib/providers/toast-provider.svelte";
-    import { UnauthorizedError } from "$lib/api/api-helpers";
     import Form from "$lib/components/ui/input/Form.svelte";
     import { resolve } from "$app/paths";
+    import { getAuthProvider, getToastProvider } from "$lib/context";
+    import UnauthorizedError from "$lib/api/unauthorized-error";
 
     let { data }: PageProps = $props();
 
-    const toast: ToastProvider = getContext("toast");
+    const toast = getToastProvider();
+    const auth = getAuthProvider();
 
     var error = $state<string | null>(null);
     var processing = $state(false);
@@ -35,13 +34,8 @@
             const returnTo = data.return ?? "/dashboard";
             log.debug("Return to: ", returnTo);
 
-            await changePassword(oldPassword, newPassword);
-            toast.show({
-                type: "info",
-                message: "Password changed successfully.",
-                durationMs: 5000,
-                dismissText: "Dismiss",
-            });
+            await auth.changePassword(oldPassword, newPassword);
+            toast.success("Password changed successfully.");
 
             log.debug("Password reset successful, redirecting...");
             let returnToBase = resolve("/");

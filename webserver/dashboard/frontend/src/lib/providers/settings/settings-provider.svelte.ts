@@ -1,7 +1,6 @@
 import { DashboardSettings } from "./dashboard-settings.svelte";
 import { ProxySettings } from "./proxy-settings.svelte";
 
-// An interface that all settings objects must implement
 export interface Settings {
     reload(): Promise<void>;
 }

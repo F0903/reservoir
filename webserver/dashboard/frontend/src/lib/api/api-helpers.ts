@@ -1,15 +1,9 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { log } from "$lib/utils/logger";
+import UnauthorizedError from "./unauthorized-error";
 
 export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promise<Response>;
-
-export class UnauthorizedError extends Error {
-    constructor() {
-        super("Unauthorized, redirecting to login.");
-        this.name = "UnauthorizedError";
-    }
-}
 
 export type LoginRedirectOptions = { returnToLastWindow: boolean };
 export const DefaultRedirectOptions: LoginRedirectOptions = { returnToLastWindow: true };
@@ -95,7 +89,12 @@ export async function apiGetTextStream(
         return resp.body.pipeThrough(new TextDecoderStream());
     } catch (err) {
         if (redirectOnUnauthorized && err instanceof UnauthorizedError) {
-            return new ReadableStream<string>();
+            if (redirectOnUnauthorized) {
+                await redirectToLogin(redirectOnUnauthorized);
+                // We still continue to throw no matter what, so that the caller can handle it if they want to.
+            }
+
+            throw new UnauthorizedError();
         } else {
             throw err;
         }

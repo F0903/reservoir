@@ -71,7 +71,11 @@
             style:--box-width-ch={boxWidthCh}
             {disabled}
         />
-        {@render suffixElement?.()}
+        {#if suffixElement}
+            <div class="suffix">
+                {@render suffixElement()}
+            </div>
+        {/if}
     </div>
 </div>
 
@@ -79,61 +83,73 @@
     .input-container {
         display: flex;
         flex-direction: row;
+        align-items: center;
 
         height: var(--input-height, 42px);
-        padding: var(--input-padding, 0.5rem);
+        padding: 0 0.75rem;
 
-        border-width: var(--input-border-width, 1px);
-        border-style: var(--input-border-style, solid);
-        border-color: var(--input-border-color, var(--primary-450));
-        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
 
         background-color: var(--primary-600);
+        transition: all 0.2s ease;
+    }
+
+    .input-container:hover {
+        border-color: rgba(255, 255, 255, 0.15);
     }
 
     .input-container:has(.input:focus) {
         border-color: var(--secondary-400);
+        background-color: var(--primary-700);
+        box-shadow: 0 0 0 2px rgba(var(--secondary-400-rgb), 0.1);
     }
 
     .input-container:has(.input:invalid) {
-        border-color: var(--error-border-color);
+        border-color: var(--error-color);
     }
 
     .input-label-container {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-
+        gap: 0.4rem;
         width: var(--input-width, 100%);
-
-        margin: 1.2rem 0px;
+        margin: 0.75rem 0;
     }
 
     .label {
-        font-size: 1rem;
-        color: var(--secondary-500);
-        letter-spacing: 0.05em;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--secondary-300);
+        opacity: 0.8;
+        padding-left: 0.2rem;
+    }
+
+    .suffix {
+        display: flex;
+        align-items: center;
+        margin-left: 0.5rem;
+        opacity: 0.5;
     }
 
     .input:disabled {
-        filter: brightness(0.8);
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     .input {
         box-sizing: border-box;
-
         font-style: normal;
         font-family: "Chivo Mono Variable", monospace;
-        font-size: 0.85rem;
-        letter-spacing: var(--input-letter-spacing, 0.025em);
-        color: var(--text-primary);
-        background-color: var(--primary-600);
+        font-size: 0.9rem;
+        color: var(--text-400);
+        background: transparent;
+        border: none;
+        outline: none;
 
         width: 100%;
         height: 100%;
-
-        transition-property: border-color;
-        transition-timing-function: ease-in-out;
-        transition-duration: 75ms;
     }
 </style>

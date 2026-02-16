@@ -40,6 +40,7 @@ func New() *API {
 			&log.LogStreamEndpoint{},
 			&auth.LoginEndpoint{},
 			&auth.LogoutEndpoint{},
+			&auth.MeEndpoint{},
 			&auth.ChangePasswordEndpoint{},
 		},
 	}

@@ -1,107 +1,98 @@
 <script lang="ts">
     import Card from "$lib/components/ui/Card.svelte";
-
-    type DynamicFontSize = {
-        base: number;
-        min: number;
-        max: number;
-    };
-
-    const defaultValueSize: DynamicFontSize = {
-        base: 1.5,
-        min: 0.8,
-        max: 2.4,
-    };
-
-    const defaultLabelSize: DynamicFontSize = {
-        base: 0.9,
-        min: 0.55,
-        max: 1.1,
-    };
+    import type { Component } from "svelte";
 
     const {
         label,
         value,
-        dynamicValueSize = defaultValueSize,
-        dynamicLabelSize = defaultLabelSize,
+        icon: Icon = null,
+    }: {
+        label: string;
+        value: string | number;
+        icon?: Component | null;
     } = $props();
-
-    const clampSize = (size: number, min: number, max: number) =>
-        Math.max(min, Math.min(max, size));
-
-    const computeFontSize = (
-        content: string | number,
-        base: number,
-        step: number,
-        min: number,
-        max: number,
-    ) => {
-        const normalized = String(content ?? "").replace(/\s+/g, "");
-        return clampSize(base - normalized.length * step, min, max);
-    };
-
-    const valueFontSize = $derived(
-        computeFontSize(
-            value,
-            dynamicValueSize.base,
-            0.08,
-            dynamicValueSize.min,
-            dynamicValueSize.max,
-        ),
-    );
-    const labelFontSize = $derived(
-        computeFontSize(
-            label,
-            dynamicLabelSize.base,
-            0.012,
-            dynamicLabelSize.min,
-            dynamicLabelSize.max,
-        ),
-    );
 </script>
 
-<div
-    class="metric-card-wrapper"
-    style={`--auto-value-size:${valueFontSize}rem; --auto-label-size:${labelFontSize}rem;`}
->
+<div class="metric-card-wrapper">
     <Card
-        --card-height="var(--metric-height, 100%)"
+        --card-height="100%"
         --card-width="var(--metric-width, 100%)"
-        --card-text-align="var(--metric-text-align, center)"
-        --card-padding="var(--metric-padding, 1rem)"
+        --card-text-align="var(--metric-text-align, left)"
+        --card-padding="var(--metric-padding, 0.75rem 1rem)"
         --card-background="var(--metric-background, var(--primary-600))"
         --card-border="var(--metric-border, 1px solid var(--primary-500))"
-        --card-border-radius="var(--metric-border-radius, 8px)"
+        --card-border-radius="var(--metric-border-radius, 12px)"
+        --card-justify-content="flex-start"
+        --card-gap="0.25rem"
     >
+        <div class="accent-bar"></div>
+        <div class="metric-header">
+            <span class="metric-label">{label}</span>
+            {#if Icon}
+                <div class="icon-container">
+                    <Icon size={14} />
+                </div>
+            {/if}
+        </div>
         <div class="metric-value">{value}</div>
-        <div class="metric-label">{label}</div>
     </Card>
 </div>
 
 <style>
     .metric-card-wrapper {
         container-type: inline-size;
+        display: flex;
         height: 100%;
         width: 100%;
-        --auto-value-size: clamp(0.9rem, 14cqw, 1.1rem);
-        --auto-label-size: clamp(0.6rem, 8cqw, 0.8rem);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .metric-card-wrapper:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.05);
+    }
+
+    .accent-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--metric-value-color, var(--secondary-300));
+        opacity: 0.6;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        margin-bottom: 0.1rem;
+    }
+
+    .icon-container {
+        color: var(--metric-value-color, var(--secondary-300));
+        opacity: 0.5;
     }
 
     .metric-value {
-        font-size: var(--metric-value-size, var(--auto-value-size));
-        font-weight: var(--metric-value-weight, bold);
-        color: var(--metric-value-color, var(--secondary-400));
-        margin-bottom: 0.25rem;
-        line-height: 1.15;
-        word-break: break-word;
+        /* Scale font size based on container width */
+        font-size: var(--metric-value-size, clamp(0.9rem, 12cqw, 1.4rem));
+        font-weight: 700;
+        color: var(--metric-value-color, var(--secondary-300));
+        line-height: 1;
+        overflow-wrap: anywhere;
     }
 
     .metric-label {
-        font-size: var(--metric-label-size, var(--auto-label-size));
-        color: var(--metric-label-color, var(--primary-200));
+        font-size: var(--metric-label-size, clamp(0.55rem, 7cqw, 0.7rem));
+        color: var(--metric-label-color, rgba(255, 255, 255, 0.4));
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
+        font-weight: 600;
         line-height: 1.1;
-        word-break: break-word;
+        overflow: hidden;
     }
 </style>

@@ -16,121 +16,116 @@
     }
 </script>
 
-<div class="input-container">
-    <input
-        type="checkbox"
-        class="input"
-        id="{label}-toggle"
-        bind:checked={value}
-        title={tooltip}
-        aria-checked={value}
-        role="switch"
-        {disabled}
-    />
+<div class="toggle-wrapper">
     <label class="label" for="{label}-toggle" title={tooltip}>{label}</label>
-    <div
-        class="track"
-        class:checked={value}
-        aria-hidden="true"
-        onclick={onToggleClick}
-        class:disabled
-    >
-        <div class="thumb"></div>
+    <div class="input-container">
+        <input
+            type="checkbox"
+            class="input"
+            id="{label}-toggle"
+            bind:checked={value}
+            title={tooltip}
+            aria-checked={value}
+            role="switch"
+            {disabled}
+        />
+        <div
+            class="track"
+            class:checked={value}
+            aria-hidden="true"
+            onclick={onToggleClick}
+            class:disabled
+        >
+            <div class="thumb"></div>
+        </div>
+        <span class="status-text">{value ? "Enabled" : "Disabled"}</span>
     </div>
 </div>
 
 <style>
-    .thumb {
-        --thumb-size: calc(var(--track-height) - (var(--track-padding) * 2));
-
-        width: var(--thumb-size);
-        height: var(--thumb-size);
-        background-color: var(--secondary-600);
-        border-radius: 50%;
-
-        box-shadow: 0px 0px 10px -3px rgba(0, 0, 0, 1);
-
-        transition:
-            transform var(--pos-trans-duration) var(--pos-trans-timing),
-            background-color var(--color-trans-duration) var(--color-trans-timing);
+    .toggle-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin: 0.75rem 0;
+        width: var(--toggle-width, 100%);
     }
 
-    .track.checked .thumb {
-        transform: translateX(
-            calc(var(--track-width) - var(--thumb-size) - (var(--track-padding) * 2))
-        );
-        background-color: var(--tertiary-300);
+    .input-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 1rem;
+        height: 42px;
     }
 
-    .track.checked {
-        background-color: var(--tertiary-500);
+    .label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--secondary-300);
+        opacity: 0.8;
+        padding-left: 0.2rem;
     }
 
-    .track.disabled {
-        filter: brightness(0.8);
-        pointer-events: none;
+    .status-text {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-400);
+        opacity: 0.6;
     }
 
     .track {
-        --track-height: var(--toggle-track-height, 24px);
-        --track-width: var(--toggle-track-width, 45px);
-        --track-padding: var(--toggle-track-padding, 2px);
-
-        --color-trans-duration: 100ms;
-        --color-trans-timing: ease-in-out;
-        --pos-trans-duration: 75ms;
-        --pos-trans-timing: cubic-bezier(0.86, 0, 0.07, 1);
+        --track-height: 24px;
+        --track-width: 48px;
+        --track-padding: 3px;
 
         width: var(--track-width);
         height: var(--track-height);
-        background-color: var(--primary-450);
+        background-color: var(--primary-600);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: calc(var(--track-height) / 2);
 
         display: flex;
         align-items: center;
         padding: var(--track-padding);
-
-        transition-property: background-color;
-        transition-timing-function: var(--color-trans-timing);
-        transition-duration: var(--color-trans-duration);
-
-        overflow: hidden;
-
         cursor: pointer;
+        transition: all 0.2s ease;
     }
 
-    .input-container {
-        position: relative;
-
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        gap: 15px;
-
-        width: var(--toggle-width, 100%);
-
-        margin: 1.2rem 0px;
+    .track.checked {
+        background-color: var(--success-color);
+        border-color: var(--success-border);
     }
 
-    .label {
-        font-size: 1rem;
-        color: var(--secondary-500);
-        letter-spacing: 0.05em;
+    .thumb {
+        width: calc(var(--track-height) - (var(--track-padding) * 2) - 2px);
+        height: calc(var(--track-height) - (var(--track-padding) * 2) - 2px);
+        background-color: #fff;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .track.checked .thumb {
+        transform: translateX(calc(var(--track-width) - var(--track-height)));
+    }
+
+    .track.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     .input {
-        opacity: 0; /* Hide the default checkbox */
-        position: absolute; /* Remove it from the document flow */
-        inset: 0; /* Ensure it covers the same area as the track */
-        z-index: -1; /* Place it behind the custom track and thumb */
-    }
-
-    .input:focus {
-        border-color: var(--secondary-400);
-    }
-
-    .input:invalid {
-        border-color: var(--error-border-color);
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
     }
 </style>

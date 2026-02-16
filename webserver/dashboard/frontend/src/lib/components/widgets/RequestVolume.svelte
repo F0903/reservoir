@@ -3,10 +3,9 @@
     import Loadable from "../ui/Loadable.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Widget from "./base/Widget.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Request Volume">
@@ -23,7 +22,6 @@
                     <MetricCard
                         label="Total Requests"
                         value={totalRequests.toLocaleString()}
-                        --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard label="HTTP Share" value={`${httpShare.toFixed(1)}%`} />
@@ -39,10 +37,12 @@
                                 {
                                     label: "HTTP",
                                     data: [httpRequests],
+                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "HTTPS",
                                     data: [httpsRequests],
+                                    backgroundColor: "var(--secondary-300)",
                                 },
                             ],
                         }}

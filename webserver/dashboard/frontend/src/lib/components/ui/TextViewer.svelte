@@ -2,6 +2,7 @@
     import { onMount, tick } from "svelte";
     import LogLine from "./LogLine.svelte";
     import { isNumber } from "$lib/utils/generic-type-predicates";
+    import { log } from "$lib/utils/logger";
 
     type SyntaxHighlightingType = "none" | "slog";
 
@@ -38,7 +39,7 @@
 
         if (!isAtBottom && autoScroll) {
             autoScroll = false;
-            console.log("Auto scroll disabled");
+            log.debug("Auto scroll disabled");
         }
     }
 

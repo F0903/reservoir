@@ -1,12 +1,11 @@
 <script lang="ts">
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
     import { formatBytesToLargest } from "$lib/utils/bytestring";
     import MetricCard from "./utils/MetricCard.svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Data Transfer">
@@ -30,62 +29,35 @@
                 <MetricCard
                     label="Bytes Served"
                     value={formatBytesToLargest(data.requests.bytes_served)}
-                    --metric-padding=".7rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-400)"
-                    --metric-height="100%"
                 />
                 <MetricCard
                     label="Bytes Fetched"
                     value={formatBytesToLargest(data.requests.bytes_fetched)}
-                    --metric-padding=".7rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-400)"
-                    --metric-height="100%"
                 />
                 <MetricCard
                     label="Bandwidth Saved"
                     value={formatBytesToLargest(
                         data.requests.bytes_served - data.requests.bytes_fetched,
                     )}
-                    --metric-padding=".7rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-400)"
-                    --metric-height="100%"
+                    --metric-value-color="var(--success-color)"
                 />
                 <MetricCard
                     label="Served Throughput"
                     value={`${formatBytesToLargest(servedPerSecond)}/s`}
-                    --metric-padding=".7rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-200)"
-                    --metric-height="100%"
                 />
                 <MetricCard
                     label="Fetched Throughput"
                     value={`${formatBytesToLargest(fetchedPerSecond)}/s`}
-                    --metric-padding=".7rem"
-                    --metric-label-color="var(--secondary-600)"
-                    --metric-value-color="var(--tertiary-200)"
-                    --metric-height="100%"
                 />
-                <MetricCard
-                    label="Requests / s"
-                    value={requestsPerSecond.toFixed(2)}
-                    --metric-padding=".7rem"
-                    --metric-height="100%"
-                />
+                <MetricCard label="Requests / s" value={requestsPerSecond.toFixed(2)} />
                 <MetricCard
                     label="Total Requests"
                     value={totalRequests.toLocaleString()}
-                    --metric-padding=".7rem"
-                    --metric-height="100%"
+                    --metric-value-color="var(--tertiary-400)"
                 />
                 <MetricCard
                     label="Avg per Request"
                     value={formatBytesToLargest(avgBytesPerRequest)}
-                    --metric-padding=".7rem"
-                    --metric-height="100%"
                 />
             </div>
         {/snippet}

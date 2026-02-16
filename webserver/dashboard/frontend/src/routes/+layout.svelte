@@ -2,29 +2,32 @@
     import "../global.css";
     import "@fontsource-variable/open-sans";
     import "@fontsource-variable/chivo-mono";
-    import { setContext } from "svelte";
     import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { ToastProvider } from "$lib/providers/toast-provider.svelte";
+    import { MetricsProvider } from "$lib/providers/metrics/metrics-provider.svelte";
+    import { ToastProvider } from "$lib/providers/toast/toast-provider.svelte";
     import { log } from "$lib/utils/logger";
+    import {
+        setSettingsProvider,
+        setMetricsProvider,
+        setToastProvider,
+        setAuthProvider,
+    } from "$lib/context";
+    import ToastContainer from "$lib/components/ui/ToastContainer.svelte";
+    import { AuthProvider } from "$lib/providers/auth/auth-provider.svelte";
 
     let { children } = $props();
 
-    const settings = setContext("settings", new SettingsProvider());
-    const _metrics = setContext("metrics", new MetricsProvider(settings, fetch));
-    const toast = setContext("toast", new ToastProvider());
+    // Initialize all providers so child components can access them
+    const settings = setSettingsProvider(new SettingsProvider());
+    const _metrics = setMetricsProvider(new MetricsProvider(settings, fetch));
+    const toasts = setToastProvider(new ToastProvider());
+    const _session = setAuthProvider(new AuthProvider());
 
     function onAsyncError(event: PromiseRejectionEvent) {
         event.preventDefault();
 
         log.error("Unhandled promise rejection caught: ", event.reason, event.promise);
-
-        toast.show({
-            type: "error",
-            message: event.reason ?? "An unexpected error occurred.",
-            durationMs: 10000,
-            dismissText: "Dismiss",
-        });
+        toasts.error(event.reason ?? "An unexpected error occurred.");
     }
 
     function onError(
@@ -57,15 +60,12 @@
             return;
         }
 
-        toast.show({
-            type: "error",
-            message,
-            durationMs: 10000,
-            dismissText: "Dismiss",
-        });
+        toasts.error(message);
     }
 </script>
 
 <svelte:window onunhandledrejection={onAsyncError} onerror={onError} />
+
+<ToastContainer />
 
 {@render children()}

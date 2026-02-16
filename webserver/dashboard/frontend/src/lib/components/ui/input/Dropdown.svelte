@@ -34,54 +34,62 @@
     .input-label-container {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
-
+        gap: 0.4rem;
         width: var(--dropdown-width, 100%);
-
-        margin: 1.2rem 0px;
+        margin: 0.75rem 0;
     }
 
     .input-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+
         height: var(--dropdown-height, 42px);
-        width: 100%;
+        padding: 0 0.5rem;
+
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+
+        background-color: var(--primary-600);
+        transition: all 0.2s ease;
+    }
+
+    .input-container:hover {
+        border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .input-container:has(.input:focus) {
+        border-color: var(--secondary-400);
+        background-color: var(--primary-700);
     }
 
     .label {
-        font-size: 1rem;
-        color: var(--secondary-500);
-        letter-spacing: 0.05em;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--secondary-300);
+        opacity: 0.8;
+        padding-left: 0.2rem;
     }
 
     .input:disabled {
-        filter: brightness(0.8);
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     .input {
-        padding: var(--dropdown-padding, 0.5rem);
-        border: 1px solid var(--primary-450);
-        border-radius: 10px;
         box-sizing: border-box;
-
         font-style: normal;
         font-family: "Chivo Mono Variable", monospace;
-        font-size: 0.85rem;
-        letter-spacing: var(--dropdown-letter-spacing, 0.025em);
-        color: var(--text-primary);
-        background-color: var(--primary-600);
+        font-size: 0.9rem;
+        color: var(--text-400);
+        background: transparent;
+        border: none;
+        outline: none;
 
         width: 100%;
         height: 100%;
-
-        transition-property: border-color;
-        transition-timing-function: ease-in-out;
-        transition-duration: 75ms;
-    }
-
-    .input:focus {
-        border-color: var(--secondary-400);
-    }
-
-    .input:invalid {
-        border-color: var(--error-border-color);
+        cursor: pointer;
     }
 </style>

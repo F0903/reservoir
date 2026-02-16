@@ -9,10 +9,10 @@
     import ResponseStatus from "$lib/components/widgets/ResponseStatus.svelte";
     import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
     import SquaredGrid from "$lib/components/layout/SquaredGrid.svelte";
-    import { getContext, onMount } from "svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
+    import { getMetricsProvider } from "$lib/context";
+    import { onMount } from "svelte";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 
     onMount(() => {
         metrics.refreshMetrics();
@@ -42,12 +42,12 @@
 
 <style>
     main {
-        height: 100%;
+        height: fit-content;
         width: 100%;
     }
 
     .dashboard {
-        padding: 1.5rem;
+        margin: 1.5rem;
     }
 
     @media (max-width: var(--mobile-cutoff)) {

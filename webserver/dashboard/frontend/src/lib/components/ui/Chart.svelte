@@ -2,12 +2,8 @@
     import Chart from "chart.js/auto";
     import { onMount } from "svelte";
     import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
-    import { customChartColors } from "$lib/utils/chart-colors";
     import { log } from "$lib/utils/logger";
     import { patch } from "$lib/utils/patch";
-
-    // Register the custom color plugin
-    Chart.register(customChartColors);
 
     let {
         type,
@@ -16,6 +12,35 @@
     }: { type: ChartType; data: ChartData; options?: ChartConfiguration["options"] } = $props();
 
     const css = getComputedStyle(document.documentElement);
+
+    // Helper to resolve var(--color) to actual color string
+    function resolveColor(color: string | string[] | undefined): string | string[] | undefined {
+        if (!color) return color;
+        if (Array.isArray(color)) return color.map((c) => resolveColor(c) as string);
+        if (typeof color !== "string") return color;
+
+        if (color.startsWith("var(")) {
+            const varName = color.slice(4, -1).trim();
+            const resolved = css.getPropertyValue(varName).trim();
+            return resolved || color;
+        }
+        return color;
+    }
+
+    function resolveDatasetColors(chartData: ChartData) {
+        if (!chartData.datasets) return;
+        chartData.datasets.forEach((ds) => {
+            if (ds.backgroundColor) {
+                const resolved = resolveColor(ds.backgroundColor as string | string[]);
+                // We cast back to the internal expected type which can be many things, but string|string[] covers our usage.
+                ds.backgroundColor = resolved as typeof ds.backgroundColor;
+            }
+            if (ds.borderColor) {
+                const resolved = resolveColor(ds.borderColor as string | string[]);
+                ds.borderColor = resolved as typeof ds.borderColor;
+            }
+        });
+    }
 
     const defaultOptions: ChartConfiguration["options"] & {
         plugins?: {
@@ -27,40 +52,44 @@
         responsive: true,
         maintainAspectRatio: false,
         animation: {
-            duration: 1000,
-            easing: "easeInOutQuart",
+            duration: 800,
+            easing: "easeOutQuart",
         },
-        color: css.getPropertyValue("--secondary-600"),
+        color: "rgba(255, 255, 255, 0.7)",
         elements: {
             arc: {
-                borderWidth: 1.5,
-                borderColor: css.getPropertyValue("--text-400"),
+                borderWidth: 0,
                 hoverBorderWidth: 0,
             },
             bar: {
-                borderWidth: 1.5,
-                borderColor: css.getPropertyValue("--text-400"),
+                borderRadius: 4,
+                borderWidth: 0,
                 hoverBorderWidth: 0,
-                borderSkipped: "start",
+                borderSkipped: false,
             },
         },
         plugins: {
-            customChartColors: {
-                enabled: true,
-            },
             legend: {
                 labels: {
                     textAlign: "center",
-                    color: css.getPropertyValue("--text-400"),
-                    padding: 10,
+                    color: "rgba(255, 255, 255, 0.6)",
+                    padding: 15,
                     usePointStyle: true,
-                    pointStyle: "rectRounded",
+                    pointStyle: "circle",
                     font: {
-                        weight: 550,
-                        size: 14,
+                        weight: "bold",
+                        size: 11,
                     },
                 },
                 position: "bottom",
+            },
+            tooltip: {
+                backgroundColor: "rgba(10, 10, 10, 0.9)",
+                titleColor: "var(--secondary-300)",
+                bodyColor: "#fff",
+                padding: 10,
+                cornerRadius: 8,
+                displayColors: true,
             },
         },
     };
@@ -72,21 +101,24 @@
             x: {
                 stacked: true,
                 grid: {
-                    display: true,
-                    color: "hsla(210, 21%, 93%, 0.1)", // Lighter grid lines
+                    display: false, // Cleaner X-axis
                 },
                 ticks: {
-                    color: "hsla(210, 21%, 93%, .75)",
+                    color: "rgba(255, 255, 255, 0.5)",
+                    font: { size: 10 },
                 },
             },
             y: {
                 stacked: true,
                 grid: {
                     display: true,
-                    color: "hsla(210, 21%, 93%, 0.1)", // Lighter grid lines
+                    color: "rgba(255, 255, 255, 0.05)", // Very subtle grid
+                    drawTicks: false,
                 },
                 ticks: {
-                    color: "hsla(210, 21%, 93%, .75)",
+                    color: "rgba(255, 255, 255, 0.5)",
+                    font: { size: 10 },
+                    padding: 8,
                 },
             },
         },
@@ -110,6 +142,8 @@
         }
         patch(processedOptions, options || {});
 
+        resolveDatasetColors(data);
+
         chart = new Chart(canvas, {
             type: type,
             data,
@@ -122,11 +156,12 @@
     });
 
     $effect(() => {
-        if (data) {
-            log.debug(`Chart data changed, updating chart... (type=${type})`, data);
-            chart.data = data;
-            chart.update();
-        }
+        if (!data || !chart) return;
+
+        log.debug(`Chart data changed, updating chart... (type=${type})`, data);
+        resolveDatasetColors(data);
+        chart.data = data;
+        chart.update("none"); // Use 'none' for instant updates during rapid data flow
     });
 </script>
 
@@ -139,15 +174,12 @@
         position: relative;
         width: 100%;
         height: 100%;
+        min-height: 0;
     }
 
     .chart {
-        background-color: var(--primary-300); /* Gunmetal background */
-        border-radius: 8px; /* Optional: rounded corners */
-        padding: 10px; /* Optional: some padding */
-
         display: block;
-        width: 100% !important; /* For some reason, it will only automatically resize with !important set. */
-        height: 100% !important; /* For some reason, it will only automatically resize with !important set. */
+        width: 100% !important;
+        height: 100% !important;
     }
 </style>

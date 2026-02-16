@@ -1,12 +1,11 @@
 <script lang="ts">
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
     import { formatBytesToLargest } from "$lib/utils/bytestring";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 </script>
 
 <Widget title="Cache Statistics">
@@ -19,56 +18,31 @@
                 <MetricCard
                     label="Cache Entries"
                     value={data.cache.cache_entries.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
                 />
                 <MetricCard
                     label="Cache Hits"
                     value={data.cache.cache_hits.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
+                    --metric-value-color="var(--success-color)"
                 />
-                <MetricCard
-                    label="Cache Misses"
-                    value={data.cache.cache_misses.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
-                />
+                <MetricCard label="Cache Misses" value={data.cache.cache_misses.toLocaleString()} />
                 <MetricCard
                     label="Cache Errors"
                     value={data.cache.cache_errors.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
+                    --metric-value-color="var(--log-error-color)"
                 />
                 <MetricCard
                     label="Bytes Cached"
                     value={formatBytesToLargest(data.cache.bytes_cached)}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
                 />
-                <MetricCard
-                    label="Cache Fill Level"
-                    value={`${fillPercent.toFixed(1)}%`}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
-                />
-                <MetricCard
-                    label="Cleanup Runs"
-                    value={data.cache.cleanup_runs.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
-                />
+                <MetricCard label="Cache Fill Level" value={`${fillPercent.toFixed(1)}%`} />
+                <MetricCard label="Cleanup Runs" value={data.cache.cleanup_runs.toLocaleString()} />
                 <MetricCard
                     label="Bytes Cleaned"
                     value={formatBytesToLargest(data.cache.bytes_cleaned)}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
                 />
                 <MetricCard
                     label="Cache Evictions"
                     value={data.cache.cache_evictions.toLocaleString()}
-                    --metric-value-size="1rem"
-                    --metric-label-size="0.7rem"
                 />
             </div>
         {/snippet}
@@ -78,8 +52,15 @@
 <style>
     .metrics-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 1rem;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+        gap: 0.5rem;
         height: 100%;
+        width: 100%;
+    }
+
+    .metrics-grid :global(.metric-card-wrapper) {
+        flex: 1;
+        min-height: 0;
     }
 </style>

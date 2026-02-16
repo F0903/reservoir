@@ -6,6 +6,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 ## Proxy
 - More tests
+- Refactor config setup 
 - Content-Type Specific Handling (?)
 
 ## Dashboard

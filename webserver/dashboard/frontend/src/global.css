@@ -7,8 +7,9 @@
     --primary-200: hsla(207, 36%, 22%);
     --primary-300: hsla(207, 36%, 19%);
     --primary-400: hsla(207, 36%, 17%);
-    --primary-450: hsla(207, 36%, 14%);
+    --primary-450: hsla(207, 36%, 13%);
     --primary-500: hsla(207, 39%, 11%);
+    --primary-550: hsla(207, 39%, 9.5%);
     --primary-600: hsla(207, 39%, 8%);
     --primary-700: hsla(207, 39%, 6%);
     --primary-800: hsla(207, 39%, 4%);
@@ -33,13 +34,20 @@
 
     --default-shadow: 5px 5px 10px 1px rgba(0, 0, 0, 0.5);
 
-    --error-background-color: hsl(0, 50%, 50%);
-    --error-border-color: hsl(0, 100%, 70%);
-    --error-text-color: var(--text-400);
+    /* Semantic state colors */
+    --success-color: hsl(120, 45%, 45%);
+    --success-bg: hsl(120, 40%, 10%);
+    --success-border: hsl(120, 45%, 30%);
+
+    --error-color: hsl(0, 85%, 65%);
+    --error-bg: hsl(0, 50%, 15%);
+    --error-border: hsl(0, 80%, 40%);
+
+    --warning-color: hsl(45, 100%, 70%);
 
     --log-info-color: hsl(120, 50%, 70%);
-    --log-warn-color: hsl(45, 100%, 70%);
-    --log-error-color: hsl(0, 100%, 70%);
+    --log-warn-color: var(--warning-color);
+    --log-error-color: var(--error-color);
     --log-debug-color: hsl(210, 20%, 60%);
 
     --mobile-cutoff: 768px;

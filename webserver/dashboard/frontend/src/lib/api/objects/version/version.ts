@@ -4,6 +4,6 @@ export type Version = {
     version: string;
 };
 
-export async function getVersion(fetchFn: FetchFn = fetch): Promise<Readonly<Version>> {
+export async function version(fetchFn: FetchFn = fetch): Promise<Readonly<Version>> {
     return apiGet("/version", fetchFn);
 }

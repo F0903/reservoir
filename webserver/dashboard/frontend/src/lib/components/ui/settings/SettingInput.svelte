@@ -1,6 +1,6 @@
 <script
     lang="ts"
-    generics="C extends Component<CP, CE, 'value'>, CP extends { value: unknown }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value'], O = V"
+    generics="C extends Component<CP, CE, 'value'>, CP extends { label: string, value: string | number | boolean }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value'], O = V"
 >
     import { log } from "$lib/utils/logger";
     import type { Component } from "svelte";
@@ -25,7 +25,7 @@
     let inputValue: V = $state(get());
 
     // Has 'inputValue' changed from 'get()'?
-    function hasDiverged() {
+    export function hasDiverged() {
         if (get() === undefined) return false;
         log.debug(`Checking divergence: inputValue=${inputValue}, get()=${get()}`);
         // We use != to allow type coercion (e.g. between number and string)

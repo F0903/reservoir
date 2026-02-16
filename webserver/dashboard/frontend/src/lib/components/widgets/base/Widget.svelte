@@ -14,25 +14,40 @@
 <Card
     --card-width="var(--widget-width, 100%)"
     --card-height="var(--widget-height, 100%)"
-    --card-padding="var(--widget-padding,  0.75rem)"
+    --card-padding="0"
+    --card-background="var(--primary-500)"
 >
-    <h2 class="title">{title}</h2>
+    <div class="widget-header">
+        <h2 class="title">{title}</h2>
+    </div>
     <div class="widget-content">
         {@render children()}
     </div>
 </Card>
 
 <style>
+    .widget-header {
+        padding: 0.75rem 1rem;
+        background-color: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 15px 15px 0 0;
+    }
+
     .widget-content {
+        display: flex;
+        flex-direction: column;
         flex-grow: 1;
         min-height: 0;
+        padding: 1rem;
+        overflow: hidden;
     }
 
     .title {
-        margin-bottom: 0.5rem;
-
-        font-size: var(--widget-title-size, 1.2rem);
-        font-weight: 600;
-        text-align: center;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--secondary-300);
+        text-align: left;
     }
 </style>

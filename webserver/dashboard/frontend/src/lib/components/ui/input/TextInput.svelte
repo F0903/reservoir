@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { Snippet } from "svelte";
     import Input from "./Input.svelte";
 
     let {
@@ -17,6 +18,7 @@
         onSubmit,
         disabled = false,
         censor = false,
+        suffixElement,
     }: {
         label: string;
         pattern?: string;
@@ -30,6 +32,7 @@
         onSubmit?: (_event: Event) => void;
         disabled?: boolean;
         censor?: boolean;
+        suffixElement?: Snippet;
     } = $props();
 
     let input: Input;
@@ -53,4 +56,5 @@
     {max}
     {onSubmit}
     {disabled}
+    {suffixElement}
 />

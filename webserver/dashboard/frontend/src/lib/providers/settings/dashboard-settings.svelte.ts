@@ -2,67 +2,51 @@ import { browser } from "$app/environment";
 import { log } from "$lib/utils/logger";
 import type { Settings } from "./settings-provider.svelte";
 
-type Fields = {
+type DashboardSettingsFields = {
     updateInterval: number;
 };
 
 // Manages browser stored settings for the dashboard
 export class DashboardSettings implements Settings {
-    fields: Fields = $state({
+    fields: DashboardSettingsFields = $state({
         updateInterval: 10000,
     });
 
     constructor() {
-        this.reload();
+        if (browser) {
+            this.loadFromLocalStorage();
 
-        $effect(() => {
-            if (this.fields.updateInterval) {
-                this.save();
-            }
-        });
+            // Auto-save whenever fields change
+            $effect.root(() => {
+                $effect(() => {
+                    this.save();
+                });
+            });
+        }
     }
 
-    reload = () => {
-        if (!browser) {
-            // If SSR, just return
-            return Promise.resolve();
-        }
+    private loadFromLocalStorage = () => {
+        const configJson = localStorage.getItem("dashboardConfig");
+        if (!configJson) return;
 
-        let configJson = localStorage.getItem("dashboardConfig");
-        log.debug("Reloading dashboard settings from localStorage...", configJson);
-        if (!configJson) {
-            log.debug("No dashboard settings found in localStorage, saving defaults...");
-            this.save(); // Try to save defaults if nothing is present
-
-            configJson = localStorage.getItem("dashboardConfig");
-            if (!configJson) {
-                return Promise.resolve();
-            }
-        }
-
-        let savedData;
         try {
-            savedData = JSON.parse(configJson);
+            const savedData = JSON.parse(configJson);
+            Object.assign(this.fields, savedData);
+            log.debug("Loaded dashboard settings from localStorage:", $state.snapshot(this.fields));
         } catch (e) {
             log.error("Failed to parse dashboard settings from localStorage:", e);
-            return Promise.resolve();
         }
+    };
 
-        log.debug("Parsed dashboard settings from localStorage:", savedData);
-        if (savedData.updateInterval == this.fields.updateInterval) {
-            log.debug("No changes detected in dashboard settings.");
-            return Promise.resolve();
-        }
-
-        this.fields.updateInterval = savedData.updateInterval;
-
-        log.debug("Updated dashboard settings from localStorage:", this.fields);
+    reload = async () => {
+        this.loadFromLocalStorage();
         return Promise.resolve();
     };
 
     save = () => {
         if (!browser) return; // Do not run this in SSR
 
+        log.debug("Saving dashboard settings to localStorage:", $state.snapshot(this.fields));
         localStorage.setItem("dashboardConfig", JSON.stringify(this.fields));
     };
 }

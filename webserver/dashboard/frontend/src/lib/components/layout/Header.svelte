@@ -1,17 +1,35 @@
 <script lang="ts">
-    import { getVersion } from "$lib/api/objects/version/version";
+    import { version } from "$lib/api/objects/version/version";
     import { onMount } from "svelte";
+    import { getAuthProvider } from "$lib/context";
+    import { LogOut, User } from "@lucide/svelte";
 
     let version_string = $state("");
+    const session = getAuthProvider();
 
     onMount(async () => {
-        let version_obj = await getVersion();
+        let version_obj = await version();
         version_string = version_obj.version;
     });
 </script>
 
 <header>
-    <h1>reservoir <span class="version-string">{version_string}</span></h1>
+    <div class="title-section">
+        <h1>reservoir <span class="version-string">{version_string}</span></h1>
+    </div>
+
+    {#if session.user}
+        <div class="user-section">
+            <div class="user-info">
+                <User size={18} />
+                <span class="username">{session.user.username}</span>
+            </div>
+            <button class="logout-btn" onclick={session.logout} title="Logout">
+                <LogOut size={18} />
+                <span>Logout</span>
+            </button>
+        </div>
+    {/if}
 </header>
 
 <style>
@@ -23,11 +41,52 @@
 
     header {
         background-color: var(--primary-600);
-        padding: 1rem;
+        padding: 0.75rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     h1 {
         color: var(--tertiary-400);
         user-select: none;
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .user-section {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-400);
+        font-size: 0.9rem;
+    }
+
+    .username {
+        font-weight: 600;
+    }
+
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        color: var(--secondary-300);
+        font-size: 0.9rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .logout-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--secondary-400);
     }
 </style>

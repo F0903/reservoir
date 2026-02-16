@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Toast from "./Toast.svelte";
-import { ToastHandle } from "../../providers/toast-provider.svelte";
+import { ToastHandle } from "../../providers/toast/toast-provider.svelte";
 
 describe("Toast component", () => {
     beforeEach(() => {
@@ -24,6 +24,20 @@ describe("Toast component", () => {
         });
 
         expect(screen.getByText("Test Message")).toBeInTheDocument();
+    });
+
+    it("should render success message", () => {
+        const handle = new ToastHandle(vi.fn());
+        render(Toast, {
+            props: {
+                type: "success",
+                message: "Success Message",
+                durationMs: 3000,
+                handle,
+            },
+        });
+
+        expect(screen.getByText("Success Message")).toBeInTheDocument();
     });
 
     it("should call handle.close after duration", async () => {

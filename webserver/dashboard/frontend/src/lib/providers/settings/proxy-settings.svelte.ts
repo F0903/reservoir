@@ -5,14 +5,10 @@ import { log } from "$lib/utils/logger";
 import { patch } from "$lib/utils/patch";
 import type { Settings } from "./settings-provider.svelte";
 
-// Manages proxy settings from API.
+// Gets proxy settings from API.
 export class ProxySettings implements Settings {
     fields: Config = $state({} as Config);
     needsRestart = $state(false);
-
-    constructor() {
-        this.reload();
-    }
 
     reload = async (): Promise<void> => {
         if (!browser) {

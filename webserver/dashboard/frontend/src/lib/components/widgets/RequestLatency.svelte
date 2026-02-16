@@ -3,10 +3,9 @@
     import Loadable from "$lib/components/ui/Loadable.svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
-    import type { MetricsProvider } from "$lib/providers/metric-providers.svelte";
-    import { getContext } from "svelte";
+    import { getMetricsProvider } from "$lib/context";
 
-    const metrics = getContext("metrics") as MetricsProvider;
+    const metrics = getMetricsProvider();
 
     const nanosToMillis = (value: number) => value / 1e6;
 </script>
@@ -35,14 +34,12 @@
                     <MetricCard
                         label="Client → Reservoir"
                         value={`${avgClientLatencyMs.toFixed(2)} ms`}
-                        --metric-label-color="var(--secondary-600)"
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard
                         label="Reservoir → Upstream"
                         value={`${avgUpstreamLatencyMs.toFixed(2)} ms`}
-                        --metric-label-color="var(--secondary-600)"
-                        --metric-value-color="var(--tertiary-200)"
+                        --metric-value-color="var(--tertiary-400)"
                     />
                     <div class="double-span">
                         <MetricCard
@@ -61,10 +58,12 @@
                                 {
                                     label: "Client",
                                     data: [avgClientLatencyMs],
+                                    backgroundColor: "var(--tertiary-400)",
                                 },
                                 {
                                     label: "Upstream",
                                     data: [avgUpstreamLatencyMs],
+                                    backgroundColor: "var(--tertiary-600)",
                                 },
                             ],
                         }}
