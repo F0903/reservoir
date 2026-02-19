@@ -30,17 +30,19 @@ type cacheJanitor[MetadataT any] struct {
 
 	cacheFns cacheFunctions[MetadataT]
 	subs     config.ConfigSubscriber
+	cfg      *config.Config
 }
 
-func newCacheJanitor[MetadataT any](interval time.Duration, cacheFns cacheFunctions[MetadataT]) *cacheJanitor[MetadataT] {
+func newCacheJanitor[MetadataT any](cfg *config.Config, interval time.Duration, cacheFns cacheFunctions[MetadataT]) *cacheJanitor[MetadataT] {
 	j := &cacheJanitor[MetadataT]{
 		stopChan:        make(chan struct{}),
 		intervalChanged: make(chan time.Duration, 1),
 		interval:        interval,
 		cacheFns:        cacheFns,
+		cfg:             cfg,
 	}
 
-	j.subs.Add(config.Global.Cache.CleanupInterval.OnChange(func(newInterval duration.Duration) {
+	j.subs.Add(cfg.Cache.CleanupInterval.OnChange(func(newInterval duration.Duration) {
 		slog.Info("Cache cleanup interval changed", "new_interval", newInterval)
 		j.intervalChanged <- newInterval.Cast()
 	}))
@@ -206,7 +208,7 @@ func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
 }
 
 func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
-	maxCacheSize := config.Global.Cache.MaxCacheSize.Read().Bytes()
+	maxCacheSize := j.cfg.Cache.MaxCacheSize.Read().Bytes()
 	startCacheSize := j.cacheFns.getCacheSize()
 	if startCacheSize < maxCacheSize {
 		return

@@ -3,6 +3,7 @@ package apitypes
 
 import (
 	"net/http"
+	"reservoir/config"
 	"reservoir/db/models"
 	"reservoir/db/stores"
 	"reservoir/webserver/auth"
@@ -11,9 +12,10 @@ import (
 type Context struct {
 	Session   *auth.Session
 	UserStore *stores.UserStore
+	Config    *config.Config
 }
 
-func CreateContext(r *http.Request) (Context, error) {
+func CreateContext(r *http.Request, cfg *config.Config) (Context, error) {
 	sess, authorized := auth.SessionFromRequest(r)
 	var users *stores.UserStore
 	if authorized {
@@ -23,6 +25,7 @@ func CreateContext(r *http.Request) (Context, error) {
 	return Context{
 		Session:   sess,
 		UserStore: users,
+		Config:    cfg,
 	}, nil
 }
 

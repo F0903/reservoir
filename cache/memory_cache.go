@@ -46,7 +46,7 @@ type MemoryCache[MetadataT any] struct {
 	subs    config.ConfigSubscriber
 }
 
-func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
+func NewMemoryCache[MetadataT any](cfg *config.Config, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
 	sysMem, err := mem.VirtualMemory()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
@@ -60,18 +60,18 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 		byteSize:     atomics.NewInt64(0),
 	}
 
-	c.subs.Add(config.Global.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	}))
 
-	c.subs.Add(config.Global.Cache.Memory.MemoryBudgetPercent.OnChange(func(newPercent int) {
+	c.subs.Add(cfg.Cache.Memory.MemoryBudgetPercent.OnChange(func(newPercent int) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.memoryCap = int64(sysMem.Total) * int64(newPercent) / 100
 		slog.Info("Memory budget changed", "new_percent", newPercent, "new_cap", bytesize.ByteSize(c.memoryCap))
 	}))
 
-	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
+	c.janitor = newCacheJanitor(cfg, cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
 			snapshot := maps.Clone(c.entries)

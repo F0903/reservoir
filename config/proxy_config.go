@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"reservoir/utils/duration"
 	"time"
 )
@@ -25,6 +26,19 @@ func (c *ProxyConfig) setRestartNeededProps() {
 	c.Listen.SetRequiresRestart()
 	c.CaCert.SetRequiresRestart()
 	c.CaKey.SetRequiresRestart()
+}
+
+func (c *ProxyConfig) verify() error {
+	if c.Listen.Read() == "" {
+		return fmt.Errorf("proxy.listen cannot be empty")
+	}
+	if c.CaCert.Read() == "" {
+		return fmt.Errorf("proxy.ca_cert cannot be empty")
+	}
+	if c.CaKey.Read() == "" {
+		return fmt.Errorf("proxy.ca_key cannot be empty")
+	}
+	return nil
 }
 
 func defaultProxyConfig() ProxyConfig {

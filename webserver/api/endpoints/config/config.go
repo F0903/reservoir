@@ -33,7 +33,7 @@ func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	responseJson, err := json.Marshal(config.Global)
+	responseJson, err := json.Marshal(ctx.Config)
 	if err != nil {
 		slog.Error("Error marshaling config to JSON", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -58,7 +58,7 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apity
 		return
 	}
 
-	status, err := config.UpdatePartialFromJSON(updates)
+	status, err := config.UpdatePartialFromConfig(ctx.Config, updates)
 	if err != nil {
 		slog.Error("Failed to partially update config", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)

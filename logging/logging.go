@@ -36,13 +36,13 @@ func OpenLogFileRead() (*os.File, error) {
 
 // Initializes and appends a log file writer to the provided writers slice if configured and returns it.
 // If file logging is disabled in config, this will return nil.
-func appendLogFileWriter(writers *[]io.Writer) io.Writer {
+func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
 	slog.Info("Initializing log file writer...")
 
-	logFilePath := config.Global.Logging.File.Read()
-	logFileMaxSize := int(config.Global.Logging.MaxSize.Read().MegaBytes())
-	logFileMaxBackups := config.Global.Logging.MaxBackups.Read()
-	logFileCompress := config.Global.Logging.Compress.Read()
+	logFilePath := cfg.Logging.File.Read()
+	logFileMaxSize := int(cfg.Logging.MaxSize.Read().MegaBytes())
+	logFileMaxBackups := cfg.Logging.MaxBackups.Read()
+	logFileCompress := cfg.Logging.Compress.Read()
 
 	if logFilePath == "" {
 		slog.Info("Log file logging is disabled, skipping log file writer initialization")
@@ -64,10 +64,10 @@ func SetLogLevel(level slog.Level) {
 	logLevel.Set(level)
 }
 
-func updateLogger() io.Writer {
+func updateLogger(cfg *config.Config) io.Writer {
 	slog.Info("Updating log writers...")
 
-	logToStdOut := config.Global.Logging.ToStdout.Read()
+	logToStdOut := cfg.Logging.ToStdout.Read()
 
 	var writers []io.Writer = []io.Writer{}
 	if logToStdOut {
@@ -75,7 +75,7 @@ func updateLogger() io.Writer {
 		slog.Info("Added Stdout writer")
 	}
 
-	appendLogFileWriter(&writers)
+	appendLogFileWriter(cfg, &writers)
 
 	mw := io.MultiWriter(writers...)
 	handler := slog.NewTextHandler(mw, &slog.HandlerOptions{
@@ -86,30 +86,30 @@ func updateLogger() io.Writer {
 	return mw
 }
 
-func Init() {
+func Init(cfg *config.Config) {
 	if initialized {
 		return
 	}
 	initialized = true
 
-	logLevel.Set(config.Global.Logging.Level.Read())
+	logLevel.Set(cfg.Logging.Level.Read())
 
 	// Subscribe to log level changes
-	subs.Add(config.Global.Logging.Level.OnChange(func(newLevel slog.Level) {
+	subs.Add(cfg.Logging.Level.OnChange(func(newLevel slog.Level) {
 		logLevel.Set(newLevel)
 		slog.Info("Log level changed by configuration", "new_level", newLevel)
 	}))
 
-	subs.Add(config.Global.Logging.File.OnChange(func(string) { updateLogger() }))
-	subs.Add(config.Global.Logging.MaxSize.OnChange(func(bytesize.ByteSize) { updateLogger() }))
-	subs.Add(config.Global.Logging.MaxBackups.OnChange(func(int) { updateLogger() }))
-	subs.Add(config.Global.Logging.Compress.OnChange(func(bool) { updateLogger() }))
-	subs.Add(config.Global.Logging.ToStdout.OnChange(func(bool) { updateLogger() }))
+	subs.Add(cfg.Logging.File.OnChange(func(string) { updateLogger(cfg) }))
+	subs.Add(cfg.Logging.MaxSize.OnChange(func(bytesize.ByteSize) { updateLogger(cfg) }))
+	subs.Add(cfg.Logging.MaxBackups.OnChange(func(int) { updateLogger(cfg) }))
+	subs.Add(cfg.Logging.Compress.OnChange(func(bool) { updateLogger(cfg) }))
+	subs.Add(cfg.Logging.ToStdout.OnChange(func(bool) { updateLogger(cfg) }))
 
 	slog.Info("Initializing logging...")
 
 	slog.Info("Setting up log writers...")
-	mw := updateLogger()
+	mw := updateLogger(cfg)
 
 	// Write any early buffered log entries.
 	early.EarlyBuffer.WriteTo(mw)

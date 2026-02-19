@@ -109,9 +109,9 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 		},
 	}
 
-	status, err := UpdatePartialFromJSON(updates)
+	status, err := UpdatePartialFromConfig(Global, updates)
 	if err != nil {
-		t.Fatalf("UpdatePartialFromJSON failed: %v", err)
+		t.Fatalf("UpdatePartialFromConfig failed: %v", err)
 	}
 
 	if status == UpdateStatusFailed {
@@ -187,5 +187,86 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 	// Verify it was reset to defaults (checking a field that was definitely missing)
 	if cfg.Proxy.Listen.Read() != ":9999" {
 		t.Errorf("Expected reset to default proxy listen, got %s", cfg.Proxy.Listen.Read())
+	}
+}
+
+func TestConfig_Verify(t *testing.T) {
+	tests := []struct {
+		name    string
+		modify  func(*Config)
+		wantErr bool
+	}{
+		{
+			name:    "valid default",
+			modify:  func(c *Config) {},
+			wantErr: false,
+		},
+		{
+			name: "empty proxy listen",
+			modify: func(c *Config) {
+				c.Proxy.Listen.Overwrite("")
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty webserver listen",
+			modify: func(c *Config) {
+				c.Webserver.Listen.Overwrite("")
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative max cache size",
+			modify: func(c *Config) {
+				c.Cache.MaxCacheSize.Overwrite(0)
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory budget (too high)",
+			modify: func(c *Config) {
+				c.Cache.Memory.MemoryBudgetPercent.Overwrite(101)
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid memory budget (negative)",
+			modify: func(c *Config) {
+				c.Cache.Memory.MemoryBudgetPercent.Overwrite(-1)
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero cleanup interval",
+			modify: func(c *Config) {
+				c.Cache.CleanupInterval.Overwrite(0)
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty cache dir",
+			modify: func(c *Config) {
+				c.Cache.File.Dir.Overwrite("")
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid cache type",
+			modify: func(c *Config) {
+				c.Cache.Type.Overwrite("invalid")
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := newDefault()
+			tt.modify(cfg)
+			err := cfg.verify()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Config.verify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

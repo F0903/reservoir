@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"reservoir/config"
 	"reservoir/utils/typeutils"
 	"time"
 )
@@ -133,9 +132,7 @@ func (hd *HeaderDirectives) StripRegularConditionals(header http.Header) {
 	// We need to keep If-Range for Range requests
 }
 
-func (hd *HeaderDirectives) ShouldCache() bool {
-	ignoreCacheControl := config.Global.Proxy.CachePolicy.IgnoreCacheControl.Read()
-
+func (hd *HeaderDirectives) ShouldCache(ignoreCacheControl bool) bool {
 	if !ignoreCacheControl && hd.CacheControl.IsPresent() {
 		cc := hd.CacheControl.Value()
 		if cc.noCache {
@@ -161,10 +158,7 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 	return true // If no cache control or expires headers prevent caching, we can cache
 }
 
-func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
-	forceDefaultCacheMaxAge := config.Global.Proxy.CachePolicy.ForceDefaultMaxAge.Read()
-	defaultMaxAge := config.Global.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
-
+func (hd *HeaderDirectives) GetExpiresOrDefault(forceDefaultCacheMaxAge bool, defaultCacheMaxAge time.Duration) time.Time {
 	if !forceDefaultCacheMaxAge {
 		if hd.CacheControl.IsPresent() {
 			cc := hd.CacheControl.Value()
@@ -177,5 +171,5 @@ func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
 		}
 	}
 
-	return time.Now().Add(defaultMaxAge)
+	return time.Now().Add(defaultCacheMaxAge)
 }

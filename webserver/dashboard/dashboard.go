@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"reservoir/config"
 	"strings"
 	"time"
 )
@@ -24,10 +25,12 @@ var buildFS = func() fs.FS {
 	return fsys
 }()
 
-type Dashboard struct{}
+type Dashboard struct {
+	cfg *config.Config
+}
 
-func New() *Dashboard {
-	return &Dashboard{}
+func New(cfg *config.Config) *Dashboard {
+	return &Dashboard{cfg: cfg}
 }
 
 func (d *Dashboard) ServeDashboard(w http.ResponseWriter, r *http.Request) {

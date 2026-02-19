@@ -39,7 +39,7 @@ type FileCache[MetadataT any] struct {
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
-func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
+func NewFileCache[MetadataT any](cfg *config.Config, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
 	c := &FileCache[MetadataT]{
 		rootDir:         assertedpath.AssertDirectory(rootDir).EnsureCleared(),
 		entriesMetadata: make(map[CacheKey]*EntryMetadata[MetadataT]),
@@ -48,11 +48,11 @@ func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInte
 		maxCacheSize:    atomics.NewInt64(maxCacheSize),
 	}
 
-	c.subs.Add(config.Global.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	}))
 
-	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
+	c.janitor = newCacheJanitor(cfg, cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
 			snapshot := maps.Clone(c.entriesMetadata)

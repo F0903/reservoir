@@ -43,6 +43,7 @@ type Proxy struct {
 	ca    certs.CertAuthority
 	cache cache.Cache[cachedRequestInfo]
 	fetch fetcher
+	cfg   *config.Config
 }
 
 func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
@@ -57,26 +58,28 @@ func (p *Proxy) Destroy() {
 // Creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewProxy(cacheType config.CacheType, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
-	cacheCleanupInterval := config.Global.Cache.CleanupInterval.Read().Cast()
-	maxCacheSize := config.Global.Cache.MaxCacheSize.Read().Bytes()
+func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
+	cacheCleanupInterval := cfg.Cache.CleanupInterval.Read().Cast()
+	maxCacheSize := cfg.Cache.MaxCacheSize.Read().Bytes()
+	shardCount := cfg.Cache.LockShards.Read()
 
 	var c cache.Cache[cachedRequestInfo]
-	switch cacheType {
+	switch cfg.Cache.Type.Read() {
 	case config.CacheTypeFile:
-		cacheDir := config.Global.Cache.File.Dir.Read()
-		c = cache.NewFileCache[cachedRequestInfo](cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
+		cacheDir := cfg.Cache.File.Dir.Read()
+		c = cache.NewFileCache[cachedRequestInfo](cfg, cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	case config.CacheTypeMemory:
-		memoryBudget := config.Global.Cache.Memory.MemoryBudgetPercent.Read()
-		c = cache.NewMemoryCache[cachedRequestInfo](memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
+		memoryBudget := cfg.Cache.Memory.MemoryBudgetPercent.Read()
+		c = cache.NewMemoryCache[cachedRequestInfo](cfg, memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	default:
-		return nil, fmt.Errorf("unsupported cache type: %v", cacheType)
+		return nil, fmt.Errorf("unsupported cache type: %v", cfg.Cache.Type.Read())
 	}
 
 	return &Proxy{
 		ca:    ca,
 		cache: c,
-		fetch: newFetcher(c),
+		fetch: newFetcher(c, cfg),
+		cfg:   cfg,
 	}, nil
 }
 
@@ -127,7 +130,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	if err != nil {
 		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.Size)
 
-		if !config.Global.Proxy.RetryOnInvalidRange.Read() {
+		if !p.cfg.Proxy.RetryOnInvalidRange.Read() {
 			slog.Error("Sending 416 Range Not Satisfiable due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 			r.SetHeader("Accept-Ranges", "bytes")

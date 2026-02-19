@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"reservoir/utils/bytesize"
 	"reservoir/utils/duration"
 	"time"
@@ -34,6 +35,25 @@ func (c *CacheConfig) setRestartNeededProps() {
 	c.Type.SetRequiresRestart()
 	c.File.Dir.SetRequiresRestart()
 	c.LockShards.SetRequiresRestart()
+}
+
+func (c *CacheConfig) verify() error {
+	if c.MaxCacheSize.Read().Bytes() <= 0 {
+		return fmt.Errorf("cache.max_cache_size must be greater than 0")
+	}
+	if c.CleanupInterval.Read().Cast() <= 0 {
+		return fmt.Errorf("cache.cleanup_interval must be greater than 0")
+	}
+	if c.Memory.MemoryBudgetPercent.Read() < 0 || c.Memory.MemoryBudgetPercent.Read() > 100 {
+		return fmt.Errorf("cache.memory.memory_budget_percent must be between 0 and 100")
+	}
+	if c.File.Dir.Read() == "" {
+		return fmt.Errorf("cache.file.dir cannot be empty")
+	}
+	if c.Type.Read() != CacheTypeFile && c.Type.Read() != CacheTypeMemory {
+		return fmt.Errorf("cache.type must be either 'file' or 'memory'")
+	}
+	return nil
 }
 
 func defaultCacheConfig() CacheConfig {

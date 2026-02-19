@@ -10,24 +10,16 @@ func (c *Config) verify() error {
 		return err
 	}
 
-	if c.Proxy.Listen.Read() == "" {
-		return fmt.Errorf("proxy.listen cannot be empty")
+	if err := c.Proxy.verify(); err != nil {
+		return err
 	}
 
-	if c.Webserver.Listen.Read() == "" {
-		return fmt.Errorf("webserver.listen cannot be empty")
+	if err := c.Webserver.verify(); err != nil {
+		return err
 	}
 
-	if c.Cache.MaxCacheSize.Read().Bytes() <= 0 {
-		return fmt.Errorf("cache.max_cache_size must be greater than 0")
-	}
-
-	if c.Cache.Memory.MemoryBudgetPercent.Read() < 0 || c.Cache.Memory.MemoryBudgetPercent.Read() > 100 {
-		return fmt.Errorf("cache.memory.memory_budget_percent must be between 0 and 100")
-	}
-
-	if c.Cache.CleanupInterval.Read().Cast() <= 0 {
-		return fmt.Errorf("cache.cleanup_interval must be greater than 0")
+	if err := c.Cache.verify(); err != nil {
+		return err
 	}
 
 	return nil
@@ -50,10 +42,8 @@ func checkIsSetRecursive(val reflect.Value) error {
 		// Check if it's a ConfigProp. We need to get the pointer to call methods.
 		// If it's a field in a struct we just Elem'd from a pointer, it should be addressable.
 		if field.CanAddr() {
-			if isSetMethod := field.Addr().MethodByName("IsSet"); isSetMethod.IsValid() {
-				returns := isSetMethod.Call(nil)
-				isSet := returns[0].Bool()
-				if !isSet {
+			if prop, ok := field.Addr().Interface().(StagedConfigProp); ok {
+				if !prop.IsSet() {
 					jsonTag, _ := fieldType.Tag.Lookup("json")
 					return fmt.Errorf("missing or uninitialized required configuration property: '%s'", jsonTag)
 				}

@@ -18,30 +18,28 @@ import (
 	"syscall"
 )
 
-func startProxy(errChan chan error, ctx context.Context) error {
-	caCert := config.Global.Proxy.CaCert.Read()
-	caKey := config.Global.Proxy.CaKey.Read()
+func startProxy(cfg *config.Config, errChan chan error, ctx context.Context) error {
+	caCert := cfg.Proxy.CaCert.Read()
+	caKey := cfg.Proxy.CaKey.Read()
 	ca, err := certs.NewPrivateCA(caCert, caKey)
 	if err != nil {
 		return fmt.Errorf("failed to create CA: %v", err)
 	}
 
-	cacheType := config.Global.Cache.Type.Read()
-	shardCount := config.Global.Cache.LockShards.Read()
-	proxy, err := proxy.NewProxy(cacheType, ca, shardCount, ctx)
+	p, err := proxy.NewProxy(cfg, ca, ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy: %v", err)
 	}
 
-	proxyListen := config.Global.Proxy.Listen.Read()
+	proxyListen := cfg.Proxy.Listen.Read()
 	slog.Info("Starting proxy server", "address", proxyListen)
-	proxy.Listen(proxyListen, errChan, ctx)
+	p.Listen(proxyListen, errChan, ctx)
 	return nil
 }
 
-func startWebServer(errChan chan error, ctx context.Context) error {
-	dashboardDisabled := config.Global.Webserver.DashboardDisabled.Read()
-	apiDisabled := config.Global.Webserver.ApiDisabled.Read()
+func startWebServer(cfg *config.Config, errChan chan error, ctx context.Context) error {
+	dashboardDisabled := cfg.Webserver.DashboardDisabled.Read()
+	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 	if apiDisabled && !dashboardDisabled {
 		panic("API cannot be disabled while dashboard is enabled")
 	} else if apiDisabled && dashboardDisabled {
@@ -54,8 +52,8 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 	if dashboardDisabled {
 		slog.Info("Dashboard is disabled by configuration, skipping registration")
 	} else {
-		dashboard := dashboard.New()
-		if err := webserver.Register(dashboard); err != nil {
+		d := dashboard.New(cfg)
+		if err := webserver.Register(d); err != nil {
 			return fmt.Errorf("failed to register dashboard: %v", err)
 		}
 	}
@@ -63,15 +61,15 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 	if apiDisabled {
 		slog.Info("API is disabled by configuration, skipping registration")
 	} else {
-		api := api.New()
-		if err := webserver.Register(api); err != nil {
+		a := api.New(cfg)
+		if err := webserver.Register(a); err != nil {
 			return fmt.Errorf("failed to register API: %v", err)
 		}
 	}
 
 	auth.StartSessionGC()
 
-	webserverListen := config.Global.Webserver.Listen.Read()
+	webserverListen := cfg.Webserver.Listen.Read()
 	slog.Info("Starting webserver", "address", webserverListen)
 	webserver.Listen(webserverListen, errChan, ctx)
 	return nil
@@ -79,7 +77,7 @@ func startWebServer(errChan chan error, ctx context.Context) error {
 
 func main() {
 	config.OverrideGlobalConfigFromFlags()
-	logging.Init()
+	logging.Init(config.Global)
 
 	// Channel to handle OS signals for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -95,12 +93,12 @@ func main() {
 		panic(err)
 	}
 
-	if err := startProxy(errChan, ctx); err != nil {
+	if err := startProxy(config.Global, errChan, ctx); err != nil {
 		slog.Error("Failed to start proxy", "error", err)
 		panic(err)
 	}
 
-	if err := startWebServer(errChan, ctx); err != nil {
+	if err := startWebServer(config.Global, errChan, ctx); err != nil {
 		slog.Error("Failed to start webserver", "error", err)
 		panic(err)
 	}

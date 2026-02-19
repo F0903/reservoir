@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"reservoir/config"
 	"reservoir/utils"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/streaming"
@@ -113,7 +112,7 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 		return
 	}
 
-	logFilePath := config.Global.Logging.File.Read()
+	logFilePath := ctx.Config.Logging.File.Read()
 	if logFilePath == "" {
 		http.Error(w, "No Log File Configured", http.StatusNotFound)
 		return

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"reservoir/config"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ func TestFileCache_Basic(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	c := NewFileCache[TestMeta](tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := NewFileCache[TestMeta](config.Global, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := FromString("test-key")

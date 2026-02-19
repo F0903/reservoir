@@ -80,13 +80,11 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		config.Global.Logging.ToStdout.Overwrite(false)
 	}
 
-	logging.Init()
+	logging.Init(config.Global)
 
 	ctx := t.Context()
 
-	cacheType := config.Global.Cache.Type.Read()
-	lockShards := config.Global.Cache.LockShards.Read()
-	p, err := proxy.NewProxy(cacheType, &FakeCA{}, lockShards, ctx)
+	p, err := proxy.NewProxy(config.Global, &FakeCA{}, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
@@ -199,9 +197,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 
 	ctx := t.Context()
 
-	cacheType := config.Global.Cache.Type.Read()
-	lockShards := config.Global.Cache.LockShards.Read()
-	p, err := proxy.NewProxy(cacheType, ca, lockShards, ctx)
+	p, err := proxy.NewProxy(config.Global, ca, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}

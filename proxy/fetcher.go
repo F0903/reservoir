@@ -19,18 +19,20 @@ var ErrNotCacheable = errors.New("response not cacheable")
 
 type fetcher struct {
 	cache cache.Cache[cachedRequestInfo]
+	cfg   *config.Config
 	group singleflight.Group
 }
 
-func newFetcher(cache cache.Cache[cachedRequestInfo]) fetcher {
+func newFetcher(cache cache.Cache[cachedRequestInfo], cfg *config.Config) fetcher {
 	return fetcher{
 		cache: cache,
+		cfg:   cfg,
 		group: singleflight.Group{},
 	}
 }
 
-func shouldResponseBeCached(resp *http.Response, upstreamHd *headers.HeaderDirectives) bool {
-	return upstreamHd.ShouldCache() &&
+func (f *fetcher) shouldResponseBeCached(resp *http.Response, upstreamHd *headers.HeaderDirectives) bool {
+	return upstreamHd.ShouldCache(f.cfg.Proxy.CachePolicy.IgnoreCacheControl.Read()) &&
 		resp.StatusCode == http.StatusOK &&
 		resp.Request.Method == http.MethodGet
 }
@@ -41,7 +43,7 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 	slog.Debug("Revalidating cache metadata...", "url", req.URL, "key", key)
 	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 		// Update the metadata to reflect that the cached response is still valid.
-		maxAge := config.Global.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
+		maxAge := f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
 		meta.Expires = time.Now().Add(maxAge)
 	})
 	if err != nil {
@@ -55,7 +57,7 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[cachedRequestInfo], err error) {
 	slog.Debug("Handling 200 response from upstream", "url", req.URL, "key", key)
 
-	if !shouldResponseBeCached(resp, upstreamHd) {
+	if !f.shouldResponseBeCached(resp, upstreamHd) {
 		slog.Debug("Got response code 200, but result is not cacheable", "status", resp.Status, "url", req.URL, "key", key)
 		return nil, nil
 	}
@@ -72,7 +74,10 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key 
 	var bytesRead int
 	reader := countingreader.New(resp.Body, &bytesRead)
 
-	maxAge := upstreamHd.GetExpiresOrDefault()
+	maxAge := upstreamHd.GetExpiresOrDefault(
+		f.cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Read(),
+		f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast(),
+	)
 	cached, err = f.cache.Cache(key, reader, maxAge, cachedRequestInfo{
 		ETag:         etag,
 		LastModified: lastModified,
@@ -134,7 +139,7 @@ func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time
 	metrics.Global.Requests.UpstreamRequests.Increment()
 
 	startTime := time.Now()
-	resp, err := sendRequestToTarget(req, config.Global.Proxy.UpstreamDefaultHttps.Read())
+	resp, err := sendRequestToTarget(req, f.cfg.Proxy.UpstreamDefaultHttps.Read())
 	latency := time.Since(startTime)
 
 	metrics.Global.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
