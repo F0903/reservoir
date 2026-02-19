@@ -10,6 +10,7 @@ import (
 	"reservoir/config"
 	"reservoir/logging/early"
 	"reservoir/utils/assertedpath"
+	"reservoir/utils/bytesize"
 )
 
 var (
@@ -57,31 +58,17 @@ func appendLogFileWriter(writers *[]io.Writer) io.Writer {
 }
 
 var initialized bool
-var unsubscribe func()
+var subs config.ConfigSubscriber
 
 func SetLogLevel(level slog.Level) {
 	logLevel.Set(level)
 }
 
-func Init() {
-	if initialized {
-		return
-	}
-	initialized = true
+func updateLogger() io.Writer {
+	slog.Info("Updating log writers...")
 
 	logToStdOut := config.Global.LogToStdout.Read()
 
-	logLevel.Set(config.Global.LogLevel.Read())
-
-	// Subscribe to log level changes
-	unsubscribe = config.Global.LogLevel.OnChange(func(newLevel slog.Level) {
-		logLevel.Set(newLevel)
-		slog.Info("Log level changed by configuration", "new_level", newLevel)
-	})
-
-	slog.Info("Initializing logging...")
-
-	slog.Info("Setting up log writers...")
 	var writers []io.Writer = []io.Writer{}
 	if logToStdOut {
 		writers = append(writers, os.Stdout)
@@ -90,16 +77,41 @@ func Init() {
 
 	appendLogFileWriter(&writers)
 
-	slog.Info("Setting up slog handler...")
 	mw := io.MultiWriter(writers...)
 	handler := slog.NewTextHandler(mw, &slog.HandlerOptions{
 		Level: &logLevel,
 	})
 	slog.SetDefault(slog.New(handler))
+	slog.Info("Log writers updated successfully")
+	return mw
+}
+
+func Init() {
+	if initialized {
+		return
+	}
+	initialized = true
+
+	logLevel.Set(config.Global.LogLevel.Read())
+
+	// Subscribe to log level changes
+	subs.Add(config.Global.LogLevel.OnChange(func(newLevel slog.Level) {
+		logLevel.Set(newLevel)
+		slog.Info("Log level changed by configuration", "new_level", newLevel)
+	}))
+
+	subs.Add(config.Global.LogFile.OnChange(func(string) { updateLogger() }))
+	subs.Add(config.Global.LogFileMaxSize.OnChange(func(bytesize.ByteSize) { updateLogger() }))
+	subs.Add(config.Global.LogFileMaxBackups.OnChange(func(int) { updateLogger() }))
+	subs.Add(config.Global.LogFileCompress.OnChange(func(bool) { updateLogger() }))
+	subs.Add(config.Global.LogToStdout.OnChange(func(bool) { updateLogger() }))
+
+	slog.Info("Initializing logging...")
+
+	slog.Info("Setting up log writers...")
+	mw := updateLogger()
 
 	// Write any early buffered log entries.
 	early.EarlyBuffer.WriteTo(mw)
 	early.EarlyBuffer = &bytes.Buffer{} // Reset buffer to "free" memory
-
-	slog.Info("Slog handler and multi-writer set up successfully", "log-level", logLevel.String())
 }

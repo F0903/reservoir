@@ -8,6 +8,7 @@ import (
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/bytesize"
+	"reservoir/utils/duration"
 	"slices"
 	"sync"
 	"time"
@@ -22,19 +23,29 @@ type cacheFunctions[MetadataT any] struct {
 }
 
 type cacheJanitor[MetadataT any] struct {
-	stopChan chan struct{}
-	interval time.Duration
-	running  bool
+	stopChan        chan struct{}
+	intervalChanged chan time.Duration
+	interval        time.Duration
+	running         bool
 
 	cacheFns cacheFunctions[MetadataT]
+	subs     config.ConfigSubscriber
 }
 
 func newCacheJanitor[MetadataT any](interval time.Duration, cacheFns cacheFunctions[MetadataT]) *cacheJanitor[MetadataT] {
-	return &cacheJanitor[MetadataT]{
-		stopChan: make(chan struct{}),
-		interval: interval,
-		cacheFns: cacheFns,
+	j := &cacheJanitor[MetadataT]{
+		stopChan:        make(chan struct{}),
+		intervalChanged: make(chan time.Duration, 1),
+		interval:        interval,
+		cacheFns:        cacheFns,
 	}
+
+	j.subs.Add(config.Global.CacheCleanupInterval.OnChange(func(newInterval duration.Duration) {
+		slog.Info("Cache cleanup interval changed", "new_interval", newInterval)
+		j.intervalChanged <- newInterval.Cast()
+	}))
+
+	return j
 }
 
 func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
@@ -47,7 +58,7 @@ func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
 		ticker := time.NewTicker(j.interval)
 		defer ticker.Stop()
 
-		slog.Info("Cache cleanup task started")
+		slog.Info("Cache cleanup task started", "interval", j.interval)
 		for {
 			select {
 			case <-ticker.C:
@@ -56,6 +67,10 @@ func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
 				j.ensureCacheSize()
 				metrics.Global.Cache.CleanupRuns.Increment()
 				slog.Info("Cache cleanup cycle complete")
+			case newInterval := <-j.intervalChanged:
+				j.interval = newInterval
+				ticker.Reset(j.interval)
+				slog.Info("Cache cleanup ticker reset", "new_interval", j.interval)
 			case <-j.stopChan:
 				slog.Info("Cache cleanup task stopped")
 				return
@@ -72,6 +87,8 @@ func (j *cacheJanitor[MetadataT]) stop() {
 		return
 	}
 	j.running = false
+
+	j.subs.UnsubscribeAll()
 
 	close(j.stopChan)
 }

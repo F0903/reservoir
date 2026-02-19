@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"reservoir/config"
 	"reservoir/metrics"
@@ -41,8 +42,8 @@ type MemoryCache[MetadataT any] struct {
 	maxCacheSize atomics.Int64
 	byteSize     atomics.Int64
 
-	janitor     *cacheJanitor[MetadataT]
-	unsubscribe func()
+	janitor *cacheJanitor[MetadataT]
+	subs    config.ConfigSubscriber
 }
 
 func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *MemoryCache[MetadataT] {
@@ -50,19 +51,25 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
 	}
-	memoryCap := int64(sysMem.Total) * int64(memoryBudgetPercent) / 100
 
 	c := &MemoryCache[MetadataT]{
 		entries:      make(map[CacheKey]*memoryInternalEntry[MetadataT]),
 		locks:        make([]sync.RWMutex, shardCount),
-		memoryCap:    memoryCap,
+		memoryCap:    int64(sysMem.Total) * int64(memoryBudgetPercent) / 100,
 		maxCacheSize: atomics.NewInt64(maxCacheSize),
 		byteSize:     atomics.NewInt64(0),
 	}
 
-	c.unsubscribe = config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
-	})
+	}))
+
+	c.subs.Add(config.Global.CacheMemoryBudgetPercent.OnChange(func(newPercent int) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.memoryCap = int64(sysMem.Total) * int64(newPercent) / 100
+		slog.Info("Memory budget changed", "new_percent", newPercent, "new_cap", bytesize.ByteSize(c.memoryCap))
+	}))
 
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
@@ -98,9 +105,7 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 
 func (c *MemoryCache[MetadataT]) Destroy() {
 	c.janitor.stop()
-	if c.unsubscribe != nil {
-		c.unsubscribe()
-	}
+	c.subs.UnsubscribeAll()
 }
 
 func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {

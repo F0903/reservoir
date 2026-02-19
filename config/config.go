@@ -66,15 +66,8 @@ func (c *Config) setRestartNeededProps() {
 	c.WebserverListen.SetRequiresRestart()
 	c.DashboardDisabled.SetRequiresRestart()
 	c.ApiDisabled.SetRequiresRestart()
-	c.LogFile.SetRequiresRestart()
-	c.LogFileMaxSize.SetRequiresRestart()
-	c.LogFileMaxBackups.SetRequiresRestart()
-	c.LogFileCompress.SetRequiresRestart()
-	c.LogToStdout.SetRequiresRestart()
 	c.CacheType.SetRequiresRestart()
 	c.CacheDir.SetRequiresRestart()
-	c.CacheMemoryBudgetPercent.SetRequiresRestart()
-	c.CacheCleanupInterval.SetRequiresRestart()
 	c.CacheLockShards.SetRequiresRestart()
 }
 
@@ -131,10 +124,30 @@ func (c *Config) persist() error {
 }
 
 func (c *Config) verify() error {
-	// Could perhaps add more validation in the future.
 	if c.ConfigVersion.Read() != configVersion {
 		return ErrConfigVersionMismatch
 	}
+
+	if c.ProxyListen.Read() == "" {
+		return fmt.Errorf("proxy_listen cannot be empty")
+	}
+
+	if c.WebserverListen.Read() == "" {
+		return fmt.Errorf("webserver_listen cannot be empty")
+	}
+
+	if c.MaxCacheSize.Read().Bytes() <= 0 {
+		return fmt.Errorf("max_cache_size must be greater than 0")
+	}
+
+	if c.CacheMemoryBudgetPercent.Read() < 0 || c.CacheMemoryBudgetPercent.Read() > 100 {
+		return fmt.Errorf("cache_memory_budget_percent must be between 0 and 100")
+	}
+
+	if c.CacheCleanupInterval.Read().Cast() <= 0 {
+		return fmt.Errorf("cache_cleanup_interval must be greater than 0")
+	}
+
 	return nil
 }
 
@@ -258,6 +271,23 @@ const (
 	UpdateStatusSuccess
 	UpdateStatusRestartRequired
 )
+
+type ConfigSubscriber struct {
+	unsubs []func()
+}
+
+func (s *ConfigSubscriber) Add(unsub func()) {
+	s.unsubs = append(s.unsubs, unsub)
+}
+
+func (s *ConfigSubscriber) UnsubscribeAll() {
+	for _, unsub := range s.unsubs {
+		if unsub != nil {
+			unsub()
+		}
+	}
+	s.unsubs = nil
+}
 
 func UpdatePartialFromJSON(updates map[string]any) (UpdateStatus, error) {
 	slog.Info("Updating global config with partial JSON", "updates", updates)

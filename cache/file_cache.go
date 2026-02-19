@@ -35,7 +35,7 @@ type FileCache[MetadataT any] struct {
 	byteSize        atomics.Int64
 	maxCacheSize    atomics.Int64
 	janitor         *cacheJanitor[MetadataT]
-	unsubscribe     func()
+	subs            config.ConfigSubscriber
 }
 
 // NewFileCache creates a new FileCache instance with the specified root directory.
@@ -48,9 +48,9 @@ func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInte
 		maxCacheSize:    atomics.NewInt64(maxCacheSize),
 	}
 
-	c.unsubscribe = config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
-	})
+	}))
 
 	c.janitor = newCacheJanitor(cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
@@ -85,9 +85,7 @@ func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInte
 
 func (c *FileCache[MetadataT]) Destroy() {
 	c.janitor.stop()
-	if c.unsubscribe != nil {
-		c.unsubscribe()
-	}
+	c.subs.UnsubscribeAll()
 }
 
 func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
