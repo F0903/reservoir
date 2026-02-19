@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { apiGet, apiPost, UnauthorizedError } from "./api-helpers";
+import { apiGet, apiPost } from "./api-helpers";
+import UnauthorizedError from "./unauthorized-error";
 
 // Mock $app/navigation and $app/paths
 vi.mock("$app/navigation", () => ({

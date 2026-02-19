@@ -8,7 +8,7 @@
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
     import { parseByteString } from "$lib/utils/bytestring";
-    import { patchConfig } from "$lib/api/objects/config/config";
+    import { patchConfig, type ConfigPropPath } from "$lib/api/objects/config/config";
     import NumberInput from "$lib/components/ui/input/NumberInput.svelte";
     import PercentInput from "$lib/components/ui/input/PercentInput.svelte";
     import { getSettingsProvider, getToastProvider } from "$lib/context";
@@ -48,7 +48,7 @@
     type TabId = (typeof tabs)[number]["id"];
     let activeTab = $state<TabId>("dashboard");
 
-    async function sendPatch(propName: string, value: unknown) {
+    async function sendPatch(propName: ConfigPropPath, value: unknown) {
         const status = await patchConfig(propName, value);
         log.debug(`Patched config ${propName} with value ${value}, status: ${status}`);
         if (status === "restart required") {
@@ -115,16 +115,16 @@
             [
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.proxy_listen,
-                    commit: async (val: string) => await sendPatch("proxy_listen", val),
+                    get: () => settings.proxySettings.fields.proxy.listen,
+                    commit: async (val: string) => await sendPatch("proxy.listen", val),
                     label: "Proxy Listen",
                     pattern: ipPortPattern,
                     tooltip: "IP and port for the proxy server.",
                 },
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.webserver_listen,
-                    commit: async (val: string) => await sendPatch("webserver_listen", val),
+                    get: () => settings.proxySettings.fields.webserver.listen,
+                    commit: async (val: string) => await sendPatch("webserver.listen", val),
                     label: "Webserver Listen",
                     pattern: ipPortPattern,
                     tooltip: "IP and port for the internal web server.",
@@ -133,15 +133,15 @@
             [
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.ca_cert,
-                    commit: async (val: string) => await sendPatch("ca_cert", val),
+                    get: () => settings.proxySettings.fields.proxy.ca_cert,
+                    commit: async (val: string) => await sendPatch("proxy.ca_cert", val),
                     label: "CA Certificate Path",
                     pattern: stringPattern,
                 },
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.ca_key,
-                    commit: async (val: string) => await sendPatch("ca_key", val),
+                    get: () => settings.proxySettings.fields.proxy.ca_key,
+                    commit: async (val: string) => await sendPatch("proxy.ca_key", val),
                     label: "CA Key Path",
                     pattern: stringPattern,
                 },
@@ -149,15 +149,35 @@
             [
                 {
                     InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.upstream_default_https,
-                    commit: async (val: boolean) => await sendPatch("upstream_default_https", val),
+                    get: () => settings.proxySettings.fields.proxy.upstream_default_https,
+                    commit: async (val: boolean) =>
+                        await sendPatch("proxy.upstream_default_https", val),
                     label: "Upstream Default HTTPS",
                 },
                 {
                     InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.retry_on_range_416,
-                    commit: async (val: boolean) => await sendPatch("retry_on_range_416", val),
+                    get: () => settings.proxySettings.fields.proxy.retry_on_range_416,
+                    commit: async (val: boolean) =>
+                        await sendPatch("proxy.retry_on_range_416", val),
                     label: "Retry on Range 416",
+                },
+            ],
+            [
+                {
+                    InputComponent: TextInput,
+                    get: () => settings.proxySettings.fields.proxy.cache_policy.default_max_age,
+                    commit: async (val: string) =>
+                        await sendPatch("proxy.cache_policy.default_max_age", val),
+                    label: "Default Max Age",
+                    pattern: durationPattern,
+                },
+                {
+                    InputComponent: Toggle,
+                    get: () =>
+                        settings.proxySettings.fields.proxy.cache_policy.ignore_cache_control,
+                    commit: async (val: boolean) =>
+                        await sendPatch("proxy.cache_policy.ignore_cache_control", val),
+                    label: "Ignore Cache Control",
                 },
             ],
         ],
@@ -165,15 +185,15 @@
             [
                 {
                     InputComponent: Dropdown,
-                    get: () => settings.proxySettings.fields.cache_type,
-                    commit: async (val: string) => await sendPatch("cache_type", val),
+                    get: () => settings.proxySettings.fields.cache.type,
+                    commit: async (val: string) => await sendPatch("cache.type", val),
                     label: "Storage Type",
                     options: ["memory", "file"],
                 },
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.cache_dir,
-                    commit: async (val: string) => await sendPatch("cache_dir", val),
+                    get: () => settings.proxySettings.fields.cache.file.dir,
+                    commit: async (val: string) => await sendPatch("cache.file.dir", val),
                     label: "Cache Directory",
                     pattern: stringPattern,
                 },
@@ -181,33 +201,18 @@
             [
                 {
                     InputComponent: TextInput,
-                    get: () => String(settings.proxySettings.fields.max_cache_size),
+                    get: () => String(settings.proxySettings.fields.cache.max_cache_size),
                     valueTransform: (val: string) => parseByteString(val),
-                    commit: async (val: number) => await sendPatch("max_cache_size", val),
+                    commit: async (val: number) => await sendPatch("cache.max_cache_size", val),
                     label: "Max Cache Size",
                     pattern: bytesizePattern,
                 },
                 {
                     InputComponent: PercentInput,
-                    get: () => settings.proxySettings.fields.cache_memory_budget_percent,
+                    get: () => settings.proxySettings.fields.cache.memory.memory_budget_percent,
                     commit: async (val: number) =>
-                        await sendPatch("cache_memory_budget_percent", val),
+                        await sendPatch("cache.memory.memory_budget_percent", val),
                     label: "Memory Budget (%)",
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.default_cache_max_age,
-                    commit: async (val: string) => await sendPatch("default_cache_max_age", val),
-                    label: "Default Max Age",
-                    pattern: durationPattern,
-                },
-                {
-                    InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.ignore_cache_control,
-                    commit: async (val: boolean) => await sendPatch("ignore_cache_control", val),
-                    label: "Ignore Cache Control",
                 },
             ],
         ],
@@ -216,30 +221,30 @@
                 {
                     InputComponent: Dropdown,
                     options: ["DEBUG", "INFO", "WARN", "ERROR"],
-                    get: () => settings.proxySettings.fields.log_level,
-                    commit: async (val: string) => await sendPatch("log_level", val),
+                    get: () => settings.proxySettings.fields.logging.level,
+                    commit: async (val: string) => await sendPatch("logging.level", val),
                     label: "Log Level",
                 },
                 {
                     InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.log_to_stdout,
-                    commit: async (val: boolean) => await sendPatch("log_to_stdout", val),
+                    get: () => settings.proxySettings.fields.logging.to_stdout,
+                    commit: async (val: boolean) => await sendPatch("logging.to_stdout", val),
                     label: "Log to Stdout",
                 },
             ],
             [
                 {
                     InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.log_file,
-                    commit: async (val: string) => await sendPatch("log_file", val),
+                    get: () => settings.proxySettings.fields.logging.file,
+                    commit: async (val: string) => await sendPatch("logging.file", val),
                     label: "Log File Path",
                     pattern: optionalStringPattern,
                 },
                 {
                     InputComponent: TextInput,
-                    get: () => String(settings.proxySettings.fields.log_file_max_size),
+                    get: () => String(settings.proxySettings.fields.logging.max_size),
                     valueTransform: (val: string) => parseByteString(val),
-                    commit: async (val: number) => await sendPatch("log_file_max_size", val),
+                    commit: async (val: number) => await sendPatch("logging.max_size", val),
                     label: "Max File Size",
                     pattern: bytesizePattern,
                 },

@@ -48,7 +48,7 @@ func NewFileCache[MetadataT any](rootDir string, maxCacheSize int64, cleanupInte
 		maxCacheSize:    atomics.NewInt64(maxCacheSize),
 	}
 
-	c.subs.Add(config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(config.Global.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	}))
 

@@ -68,24 +68,24 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 	}))
 
 	// Setup Config Defaults for Tests
-	config.Global.UpstreamDefaultHttps.Overwrite(false)
-	config.Global.CacheDir.Overwrite(cacheDir)
-	config.Global.RetryOnRange416.Overwrite(false)
-	config.Global.IgnoreCacheControl.Overwrite(false)
-	config.Global.ForceDefaultCacheMaxAge.Overwrite(false)
-	config.Global.CacheType.Overwrite(config.CacheTypeMemory)
-	config.Global.CacheLockShards.Overwrite(32)
+	config.Global.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	config.Global.Cache.File.Dir.Overwrite(cacheDir)
+	config.Global.Proxy.RetryOnRange416.Overwrite(false)
+	config.Global.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
+	config.Global.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
+	config.Global.Cache.Type.Overwrite(config.CacheTypeMemory)
+	config.Global.Cache.LockShards.Overwrite(32)
 
 	if _, ok := t.(*testing.B); ok {
-		config.Global.LogToStdout.Overwrite(false)
+		config.Global.Logging.ToStdout.Overwrite(false)
 	}
 
 	logging.Init()
 
 	ctx := t.Context()
 
-	cacheType := config.Global.CacheType.Read()
-	lockShards := config.Global.CacheLockShards.Read()
+	cacheType := config.Global.Cache.Type.Read()
+	lockShards := config.Global.Cache.LockShards.Read()
 	p, err := proxy.NewProxy(cacheType, &FakeCA{}, lockShards, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
@@ -192,15 +192,15 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		}
 	}))
 
-	config.Global.UpstreamDefaultHttps.Overwrite(true)
-	config.Global.CacheDir.Overwrite(cacheDir)
-	config.Global.CacheType.Overwrite(config.CacheTypeMemory)
-	config.Global.CacheLockShards.Overwrite(32)
+	config.Global.Proxy.UpstreamDefaultHttps.Overwrite(true)
+	config.Global.Cache.File.Dir.Overwrite(cacheDir)
+	config.Global.Cache.Type.Overwrite(config.CacheTypeMemory)
+	config.Global.Cache.LockShards.Overwrite(32)
 
 	ctx := t.Context()
 
-	cacheType := config.Global.CacheType.Read()
-	lockShards := config.Global.CacheLockShards.Read()
+	cacheType := config.Global.Cache.Type.Read()
+	lockShards := config.Global.Cache.LockShards.Read()
 	p, err := proxy.NewProxy(cacheType, ca, lockShards, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)

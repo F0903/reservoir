@@ -60,11 +60,11 @@ func NewMemoryCache[MetadataT any](memoryBudgetPercent int, maxCacheSize int64, 
 		byteSize:     atomics.NewInt64(0),
 	}
 
-	c.subs.Add(config.Global.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
+	c.subs.Add(config.Global.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	}))
 
-	c.subs.Add(config.Global.CacheMemoryBudgetPercent.OnChange(func(newPercent int) {
+	c.subs.Add(config.Global.Cache.Memory.MemoryBudgetPercent.OnChange(func(newPercent int) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		c.memoryCap = int64(sysMem.Total) * int64(newPercent) / 100
@@ -139,10 +139,7 @@ func (c *MemoryCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 
 func (c *MemoryCache[MetadataT]) cacheInternal(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT, evictIfFull bool) (*Entry[MetadataT], error) {
 	maxCacheSize := c.maxCacheSize.Get()
-	limit := c.memoryCap
-	if maxCacheSize < limit {
-		limit = maxCacheSize
-	}
+	limit := min(maxCacheSize, c.memoryCap)
 
 	if c.byteSize.Get() >= limit {
 		if evictIfFull {

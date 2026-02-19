@@ -41,7 +41,7 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 	slog.Debug("Revalidating cache metadata...", "url", req.URL, "key", key)
 	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
 		// Update the metadata to reflect that the cached response is still valid.
-		maxAge := config.Global.DefaultCacheMaxAge.Read().Cast()
+		maxAge := config.Global.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
 		meta.Expires = time.Now().Add(maxAge)
 	})
 	if err != nil {
@@ -134,7 +134,7 @@ func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time
 	metrics.Global.Requests.UpstreamRequests.Increment()
 
 	startTime := time.Now()
-	resp, err := sendRequestToTarget(req, config.Global.UpstreamDefaultHttps.Read())
+	resp, err := sendRequestToTarget(req, config.Global.Proxy.UpstreamDefaultHttps.Read())
 	latency := time.Since(startTime)
 
 	metrics.Global.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())

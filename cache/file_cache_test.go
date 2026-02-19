@@ -2,7 +2,6 @@ package cache
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"testing"
@@ -10,8 +9,7 @@ import (
 )
 
 func TestFileCache_Basic(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	tmpDir, err := os.MkdirTemp("", "reservoir-cache-test-*")
 	if err != nil {

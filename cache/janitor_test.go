@@ -13,7 +13,7 @@ func TestCache_JanitorCleanup(t *testing.T) {
 
 	// Use very short cleanup interval for testing
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](1, config.Global.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
+	c := NewMemoryCache[TestMeta](1, config.Global.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 	defer c.Destroy()
 
 	key := FromString("expired-key")
@@ -50,14 +50,14 @@ func TestCache_JanitorEviction(t *testing.T) {
 	ctx := t.Context()
 
 	// Mock global config for max cache size
-	oldMaxCacheSize := config.Global.MaxCacheSize.Read()
-	defer config.Global.MaxCacheSize.Overwrite(oldMaxCacheSize)
+	oldMaxCacheSize := config.Global.Cache.MaxCacheSize.Read()
+	defer config.Global.Cache.MaxCacheSize.Overwrite(oldMaxCacheSize)
 
 	// Set max cache size to 1KB
-	config.Global.MaxCacheSize.Overwrite(bytesize.ParseUnchecked("1K"))
+	config.Global.Cache.MaxCacheSize.Overwrite(bytesize.ParseUnchecked("1K"))
 
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](1, config.Global.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
+	c := NewMemoryCache[TestMeta](1, config.Global.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 	defer c.Destroy()
 
 	// Add 2 entries of 600 bytes each (Total 1200 > 1024)

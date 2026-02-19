@@ -58,16 +58,16 @@ func (p *Proxy) Destroy() {
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
 func NewProxy(cacheType config.CacheType, ca certs.CertAuthority, shardCount int, ctx context.Context) (*Proxy, error) {
-	cacheCleanupInterval := config.Global.CacheCleanupInterval.Read().Cast()
-	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
+	cacheCleanupInterval := config.Global.Cache.CleanupInterval.Read().Cast()
+	maxCacheSize := config.Global.Cache.MaxCacheSize.Read().Bytes()
 
 	var c cache.Cache[cachedRequestInfo]
 	switch cacheType {
 	case config.CacheTypeFile:
-		cacheDir := config.Global.CacheDir.Read()
+		cacheDir := config.Global.Cache.File.Dir.Read()
 		c = cache.NewFileCache[cachedRequestInfo](cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	case config.CacheTypeMemory:
-		memoryBudget := config.Global.CacheMemoryBudgetPercent.Read()
+		memoryBudget := config.Global.Cache.Memory.MemoryBudgetPercent.Read()
 		c = cache.NewMemoryCache[cachedRequestInfo](memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	default:
 		return nil, fmt.Errorf("unsupported cache type: %v", cacheType)
@@ -127,7 +127,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	if err != nil {
 		slog.Error("Error slicing Range header", "url", req.URL, "key", key, "error", err, "range_header", rangeHeader, "file_size", cached.Metadata.Size)
 
-		if !config.Global.RetryOnInvalidRange.Read() {
+		if !config.Global.Proxy.RetryOnInvalidRange.Read() {
 			slog.Error("Sending 416 Range Not Satisfiable due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 			r.SetHeader("Accept-Ranges", "bytes")

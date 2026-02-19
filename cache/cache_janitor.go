@@ -40,7 +40,7 @@ func newCacheJanitor[MetadataT any](interval time.Duration, cacheFns cacheFuncti
 		cacheFns:        cacheFns,
 	}
 
-	j.subs.Add(config.Global.CacheCleanupInterval.OnChange(func(newInterval duration.Duration) {
+	j.subs.Add(config.Global.Cache.CleanupInterval.OnChange(func(newInterval duration.Duration) {
 		slog.Info("Cache cleanup interval changed", "new_interval", newInterval)
 		j.intervalChanged <- newInterval.Cast()
 	}))
@@ -206,7 +206,7 @@ func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
 }
 
 func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
-	maxCacheSize := config.Global.MaxCacheSize.Read().Bytes()
+	maxCacheSize := config.Global.Cache.MaxCacheSize.Read().Bytes()
 	startCacheSize := j.cacheFns.getCacheSize()
 	if startCacheSize < maxCacheSize {
 		return

@@ -134,7 +134,7 @@ func (hd *HeaderDirectives) StripRegularConditionals(header http.Header) {
 }
 
 func (hd *HeaderDirectives) ShouldCache() bool {
-	ignoreCacheControl := config.Global.IgnoreCacheControl.Read()
+	ignoreCacheControl := config.Global.Proxy.CachePolicy.IgnoreCacheControl.Read()
 
 	if !ignoreCacheControl && hd.CacheControl.IsPresent() {
 		cc := hd.CacheControl.Value()
@@ -162,8 +162,8 @@ func (hd *HeaderDirectives) ShouldCache() bool {
 }
 
 func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
-	forceDefaultCacheMaxAge := config.Global.ForceDefaultCacheMaxAge.Read()
-	defaultCacheMaxAge := config.Global.DefaultCacheMaxAge.Read().Cast()
+	forceDefaultCacheMaxAge := config.Global.Proxy.CachePolicy.ForceDefaultMaxAge.Read()
+	defaultMaxAge := config.Global.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
 
 	if !forceDefaultCacheMaxAge {
 		if hd.CacheControl.IsPresent() {
@@ -177,5 +177,5 @@ func (hd *HeaderDirectives) GetExpiresOrDefault() time.Time {
 		}
 	}
 
-	return time.Now().Add(defaultCacheMaxAge)
+	return time.Now().Add(defaultMaxAge)
 }
