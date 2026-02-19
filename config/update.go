@@ -2,9 +2,14 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"reflect"
+)
+
+var (
+	ErrUpdateFailed = errors.New("failed to update config")
 )
 
 type UpdateStatus int
@@ -127,9 +132,4 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 		status = UpdateStatusRestartRequired
 	}
 	return status, nil
-}
-
-// Deprecated: Use UpdatePartialFromConfig instead.
-func UpdatePartialFromJSON(updates map[string]any) (UpdateStatus, error) {
-	return UpdatePartialFromConfig(Global, updates)
 }

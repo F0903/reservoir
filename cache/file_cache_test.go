@@ -11,6 +11,7 @@ import (
 
 func TestFileCache_Basic(t *testing.T) {
 	ctx := t.Context()
+	cfg := config.NewDefault()
 
 	tmpDir, err := os.MkdirTemp("", "reservoir-cache-test-*")
 	if err != nil {
@@ -18,7 +19,7 @@ func TestFileCache_Basic(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	c := NewFileCache[TestMeta](config.Global, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := NewFileCache[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := FromString("test-key")

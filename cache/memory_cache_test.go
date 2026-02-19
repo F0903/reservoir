@@ -10,9 +10,10 @@ import (
 
 func TestMemoryCache_Basic(t *testing.T) {
 	ctx := t.Context()
+	cfg := config.NewDefault()
 
 	// 1% memory budget, large maxCacheSize, 1 min cleanup, 16 shards
-	c := NewMemoryCache[TestMeta](config.Global, 1, 1024*1024*1024, time.Minute, 16, ctx)
+	c := NewMemoryCache[TestMeta](cfg, 1, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := FromString("test-key")

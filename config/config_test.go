@@ -89,8 +89,7 @@ func TestSetPropsFromMapRecursive_Partial(t *testing.T) {
 }
 
 func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
-	// Setup a clean global state for this test if possible,
-	// but since it's a singleton we'll just test that it works.
+	cfg := NewDefault()
 
 	updates := map[string]any{
 		"cache": map[string]any{
@@ -109,7 +108,7 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 		},
 	}
 
-	status, err := UpdatePartialFromConfig(Global, updates)
+	status, err := UpdatePartialFromConfig(cfg, updates)
 	if err != nil {
 		t.Fatalf("UpdatePartialFromConfig failed: %v", err)
 	}
@@ -118,20 +117,20 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 		t.Errorf("Expected UpdateStatusSuccess or RestartRequired, got %v", status)
 	}
 
-	if Global.Cache.MaxCacheSize.Read().String() != "50G" {
-		t.Errorf("Expected MaxCacheSize to be 50G, got %s", Global.Cache.MaxCacheSize.Read().String())
+	if cfg.Cache.MaxCacheSize.Read().String() != "50G" {
+		t.Errorf("Expected MaxCacheSize to be 50G, got %s", cfg.Cache.MaxCacheSize.Read().String())
 	}
 
-	if Global.Cache.File.Dir.Read() != "/tmp/new-cache" {
-		t.Errorf("Expected Cache.File.Dir to be /tmp/new-cache, got %s", Global.Cache.File.Dir.Read())
+	if cfg.Cache.File.Dir.Read() != "/tmp/new-cache" {
+		t.Errorf("Expected Cache.File.Dir to be /tmp/new-cache, got %s", cfg.Cache.File.Dir.Read())
 	}
 
-	if Global.Proxy.CachePolicy.IgnoreCacheControl.Read() != false {
-		t.Errorf("Expected CachePolicy.IgnoreCacheControl to be false, got %v", Global.Proxy.CachePolicy.IgnoreCacheControl.Read())
+	if cfg.Proxy.CachePolicy.IgnoreCacheControl.Read() != false {
+		t.Errorf("Expected CachePolicy.IgnoreCacheControl to be false, got %v", cfg.Proxy.CachePolicy.IgnoreCacheControl.Read())
 	}
 
-	if Global.Logging.Level.Read() != slog.LevelDebug {
-		t.Errorf("Expected LogLevel to be DEBUG, got %v", Global.Logging.Level.Read())
+	if cfg.Logging.Level.Read() != slog.LevelDebug {
+		t.Errorf("Expected LogLevel to be DEBUG, got %v", cfg.Logging.Level.Read())
 	}
 }
 
@@ -145,9 +144,9 @@ func TestLoadOrDefault_StrictPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := loadOrDefault(tmpFile)
+	cfg, err := LoadOrDefault(tmpFile)
 	if err != nil {
-		t.Fatalf("loadOrDefault should not return error on reset: %v", err)
+		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
 	}
 
 	if cfg == nil {
@@ -179,9 +178,9 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg, err := loadOrDefault(tmpFile)
+	cfg, err := LoadOrDefault(tmpFile)
 	if err != nil {
-		t.Fatalf("loadOrDefault should not return error on reset: %v", err)
+		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
 	}
 
 	// Verify it was reset to defaults (checking a field that was definitely missing)
@@ -261,7 +260,7 @@ func TestConfig_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := newDefault()
+			cfg := NewDefault()
 			tt.modify(cfg)
 			err := cfg.verify()
 			if (err != nil) != tt.wantErr {

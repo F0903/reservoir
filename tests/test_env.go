@@ -27,6 +27,7 @@ type TestEnv struct {
 	ProxyServer *httptest.Server
 	Client      *http.Client
 	Proxy       *proxy.Proxy
+	Cfg         *config.Config
 	CacheDir    string
 	T           testing.TB
 	IsHttps     bool
@@ -68,23 +69,24 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 	}))
 
 	// Setup Config Defaults for Tests
-	config.Global.Proxy.UpstreamDefaultHttps.Overwrite(false)
-	config.Global.Cache.File.Dir.Overwrite(cacheDir)
-	config.Global.Proxy.RetryOnRange416.Overwrite(false)
-	config.Global.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
-	config.Global.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
-	config.Global.Cache.Type.Overwrite(config.CacheTypeMemory)
-	config.Global.Cache.LockShards.Overwrite(32)
+	cfg := config.NewDefault()
+	cfg.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	cfg.Cache.File.Dir.Overwrite(cacheDir)
+	cfg.Proxy.RetryOnRange416.Overwrite(false)
+	cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
+	cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
+	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
+	cfg.Cache.LockShards.Overwrite(32)
 
 	if _, ok := t.(*testing.B); ok {
-		config.Global.Logging.ToStdout.Overwrite(false)
+		cfg.Logging.ToStdout.Overwrite(false)
 	}
 
-	logging.Init(config.Global)
+	logging.Init(cfg)
 
 	ctx := t.Context()
 
-	p, err := proxy.NewProxy(config.Global, &FakeCA{}, ctx)
+	p, err := proxy.NewProxy(cfg, &FakeCA{}, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
@@ -111,6 +113,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		ProxyServer: proxyServer,
 		Client:      proxyClient,
 		Proxy:       p,
+		Cfg:         cfg,
 		CacheDir:    cacheDir,
 		T:           t,
 		IsHttps:     false,
@@ -190,14 +193,15 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		}
 	}))
 
-	config.Global.Proxy.UpstreamDefaultHttps.Overwrite(true)
-	config.Global.Cache.File.Dir.Overwrite(cacheDir)
-	config.Global.Cache.Type.Overwrite(config.CacheTypeMemory)
-	config.Global.Cache.LockShards.Overwrite(32)
+	cfg := config.NewDefault()
+	cfg.Proxy.UpstreamDefaultHttps.Overwrite(true)
+	cfg.Cache.File.Dir.Overwrite(cacheDir)
+	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
+	cfg.Cache.LockShards.Overwrite(32)
 
 	ctx := t.Context()
 
-	p, err := proxy.NewProxy(config.Global, ca, ctx)
+	p, err := proxy.NewProxy(cfg, ca, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
@@ -239,6 +243,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		ProxyServer: proxyServer,
 		Client:      proxyClient,
 		Proxy:       p,
+		Cfg:         cfg,
 		CacheDir:    cacheDir,
 		T:           t,
 		IsHttps:     true,

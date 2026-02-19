@@ -76,8 +76,14 @@ func startWebServer(cfg *config.Config, errChan chan error, ctx context.Context)
 }
 
 func main() {
-	config.OverrideGlobalConfigFromFlags()
-	logging.Init(config.Global)
+	cfg, err := config.LoadOrDefault("var/config.json")
+	if err != nil {
+		slog.Error("Failed to load configuration", "error", err)
+		panic(err)
+	}
+
+	config.OverrideFromFlags(cfg)
+	logging.Init(cfg)
 
 	// Channel to handle OS signals for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -93,12 +99,12 @@ func main() {
 		panic(err)
 	}
 
-	if err := startProxy(config.Global, errChan, ctx); err != nil {
+	if err := startProxy(cfg, errChan, ctx); err != nil {
 		slog.Error("Failed to start proxy", "error", err)
 		panic(err)
 	}
 
-	if err := startWebServer(config.Global, errChan, ctx); err != nil {
+	if err := startWebServer(cfg, errChan, ctx); err != nil {
 		slog.Error("Failed to start webserver", "error", err)
 		panic(err)
 	}

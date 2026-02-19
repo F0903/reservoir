@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reservoir/utils/assertedpath"
 )
 
 var (
@@ -15,6 +16,8 @@ var (
 	ErrConfigInvalidFormat = errors.New("config invalid format")
 	ErrConfigPersist       = errors.New("config persist failed")
 )
+
+var configPath = assertedpath.Assert("var/config.json")
 
 type Config struct {
 	Proxy     ProxyConfig     `json:"proxy"`
@@ -31,7 +34,7 @@ func (c *Config) setRestartNeededProps() {
 	c.Logging.setRestartNeededProps()
 }
 
-func newDefault() *Config {
+func NewDefault() *Config {
 	cfg := &Config{
 		Proxy:     defaultProxyConfig(),
 		Webserver: defaultWebserverConfig(),
@@ -90,11 +93,11 @@ func load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
-func loadOrDefault(path string) (*Config, error) {
+func LoadOrDefault(path string) (*Config, error) {
 	cfg, err := load(path)
 	if err != nil {
 		slog.Error("Config load failed. Resetting to defaults.", "path", path, "error", err)
-		cfg = newDefault()
+		cfg = NewDefault()
 		if err := cfg.persist(); err != nil {
 			slog.Error("Failed to persist default config after reset", "error", err)
 			return nil, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)

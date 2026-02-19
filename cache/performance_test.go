@@ -52,14 +52,16 @@ func BenchmarkCacheComparison(b *testing.B) {
 
 	for _, s := range sizes {
 		b.Run(fmt.Sprintf("MemoryCache/%s", s.name), func(b *testing.B) {
-			c := NewMemoryCache[benchMetadata](config.Global, 50, 1024*1024*1024, 1*time.Hour, 32, context.Background())
+			cfg := config.NewDefault()
+			c := NewMemoryCache[benchMetadata](cfg, 50, 1024*1024*1024, 1*time.Hour, 32, context.Background())
 			defer c.Destroy()
 			benchmarkCache(b, c, s.size)
 		})
 
 		b.Run(fmt.Sprintf("FileCache/%s", s.name), func(b *testing.B) {
+			cfg := config.NewDefault()
 			tmpDir := b.TempDir()
-			c := NewFileCache[benchMetadata](config.Global, tmpDir, 1024*1024*1024, 1*time.Hour, 32, context.Background())
+			c := NewFileCache[benchMetadata](cfg, tmpDir, 1024*1024*1024, 1*time.Hour, 32, context.Background())
 			defer c.Destroy()
 			benchmarkCache(b, c, s.size)
 		})
