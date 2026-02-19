@@ -9,9 +9,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - Refactor config setup 
 - Content-Type Specific Handling (?)
 
-## Dashboard
-- Tests
-- Have another look at the settings page
+## Dashboard 
 - Mobile support 
 
 ## Project Wide
