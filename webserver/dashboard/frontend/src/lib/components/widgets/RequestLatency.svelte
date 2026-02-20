@@ -49,7 +49,7 @@
                     </div>
                 </div>
 
-                <div class="chart-container">
+                <div class="chart-container hide-on-mobile">
                     <Chart
                         type="bar"
                         data={{
@@ -110,5 +110,24 @@
     .chart-container {
         flex: 1;
         min-height: 0;
+    }
+
+    @media (max-width: 768px) {
+        .hide-on-mobile {
+            display: none;
+        }
+
+        .cards {
+            grid-template-columns: 1fr 1fr;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+        }
+
+        .double-span {
+            grid-column: span 2;
+            height: 100%;
+            display: flex;
+        }
     }
 </style>

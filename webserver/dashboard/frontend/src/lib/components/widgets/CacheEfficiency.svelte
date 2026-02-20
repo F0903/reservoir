@@ -20,7 +20,7 @@
             {@const errorRate =
                 totalCacheRequests > 0 ? (data.cache.cache_errors / totalCacheRequests) * 100 : 0}
             <div class="efficiency-display">
-                <div class="metric-card-container">
+                <div class="metric-cards-container">
                     <MetricCard
                         label="Hit Rate"
                         value={hitRate.toFixed(1) + "%"}
@@ -79,14 +79,25 @@
         align-items: stretch;
     }
 
-    .metric-card-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    .metric-cards-container {
+        display: flex;
+        flex-direction: row;
         gap: 0.75rem;
     }
 
     .efficiency-chart {
         flex: 1;
         min-height: 0;
+    }
+
+    @media (max-width: 768px) {
+        .efficiency-chart {
+            display: none;
+        }
+
+        .metric-cards-container {
+            flex-direction: column;
+            height: 100%;
+        }
     }
 </style>

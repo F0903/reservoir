@@ -29,7 +29,7 @@
         <div class="metric-header">
             <span class="metric-label">{label}</span>
             {#if Icon}
-                <div class="icon-container">
+                <div class="icon-container hide-on-mobile">
                     <Icon size={14} />
                 </div>
             {/if}
@@ -46,6 +46,8 @@
         width: 100%;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
+
+        flex: 1;
     }
 
     .metric-card-wrapper:hover {
@@ -78,21 +80,30 @@
     }
 
     .metric-value {
-        /* Scale font size based on container width */
-        font-size: var(--metric-value-size, clamp(0.9rem, 12cqw, 1.4rem));
+        /* Balanced scaling using cqmin to handle both width and height constraints */
+        font-size: var(--metric-value-size, clamp(0.5rem, 13cqmin, 1.4rem));
         font-weight: 700;
         color: var(--metric-value-color, var(--secondary-300));
-        line-height: 1;
-        overflow-wrap: anywhere;
+        line-height: 1.1;
+
+        white-space: var(--metric-value-whitespace, nowrap);
     }
 
     .metric-label {
-        font-size: var(--metric-label-size, clamp(0.55rem, 7cqw, 0.7rem));
+        font-size: var(--metric-label-size, clamp(0.5rem, 10cqmin, 0.7rem));
         color: var(--metric-label-color, rgba(255, 255, 255, 0.4));
         text-transform: uppercase;
         letter-spacing: 0.08em;
         font-weight: 600;
-        line-height: 1.1;
+        line-height: 1;
         overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 768px) {
+        .metric-card-wrapper {
+            --metric-padding: 0.4rem 0.6rem;
+        }
     }
 </style>

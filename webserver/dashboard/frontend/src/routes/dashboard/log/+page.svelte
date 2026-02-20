@@ -98,12 +98,27 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
     }
 
     .actions {
         display: flex;
         align-items: center;
         gap: 2rem;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 768px) {
+        .actions {
+            gap: 1rem;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .toggles {
+            gap: 1rem;
+        }
     }
 
     .toggles {

@@ -51,7 +51,7 @@
                     />
                 </div>
 
-                <div class="coalescing-chart">
+                <div class="coalescing-chart hide-on-mobile">
                     <Chart
                         type="bar"
                         data={{
@@ -98,11 +98,28 @@
     .metrics-row {
         display: flex;
         gap: 1rem;
+
+        min-height: fit-content;
     }
 
     .coalescing-chart {
-        flex-grow: 1;
         min-height: 0;
         height: 100%;
+    }
+
+    @media (max-width: 768px) {
+        .hide-on-mobile {
+            display: none;
+        }
+
+        .metrics-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            flex: 1;
+            min-height: 0;
+            height: 100%;
+            align-items: stretch;
+        }
     }
 </style>

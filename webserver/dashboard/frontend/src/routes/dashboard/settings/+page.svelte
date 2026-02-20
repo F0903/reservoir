@@ -433,7 +433,7 @@
 
     .group-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 350px), 1fr));
         gap: 1.5rem 3rem;
         width: 100%;
     }
@@ -443,7 +443,7 @@
         bottom: 2rem;
         left: 50%;
         transform: translateX(-50%);
-        width: calc(100% - 4rem);
+        width: calc(100% - 2rem);
         max-width: 800px;
         background-color: var(--primary-300);
         backdrop-filter: blur(10px);
@@ -458,6 +458,24 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .action-content {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .buttons {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-bar {
+            bottom: 1rem;
+            padding: 0.75rem 1rem;
+        }
     }
 
     .message {

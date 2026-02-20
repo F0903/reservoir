@@ -50,4 +50,18 @@
         color: var(--secondary-300);
         text-align: left;
     }
+
+    @media (max-width: 768px) {
+        .widget-content {
+            padding: 0.5rem;
+        }
+
+        .widget-header {
+            padding: 0.4rem 0.6rem;
+        }
+
+        .title {
+            font-size: 0.75rem;
+        }
+    }
 </style>

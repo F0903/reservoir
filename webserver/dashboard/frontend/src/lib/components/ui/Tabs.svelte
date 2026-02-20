@@ -52,6 +52,7 @@
         background-color: rgba(0, 0, 0, 0.2);
         padding: 0.5rem;
         gap: 0.5rem;
+        flex-wrap: wrap;
     }
 
     .tab-btn {
@@ -64,6 +65,8 @@
         opacity: 0.6;
         font-weight: 600;
         transition: all 0.2s ease;
+        flex: 1 1 auto;
+        justify-content: center;
     }
 
     .tab-btn:hover {
@@ -83,5 +86,20 @@
         width: 100%;
         display: flex;
         flex-direction: column;
+    }
+
+    @media (max-width: 768px) {
+        .tab-content {
+            padding: 1rem;
+        }
+
+        .tab-btn {
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .tab-btn span {
+            display: none;
+        }
     }
 </style>

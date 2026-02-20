@@ -27,15 +27,27 @@
 <main class="dashboard">
     <SquaredGrid
         elements={[
-            { Comp: CacheEfficiency, span: { width: 3, height: 2 } },
+            { Comp: CacheEfficiency, span: { width: 3, height: 3 }, mobileSpan: { width: 1 } },
             { Comp: CacheLatency, span: { width: 2, height: 2 } },
-            { Comp: RequestLatency, span: { width: 3, height: 3 } },
-            { Comp: RequestVolume, span: { width: 3, height: 2 } },
+            {
+                Comp: RequestLatency,
+                span: { width: 3, height: 3 },
+                mobileSpan: { width: 3, height: 2 },
+            },
+            { Comp: RequestVolume, span: { width: 3, height: 3 }, mobileSpan: { width: 1 } },
             { Comp: ResponseStatus, span: { width: 2, height: 2 } },
-            { Comp: RequestCoalescing, span: { width: 4, height: 3 } },
-            { Comp: DataTransfer, span: { width: 2, height: 3 } },
-            { Comp: SystemInfo, span: { width: 1, height: 3 } },
-            { Comp: CacheStats, span: { width: 3, height: 2 } },
+            {
+                Comp: RequestCoalescing,
+                span: { width: 4, height: 3 },
+                mobileSpan: { height: 2 },
+            },
+            { Comp: DataTransfer, span: { width: 2, height: 3 }, mobileSpan: { height: 3 } },
+            { Comp: SystemInfo, span: { width: 1, height: 3 }, mobileSpan: { width: 1 } },
+            {
+                Comp: CacheStats,
+                span: { width: 3, height: 2 },
+                mobileSpan: { width: 2, height: 3 },
+            },
         ]}
     />
 </main>
@@ -47,11 +59,12 @@
     }
 
     .dashboard {
-        margin: 1.5rem;
+        padding: 1.5rem;
     }
 
-    @media (max-width: var(--mobile-cutoff)) {
+    @media (max-width: 768px) {
         .dashboard {
+            margin: 0;
             padding: 0;
         }
     }

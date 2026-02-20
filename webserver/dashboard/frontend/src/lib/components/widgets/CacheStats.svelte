@@ -59,6 +59,13 @@
         width: 100%;
     }
 
+    @media (max-width: 768px) {
+        .metrics-grid {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: auto;
+        }
+    }
+
     .metrics-grid :global(.metric-card-wrapper) {
         flex: 1;
         min-height: 0;

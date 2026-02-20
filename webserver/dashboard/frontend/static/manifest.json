@@ -1,0 +1,17 @@
+{
+    "name": "Reservoir Proxy Dashboard",
+    "short_name": "Reservoir",
+    "description": "Proxy metrics and configuration dashboard",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#0a1014",
+    "theme_color": "#121d24",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}

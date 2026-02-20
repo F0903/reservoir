@@ -1,8 +1,8 @@
 <script lang="ts">
-    let { children } = $props();
+    let { children, class: className = "" } = $props();
 </script>
 
-<div class="box-container">
+<div class="box-container {className}">
     <div class="backdrop"></div>
     <div class="box">
         {@render children()}

@@ -18,7 +18,7 @@
             {@const httpsShare = totalRequests > 0 ? (httpsRequests / totalRequests) * 100 : 0}
 
             <div class="volume-wrapper">
-                <div class="cards">
+                <div class="metric-cards-container">
                     <MetricCard
                         label="Total Requests"
                         value={totalRequests.toLocaleString()}
@@ -28,7 +28,7 @@
                     <MetricCard label="HTTPS Share" value={`${httpsShare.toFixed(1)}%`} />
                 </div>
 
-                <div class="chart-container">
+                <div class="chart-container hide-on-mobile">
                     <Chart
                         type="bar"
                         data={{
@@ -76,14 +76,21 @@
         height: 100%;
     }
 
-    .cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    .metric-cards-container {
+        display: flex;
+        flex-direction: row;
         gap: 0.75rem;
     }
 
     .chart-container {
         flex: 1;
         min-height: 0;
+    }
+
+    @media (max-width: 768px) {
+        .metric-cards-container {
+            flex-direction: column;
+            height: 100%;
+        }
     }
 </style>

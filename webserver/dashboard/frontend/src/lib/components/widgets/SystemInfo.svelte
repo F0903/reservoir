@@ -65,9 +65,4 @@
         width: 100%;
         box-sizing: border-box;
     }
-
-    .metrics :global(.metric-card-wrapper) {
-        flex: 1;
-        min-height: 0;
-    }
 </style>

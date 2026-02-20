@@ -56,6 +56,12 @@
     --scrollbar-track-color: var(--primary-600);
 }
 
+@media (max-width: 768px) {
+    .hide-on-mobile {
+        display: none;
+    }
+}
+
 * {
     margin: 0;
     padding: 0;

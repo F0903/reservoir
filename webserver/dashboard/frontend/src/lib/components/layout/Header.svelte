@@ -2,7 +2,13 @@
     import { version } from "$lib/api/objects/version/version";
     import { onMount } from "svelte";
     import { getAuthProvider } from "$lib/context";
-    import { LogOut, User } from "@lucide/svelte";
+    import { LogOut, User, Menu } from "@lucide/svelte";
+
+    let {
+        onToggleMenu,
+    }: {
+        onToggleMenu?: () => void;
+    } = $props();
 
     let version_string = $state("");
     const session = getAuthProvider();
@@ -15,6 +21,9 @@
 
 <header>
     <div class="title-section">
+        <button class="menu-toggle" onclick={onToggleMenu} aria-label="Toggle menu">
+            <Menu size={24} />
+        </button>
         <h1>reservoir <span class="version-string">{version_string}</span></h1>
     </div>
 
@@ -26,7 +35,7 @@
             </div>
             <button class="logout-btn" onclick={session.logout} title="Logout">
                 <LogOut size={18} />
-                <span>Logout</span>
+                <span class="logout-text">Logout</span>
             </button>
         </div>
     {/if}
@@ -45,6 +54,25 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+    }
+
+    .title-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .menu-toggle {
+        display: none;
+        color: var(--text-400);
+        padding: 0.5rem;
+        margin-left: -0.5rem;
+        border-radius: 8px;
+        transition: background-color 0.2s;
+    }
+
+    .menu-toggle:hover {
+        background-color: rgba(255, 255, 255, 0.1);
     }
 
     h1 {
@@ -88,5 +116,27 @@
     .logout-btn:hover {
         background: rgba(255, 255, 255, 0.1);
         color: var(--secondary-400);
+    }
+
+    @media (max-width: 768px) {
+        header {
+            padding: 0.75rem 1rem;
+        }
+
+        .menu-toggle {
+            display: flex;
+        }
+
+        .user-info {
+            display: none;
+        }
+
+        .logout-text {
+            display: none;
+        }
+
+        .logout-btn {
+            padding: 0.5rem;
+        }
     }
 </style>
