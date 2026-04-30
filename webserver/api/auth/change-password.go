@@ -85,7 +85,7 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 	if err := coreauth.ClearBootstrapPasswordFile(); err != nil {
 		slog.Error("Error removing bootstrap password file", "error", err)
 	}
-	coreauth.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
+	ctx.SessionManager.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
 
 	apihttp.NoContent(w)
 }

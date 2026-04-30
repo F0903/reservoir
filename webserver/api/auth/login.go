@@ -52,7 +52,7 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	sess := auth.CreateSession(user.ID)
+	sess := ctx.SessionManager.Create(user.ID)
 	http.SetCookie(w, sess.BuildSessionCookie())
 
 	apihttp.WriteJSON(w, http.StatusOK, models.UserInfo{

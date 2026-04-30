@@ -20,6 +20,7 @@ type Runtime struct {
 	cfg              *config.Config
 	proxy            *proxy.Proxy
 	webserver        *webserver.WebServer
+	sessions         *auth.SessionManager
 	webserverEnabled bool
 	sessionGCEnabled bool
 }
@@ -51,7 +52,8 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to create proxy: %w", err)
 	}
 
-	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg)
+	sessions := auth.NewSessionManager()
+	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions)
 	if err != nil {
 		p.Destroy()
 		return nil, err
@@ -61,12 +63,13 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		cfg:              cfg,
 		proxy:            p,
 		webserver:        ws,
+		sessions:         sessions,
 		webserverEnabled: webserverEnabled,
 		sessionGCEnabled: sessionGCEnabled,
 	}, nil
 }
 
-func buildWebServer(cfg *config.Config) (*webserver.WebServer, bool, bool, error) {
+func buildWebServer(cfg *config.Config, sessions *auth.SessionManager) (*webserver.WebServer, bool, bool, error) {
 	dashboardDisabled := cfg.Webserver.DashboardDisabled.Read()
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 
@@ -92,7 +95,7 @@ func buildWebServer(cfg *config.Config) (*webserver.WebServer, bool, bool, error
 	if apiDisabled {
 		slog.Info("API is disabled by configuration, skipping registration")
 	} else {
-		a := api.New(cfg)
+		a := api.New(cfg, sessions)
 		if err := ws.Register(a); err != nil {
 			return nil, false, false, fmt.Errorf("failed to register API: %w", err)
 		}
@@ -120,7 +123,11 @@ func (r *Runtime) Run(ctx context.Context) error {
 
 	if r.sessionGCEnabled {
 		group.Go(func() error {
-			return auth.RunSessionGC(groupCtx)
+			sessions := r.sessions
+			if sessions == nil {
+				sessions = auth.DefaultSessionManager()
+			}
+			return sessions.RunGC(groupCtx)
 		})
 	}
 

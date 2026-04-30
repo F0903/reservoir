@@ -29,4 +29,4 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Treat security defaults as part of the architecture, including first-login setup, session handling, and conservative cache behavior.
 - [x] Extract and test log SSE tailing for rotation, truncation, partial lines, and transient read/stat failures.
 - [x] Add API JSON/error response helpers and robust request content-type parsing.
-- [ ] Encapsulate session state and garbage collection in a runtime-owned session manager.
+- [x] Encapsulate session state and garbage collection in a runtime-owned session manager.

@@ -25,7 +25,7 @@ func (e *LogoutEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *LogoutEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	ctx.Session.Destroy()
+	ctx.SessionManager.Destroy(ctx.Session)
 
 	cookie := ctx.Session.BuildSessionCookie()
 	cookie.Value = ""

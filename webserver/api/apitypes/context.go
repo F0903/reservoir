@@ -10,13 +10,18 @@ import (
 )
 
 type Context struct {
-	Session   *auth.Session
-	UserStore *stores.UserStore
-	Config    *config.Config
+	Session        *auth.Session
+	SessionManager *auth.SessionManager
+	UserStore      *stores.UserStore
+	Config         *config.Config
 }
 
-func CreateContext(r *http.Request, cfg *config.Config) (Context, error) {
-	sess, authorized := auth.SessionFromRequest(r)
+func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager) (Context, error) {
+	if sessions == nil {
+		sessions = auth.DefaultSessionManager()
+	}
+
+	sess, authorized := sessions.SessionFromRequest(r)
 	var users *stores.UserStore
 	if authorized {
 		var err error
@@ -27,9 +32,10 @@ func CreateContext(r *http.Request, cfg *config.Config) (Context, error) {
 	}
 
 	return Context{
-		Session:   sess,
-		UserStore: users,
-		Config:    cfg,
+		Session:        sess,
+		SessionManager: sessions,
+		UserStore:      users,
+		Config:         cfg,
 	}, nil
 }
 
