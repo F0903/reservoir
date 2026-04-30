@@ -9,7 +9,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Expand cache policy matrix tests for methods, statuses, auth/cookies, `no-store`, `private`, `Vary`, and content encoding.
 - [x] Add revalidation/stale-cache behavior tests for expired cache hits, upstream failures, and metadata updates.
 - [x] Add CONNECT/raw responder regression tests for repeated tunnel requests.
-- [ ] Add runtime shutdown integration tests for proxy, webserver, and session GC cancellation.
+- [x] Add runtime shutdown integration tests for proxy, webserver, and session GC cancellation.
 - [x] Introduce a dedicated cache policy component that handles cacheability, `Cache-Control`, `Vary`, auth/cookie headers, content encoding, request methods, and response status.
 - [x] Add explicit network timeouts for proxy listeners and upstream HTTP clients.
 - [x] Strengthen HTTP protocol boundaries so response/header state cannot leak across CONNECT tunnel requests.
