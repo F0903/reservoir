@@ -65,7 +65,11 @@ func (f *fetchResult) getResponse() (data io.ReadCloser, header http.Header, sta
 	case fetchTypeDirect:
 		return f.Direct.Response.Body, f.Direct.Response.Header, f.Direct.UpstreamStatus
 	case fetchTypeCached:
-		return f.Cached.Entry.Data, f.Cached.Entry.Metadata.Object.Header, f.Cached.UpstreamStatus
+		status := f.Cached.UpstreamStatus
+		if status == 0 {
+			status = http.StatusOK
+		}
+		return f.Cached.Entry.Data, f.Cached.Entry.Metadata.Object.Header, status
 	}
 	return nil, nil, 0
 }

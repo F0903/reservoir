@@ -162,7 +162,7 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
 	slog.Debug("Upstream responded with 416 Range Not Satisfiable, retrying without Range header...", "url", req.URL)
 
-	if noRetry {
+	if noRetry || !f.cfg.Proxy.RetryOnRange416.Read() {
 		slog.Debug("Not retrying 416 Range Not Satisfiable. Returning as is.", "url", req.URL)
 		return nil, nil
 	}

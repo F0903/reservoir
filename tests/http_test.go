@@ -88,6 +88,185 @@ func TestRangeRequests(t *testing.T) {
 	}
 }
 
+func TestInvalidCachedRangeReturns416WhenRetryDisabled(t *testing.T) {
+	env := SetupTestEnv(t)
+
+	content := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.Header().Set("ETag", "\"range-etag\"")
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/invalid-range-no-retry"
+	resp, err := env.Client.Get(targetURL)
+	if err != nil {
+		t.Fatalf("warmup failed: %v", err)
+	}
+	resp.Body.Close()
+
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Range", "bytes=100-200")
+	resp, err = env.Client.Do(req)
+	if err != nil {
+		t.Fatalf("range request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("expected 416 Range Not Satisfiable, got %d", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Content-Range"); got != fmt.Sprintf("bytes */%d", len(content)) {
+		t.Fatalf("expected Content-Range bytes */%d, got %q", len(content), got)
+	}
+	if got := upstreamRequests.Load(); got != 2 {
+		t.Fatalf("expected warmup plus original range request, got %d upstream requests", got)
+	}
+}
+
+func TestInvalidCachedRangeRetriesAsFullResponseWhenEnabled(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Proxy.RetryOnInvalidRange.Overwrite(true)
+
+	content := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.Header().Set("ETag", "\"range-etag\"")
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/invalid-range-retry"
+	resp, err := env.Client.Get(targetURL)
+	if err != nil {
+		t.Fatalf("warmup failed: %v", err)
+	}
+	resp.Body.Close()
+
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Range", "bytes=100-200")
+	resp, err = env.Client.Do(req)
+	if err != nil {
+		t.Fatalf("range request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected retry to return 200 OK, got %d", resp.StatusCode)
+	}
+	if !bytes.Equal(body, content) {
+		t.Fatalf("expected full cached body %q, got %q", content, body)
+	}
+	if got := upstreamRequests.Load(); got != 2 {
+		t.Fatalf("expected warmup plus original range request, got %d upstream requests", got)
+	}
+}
+
+func TestUpstream416IsReturnedWhenRetryDisabled(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Proxy.RetryOnRange416.Overwrite(false)
+
+	content := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		if r.Header.Get("Range") != "" {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(content)))
+			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+	})
+	env.Start()
+
+	req, err := http.NewRequest(http.MethodGet, env.Upstream.URL+"/upstream-416-no-retry", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Range", "bytes=0-9")
+	resp, err := env.Client.Do(req)
+	if err != nil {
+		t.Fatalf("range request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("expected upstream 416 to pass through, got %d", resp.StatusCode)
+	}
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected one upstream request with retry disabled, got %d", got)
+	}
+}
+
+func TestUpstream416RetriesWithoutRangeWhenEnabled(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Proxy.RetryOnRange416.Overwrite(true)
+
+	content := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	var upstreamRequests atomic.Int64
+	var upstreamRangeRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		if r.Header.Get("Range") != "" {
+			upstreamRangeRequests.Add(1)
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes */%d", len(content)))
+			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.WriteHeader(http.StatusOK)
+		w.Write(content)
+	})
+	env.Start()
+
+	req, err := http.NewRequest(http.MethodGet, env.Upstream.URL+"/upstream-416-retry", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+	req.Header.Set("Range", "bytes=0-9")
+	resp, err := env.Client.Do(req)
+	if err != nil {
+		t.Fatalf("range request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected retry to return 200 OK, got %d", resp.StatusCode)
+	}
+	if !bytes.Equal(body, content) {
+		t.Fatalf("expected full retried body %q, got %q", content, body)
+	}
+	if got := upstreamRequests.Load(); got != 2 {
+		t.Fatalf("expected original range request plus retry, got %d upstream requests", got)
+	}
+	if got := upstreamRangeRequests.Load(); got != 1 {
+		t.Fatalf("expected only original upstream request to carry Range, got %d", got)
+	}
+}
+
 func TestVaryAcceptEncodingUsesSeparateCacheVariants(t *testing.T) {
 	env := SetupTestEnv(t)
 
