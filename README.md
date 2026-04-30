@@ -95,25 +95,47 @@ Reservoir is tuned first as a shared package cache for package-manager traffic. 
 
 These defaults are intentional for package-cache deployments. If you need stricter general-purpose proxy semantics, disable `ignore_cache_control` and `force_default_max_age` in `var/config.json`.
 
+### Cache Backends
+
+Reservoir supports two cache backends:
+
+- `cache.type = "memory"` keeps cached responses in process memory. This is the default and is best for short-lived burst caching where the proxy only needs to coalesce many package-manager requests that happen close together.
+- `cache.type = "file"` stores cached response bodies under `cache.file.dir`. This is useful when cached package responses may be larger than the memory budget or when short restart continuity is useful.
+
+The file cache writes metadata sidecars next to cached response bodies. On startup, Reservoir loads sidecars only when the matching cached body still exists, the body is non-empty, and the cached response has not expired. Expired, corrupt, or orphaned cache files are discarded. This preserves useful restart continuity without turning the proxy into a long-lived package repository.
+
+Loaded file-cache entries are still subject to `cache.max_cache_size`, normal expiry, and the cleanup interval. If restored entries exceed the configured cache size, startup eviction trims them before serving traffic.
+
 ### Command-Line Arguments
 
-You can always display info about the command-line arguments by running the proxy with the `--help` flag. Otherwise, you can refer to the following list.
+You can always display info about the command-line arguments by running the proxy with the `--help` flag. Command-line arguments only override the generated configuration when they are supplied.
 
 The command-line arguments currently available are the following:
 
-- **listen** (0.0.0.0:9999) - The address and port that the proxy will listen on.
+- **version** - Print the Reservoir version and exit.
+- **listen** (:9999) - The address and port that the proxy will listen on.
 - **ca-cert** (ssl/ca.crt) - The path to the PEM cert of the CA the proxy will use to sign.
 - **ca-key** (ssl/ca.key) - The path to the PEM key of the CA the proxy will use to sign.
-- **cache-dir** (var/cache) - The path where the cache should be stored.
+- **cache-dir** (var/cache/) - The path where the file cache should be stored.
 - **webserver-listen** (localhost:8080) - The address and port that the webserver (dashboard and API) will listen on.
 - **no-dashboard** (false) - Disable the embedded dashboard.
 - **no-api** (false) - Disable the API.
 - **log-level** (info) - Set the logging level (DEBUG, INFO, WARN, ERROR).
-- **log-file** (var/proxy.log) - The path to the log file. If no path is specified, no file logging will be done. (will also disable dashboard log-viewer)
+- **log-file** (var/proxy.log) - The path to the log file. Setting this to an empty value disables file logging and the dashboard log viewer.
 - **log-file-max-size** (500M) - The maximum size of the log file before it is rotated.
 - **log-file-max-backups** (3) - The maximum number of old log files to keep.
 - **log-file-compress** (true) - Enable compression for rotated log files.
 - **log-to-stdout** (false) - Enable logging to stdout.
+
+Other cache settings are currently configured through `var/config.json` or the dashboard rather than command-line flags. The most important ones are:
+
+- `cache.type` - `memory` or `file`.
+- `cache.max_cache_size` - Maximum total cache size.
+- `cache.cleanup_interval` - How often expired entries and over-budget cache data are cleaned up.
+- `cache.memory.memory_budget_percent` - Memory-cache budget as a percentage of total system memory.
+- `proxy.cache_policy.ignore_cache_control` - Whether to ignore upstream cache-control directives.
+- `proxy.cache_policy.force_default_max_age` - Whether to always use Reservoir's configured default freshness lifetime.
+- `proxy.cache_policy.default_max_age` - The fallback/default freshness lifetime for cached responses.
 
 ## Example: Using curl with the Proxy
 
