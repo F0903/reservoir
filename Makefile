@@ -11,6 +11,7 @@ ci: check-frontend lint-frontend test-frontend generate-csp vet test-proxy build
 vet:
 	go vet ./...
 
+test-proxy: export CGO_ENABLED := 1
 test-proxy:
 	go test -v -race -count=1 ./...
 
