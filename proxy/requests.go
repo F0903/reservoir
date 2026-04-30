@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 var (
@@ -14,6 +16,34 @@ var (
 	ErrURLParseFailed    = errors.New("URL parse failed")
 	ErrSendRequestFailed = errors.New("error sending request to target")
 )
+
+const (
+	upstreamDialTimeout           = 30 * time.Second
+	upstreamKeepAlive             = 30 * time.Second
+	upstreamTLSHandshakeTimeout   = 10 * time.Second
+	upstreamResponseHeaderTimeout = 30 * time.Second
+	upstreamIdleConnTimeout       = 90 * time.Second
+	upstreamExpectContinueTimeout = 1 * time.Second
+)
+
+func newUpstreamClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   upstreamDialTimeout,
+				KeepAlive: upstreamKeepAlive,
+			}).DialContext,
+			DisableCompression:    true,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   10,
+			IdleConnTimeout:       upstreamIdleConnTimeout,
+			TLSHandshakeTimeout:   upstreamTLSHandshakeTimeout,
+			ResponseHeaderTimeout: upstreamResponseHeaderTimeout,
+			ExpectContinueTimeout: upstreamExpectContinueTimeout,
+		},
+	}
+}
 
 func removeHopByHopHeaders(header http.Header) {
 	for _, v := range header.Values("Connection") {
@@ -71,14 +101,16 @@ func changeRequestToTarget(req *http.Request, httpsDefault bool) error {
 	return nil
 }
 
-func sendRequestToTarget(req *http.Request, httpsDefault bool) (*http.Response, error) {
+func sendRequestToTarget(client *http.Client, req *http.Request, httpsDefault bool) (*http.Response, error) {
 	// Change request URL to point to the target server.
-	changeRequestToTarget(req, httpsDefault)
+	if err := changeRequestToTarget(req, httpsDefault); err != nil {
+		return nil, err
+	}
 	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.
 	removeHopByHopHeaders(req.Header)
 
 	slog.Debug("Sending request", "url", req.URL, "method", req.Method)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("Error sending request to target", "url", req.URL, "error", err)
 		return nil, fmt.Errorf("%w: %v", ErrSendRequestFailed, err)

@@ -17,17 +17,25 @@ type RawHTTPResponder struct {
 	response *http.Response
 }
 
+func newRawResponse() *http.Response {
+	return &http.Response{
+		StatusCode: 200,
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     make(http.Header),
+	}
+}
+
 func NewRawHTTPResponder(writer io.Writer) *RawHTTPResponder {
 	return &RawHTTPResponder{
-		writer: writer,
-		response: &http.Response{
-			StatusCode: 200,
-			Proto:      "HTTP/1.1",
-			ProtoMajor: 1,
-			ProtoMinor: 1,
-			Header:     make(http.Header),
-		},
+		writer:   writer,
+		response: newRawResponse(),
 	}
+}
+
+func (c *RawHTTPResponder) resetResponse() {
+	c.response = newRawResponse()
 }
 
 func (c *RawHTTPResponder) parseAndSetContentLength() error {
@@ -53,8 +61,9 @@ func (c *RawHTTPResponder) AddHeader(name string, value string) {
 
 func (c *RawHTTPResponder) SetHeaders(headers http.Header) {
 	for key, values := range headers {
+		c.response.Header.Del(key)
 		for _, value := range values {
-			c.SetHeader(key, value)
+			c.AddHeader(key, value)
 		}
 	}
 }
@@ -80,6 +89,8 @@ func (c *RawHTTPResponder) writeResponse() error {
 }
 
 func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
+	defer c.resetResponse()
+
 	resp := c.response
 
 	var read int
@@ -87,10 +98,13 @@ func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err
 	resp.StatusCode = status
 	c.parseAndSetContentLength()
 
-	return int64(read), c.writeResponse()
+	err = c.writeResponse()
+	return int64(read), err
 }
 
 func (c *RawHTTPResponder) WriteEmpty(status int) error {
+	defer c.resetResponse()
+
 	resp := c.response
 	resp.Body = http.NoBody
 	resp.StatusCode = status
@@ -103,6 +117,8 @@ func (c *RawHTTPResponder) WriteEmpty(status int) error {
 }
 
 func (c *RawHTTPResponder) WriteError(message string, errorCode int) error {
+	defer c.resetResponse()
+
 	resp := c.response
 	resp.StatusCode = errorCode
 	resp.Body = io.NopCloser(strings.NewReader(message))

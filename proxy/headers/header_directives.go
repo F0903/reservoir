@@ -138,6 +138,9 @@ func (hd *HeaderDirectives) ShouldCache(ignoreCacheControl bool) bool {
 		if cc.noCache {
 			return false // No caching allowed
 		}
+		if cc.private {
+			return false // Shared cache should not store private responses
+		}
 
 		if cc.maxAge < 1 {
 			return false // If max-age is less than 1 second, treat it as no-cache

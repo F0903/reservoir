@@ -30,6 +30,27 @@ type StagedConfigProp interface {
 	IsSet() bool
 }
 
+func cloneConfig(cfg *Config) (*Config, error) {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var cloned Config
+	if err := json.Unmarshal(data, &cloned); err != nil {
+		return nil, err
+	}
+
+	return &cloned, nil
+}
+
+func commitStagedProps(stagedProps []stagedProp) {
+	for _, prop := range stagedProps {
+		slog.Debug("Committing property...", "prop", prop)
+		prop.CommitStaged()
+	}
+}
+
 // Dynamically sets the properties of a struct based on the provided map.
 // Supports nested structs.
 func setPropsFromMapRecursive(val reflect.Value, updates map[string]any) (stagedProps []stagedProp, err error) {
@@ -104,27 +125,38 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 	}
 
 	slog.Debug("Setting properties from JSON map...", "updates", updates)
-	stagedProps, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), updates)
+	candidate, err := cloneConfig(cfg)
+	if err != nil {
+		slog.Error("Failed to clone config before update", "error", err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	candidateStagedProps, err := setPropsFromMapRecursive(reflect.ValueOf(candidate), updates)
 	if err != nil {
 		slog.Error("Failed to set properties from map", "error", err)
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	slog.Info("Committing updated properties...", "staged_count", len(stagedProps))
-	for _, prop := range stagedProps {
-		slog.Debug("Committing property...", "prop", prop)
-		prop.CommitStaged()
-	}
+	commitStagedProps(candidateStagedProps)
 
-	if err := cfg.verify(); err != nil {
+	if err := candidate.verify(); err != nil {
 		slog.Error("Updated config failed verification", "error", err)
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	if err := cfg.persist(); err != nil {
+	if err := candidate.persist(); err != nil {
 		slog.Error("Failed to persist updated config", "error", err)
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
+
+	stagedProps, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), updates)
+	if err != nil {
+		slog.Error("Failed to apply verified config update", "error", err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	slog.Info("Committing updated properties...", "staged_count", len(stagedProps))
+	commitStagedProps(stagedProps)
 
 	status := UpdateStatusSuccess
 	if IsRestartNeeded() {

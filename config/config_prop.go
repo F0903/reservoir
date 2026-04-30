@@ -47,26 +47,36 @@ func (p *ConfigProp[T]) Overwrite(value T) {
 func (p *ConfigProp[T]) Stage(newValue T) {
 	commit, _ := p.value.Load()
 
-	oldVal := commit.ref().Original()
-
 	// Copy the old Overwritable to keep any command-line overwrites.
 	overwritable := commit.Value()
 	overwritable.SetNoClear(newValue)
 	commit.Stage(overwritable)
 
 	p.value.Store(commit)
-
-	if p.requiresRestart && (oldVal != newValue) {
-		setRestartNeeded()
-	}
-
-	p.onChange.Fire(newValue)
 }
 
 func (p *ConfigProp[T]) CommitStaged() {
 	commit, _ := p.value.Load()
+	staged, ok := commit.stagedValue.Get()
+	if !ok {
+		return
+	}
+
+	oldOverwritable := commit.Value()
+	oldEffective := oldOverwritable.Get()
+	oldOriginal := oldOverwritable.Original()
+	newEffective := staged.Get()
+	newOriginal := (&staged).Original()
+
 	commit.Commit()
 	p.value.Store(commit)
+
+	if p.requiresRestart && oldOriginal != newOriginal {
+		setRestartNeeded()
+	}
+	if oldEffective != newEffective {
+		p.onChange.Fire(newEffective)
+	}
 }
 
 func (p *ConfigProp[T]) String() string {

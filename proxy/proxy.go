@@ -37,6 +37,7 @@ type cachedRequestInfo struct {
 	ETag         string
 	LastModified time.Time
 	Header       http.Header
+	Vary         []string
 }
 
 type Proxy struct {
@@ -51,14 +52,24 @@ func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) 
 	listener.ListenWithCancel(errChan, ctx)
 }
 
+func (p *Proxy) Run(address string, ctx context.Context) error {
+	listener := httplistener.New(address, p)
+	return listener.Run(ctx)
+}
+
 func (p *Proxy) Destroy() {
+	p.fetch.closeIdleConnections()
 	p.cache.Destroy()
+}
+
+func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
+	return NewProxyWithUpstreamClient(cfg, ca, nil, ctx)
 }
 
 // Creates a new MITM proxy. It should be passed the filenames
 // for the certificate and private key of a certificate authority trusted by the
 // client's machine.
-func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
+func NewProxyWithUpstreamClient(cfg *config.Config, ca certs.CertAuthority, upstreamClient *http.Client, ctx context.Context) (*Proxy, error) {
 	cacheCleanupInterval := cfg.Cache.CleanupInterval.Read().Cast()
 	maxCacheSize := cfg.Cache.MaxCacheSize.Read().Bytes()
 	shardCount := cfg.Cache.LockShards.Read()
@@ -78,7 +89,7 @@ func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (
 	return &Proxy{
 		ca:    ca,
 		cache: c,
-		fetch: newFetcher(c, cfg),
+		fetch: newFetcher(c, cfg, upstreamClient),
 		cfg:   cfg,
 	}, nil
 }

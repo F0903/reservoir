@@ -70,6 +70,9 @@ func parseRangeHeader(rangeStr string) (rangeHeader, error) {
 	if unit != "bytes" {
 		return rangeHeader{}, ErrInvalidRangeUnit
 	}
+	if valuesStr == "" {
+		return rangeHeader{}, ErrInvalidRangeValue
+	}
 
 	firstCh := valuesStr[0]
 	if firstCh == '-' {
@@ -86,6 +89,8 @@ func parseRangeHeader(rangeStr string) (rangeHeader, error) {
 		} else if isTailSmaller && valuesStr[suffixTail] == '-' {
 			// Invalid format: -N-...
 			return rangeHeader{}, ErrInvalidRangeFormat
+		} else if isTailSmaller {
+			return rangeHeader{}, ErrInvalidRangeFormat
 		}
 
 		return rangeHeader{start: -1, end: suffixLength}, nil // Indicate suffix range
@@ -94,6 +99,9 @@ func parseRangeHeader(rangeStr string) (rangeHeader, error) {
 	start, startTail, ok := parseRangeNumber(valuesStr)
 	if !ok {
 		return rangeHeader{}, ErrInvalidRangeValue
+	}
+	if startTail >= int64(len(valuesStr)) {
+		return rangeHeader{}, ErrInvalidRangeFormat
 	}
 
 	middleCh := valuesStr[startTail]
@@ -114,6 +122,8 @@ func parseRangeHeader(rangeStr string) (rangeHeader, error) {
 
 	if endTail < int64(len(valuesStr)) && valuesStr[endTail] == ',' {
 		return rangeHeader{}, ErrMultipleRangesNotSupported
+	} else if endTail < int64(len(valuesStr)) {
+		return rangeHeader{}, ErrInvalidRangeFormat
 	}
 
 	return rangeHeader{start: start, end: end}, nil

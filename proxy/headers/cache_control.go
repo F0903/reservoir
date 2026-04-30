@@ -10,6 +10,7 @@ import (
 
 type cacheControl struct {
 	noCache bool
+	private bool
 	maxAge  time.Duration
 }
 
@@ -20,6 +21,8 @@ func parseCacheControl(ccHeader string) (cacheControl, error) {
 		directive = strings.TrimSpace(directive)
 		if directive == "no-cache" || directive == "no-store" {
 			cc.noCache = true
+		} else if directive == "private" {
+			cc.private = true
 		} else if after, ok := strings.CutPrefix(directive, "max-age="); ok {
 			// max-age directive specifies the maximum amount of time a response is considered fresh in seconds.
 			maxAge, err := strconv.ParseInt(after, 10, 64)

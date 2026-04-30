@@ -32,16 +32,20 @@ type TestEnv struct {
 	T           testing.TB
 	IsHttps     bool
 	CACertPool  *x509.CertPool
+	Started     bool
 }
 
 func (e *TestEnv) Start() {
-	if e.IsHttps {
-		e.Upstream.StartTLS()
-		if e.CACertPool != nil {
-			e.CACertPool.AddCert(e.Upstream.Certificate())
+	if !e.Started {
+		if e.IsHttps {
+			e.Upstream.StartTLS()
+			if e.CACertPool != nil {
+				e.CACertPool.AddCert(e.Upstream.Certificate())
+			}
+		} else {
+			e.Upstream.Start()
 		}
-	} else {
-		e.Upstream.Start()
+		e.Started = true
 	}
 
 	e.ProxyServer.Start()
@@ -184,7 +188,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	cacheDir := t.TempDir()
 
 	// Mock HTTPS Upstream (unstarted)
-	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "max-age=60")
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte("https response body"))
@@ -192,6 +196,13 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 			t.Fatalf("failed to write response body: %v", err)
 		}
 	}))
+	upstreamTransport, ok := upstream.Client().Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("unexpected upstream transport type: %T", upstream.Client().Transport)
+	}
+	upstreamTransport = upstreamTransport.Clone()
+	upstreamTransport.DisableCompression = true
+	upstreamClient := &http.Client{Transport: upstreamTransport}
 
 	cfg := config.NewDefault()
 	cfg.Proxy.UpstreamDefaultHttps.Overwrite(true)
@@ -201,7 +212,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 
 	ctx := t.Context()
 
-	p, err := proxy.NewProxy(cfg, ca, ctx)
+	p, err := proxy.NewProxyWithUpstreamClient(cfg, ca, upstreamClient, ctx)
 	if err != nil {
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
@@ -212,13 +223,6 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	caCertPool := x509.NewCertPool()
 	caCertBytes, _ := os.ReadFile(certFile)
 	caCertPool.AppendCertsFromPEM(caCertBytes)
-
-	// Update DefaultTransport to trust our CA (for the proxy -> upstream connection)
-	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
-		transport.TLSClientConfig = &tls.Config{
-			RootCAs: caCertPool,
-		}
-	}
 
 	proxyClient := &http.Client{
 		Timeout: 10 * time.Second,
@@ -248,5 +252,6 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		T:           t,
 		IsHttps:     true,
 		CACertPool:  caCertPool,
+		Started:     true,
 	}
 }

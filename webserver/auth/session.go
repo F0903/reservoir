@@ -1,11 +1,13 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"errors"
 	"log/slog"
 	"net/http"
 	"reservoir/utils/syncmap"
+	"sync"
 	"time"
 )
 
@@ -25,29 +27,58 @@ const gcInterval = 15 * time.Minute
 
 var sessionStore *syncmap.SyncMap[string, *Session] = syncmap.New[string, *Session]()
 var gcRunning = false
+var sessionMu sync.Mutex
 
-func StartSessionGC() {
+func RunSessionGC(ctx context.Context) error {
+	sessionMu.Lock()
 	if gcRunning {
-		return
+		sessionMu.Unlock()
+		return nil
 	}
+	gcRunning = true
+	sessionMu.Unlock()
+
+	defer func() {
+		sessionMu.Lock()
+		gcRunning = false
+		sessionMu.Unlock()
+	}()
 
 	slog.Info("Starting session garbage collector", "interval", gcInterval.String(), "session_lifetime", defaultLifetime.String())
 	ticker := time.NewTicker(gcInterval)
-	go func() {
-		for range ticker.C {
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
 			now := time.Now()
+			sessionMu.Lock()
 			for item := range sessionStore.Items() {
 				if item.ExpiresAt.Before(now) {
 					sessionStore.Delete(item.ID)
 					slog.Debug("Deleted expired session", "session_id", item.ID)
 				}
 			}
+			sessionMu.Unlock()
+		case <-ctx.Done():
+			slog.Info("Session garbage collector stopped")
+			return nil
+		}
+	}
+}
+
+func StartSessionGC(ctx context.Context) {
+	go func() {
+		if err := RunSessionGC(ctx); err != nil {
+			slog.Error("Session garbage collector stopped with error", "error", err)
 		}
 	}()
-	gcRunning = true
 }
 
 func GetSession(sid string) (*Session, bool) {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+
 	sess, ok := sessionStore.Get(sid)
 
 	if !ok {
@@ -61,10 +92,14 @@ func GetSession(sid string) (*Session, bool) {
 		sessionStore.Set(sid, sess)
 	}
 
-	return sess, ok
+	sessCopy := *sess
+	return &sessCopy, ok
 }
 
 func CreateSession(userId int64) *Session {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+
 	slog.Debug("Creating new user session...", "user_id", userId)
 	sid := rand.Text()
 	now := time.Now()
@@ -108,6 +143,9 @@ func (s *Session) BuildSessionCookie() *http.Cookie {
 }
 
 func (s *Session) Destroy() {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+
 	sessionStore.Delete(s.ID)
 	slog.Debug("Destroyed session", "session_id", s.ID)
 }

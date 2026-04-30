@@ -10,6 +10,8 @@ import (
 	"reservoir/metrics"
 	"reservoir/proxy/headers"
 	"reservoir/utils/countingreader"
+	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -18,23 +20,87 @@ import (
 var ErrNotCacheable = errors.New("response not cacheable")
 
 type fetcher struct {
-	cache cache.Cache[cachedRequestInfo]
-	cfg   *config.Config
-	group singleflight.Group
+	cache        cache.Cache[cachedRequestInfo]
+	cfg          *config.Config
+	policy       cachePolicy
+	client       *http.Client
+	group        singleflight.Group
+	variantMu    sync.RWMutex
+	variantIndex map[cache.CacheKey][]string
 }
 
-func newFetcher(cache cache.Cache[cachedRequestInfo], cfg *config.Config) fetcher {
+func newFetcher(cacheStore cache.Cache[cachedRequestInfo], cfg *config.Config, upstreamClient *http.Client) fetcher {
+	if upstreamClient == nil {
+		upstreamClient = newUpstreamClient()
+	}
+
 	return fetcher{
-		cache: cache,
-		cfg:   cfg,
-		group: singleflight.Group{},
+		cache:        cacheStore,
+		cfg:          cfg,
+		policy:       newCachePolicy(cfg),
+		client:       upstreamClient,
+		group:        singleflight.Group{},
+		variantIndex: make(map[cache.CacheKey][]string),
 	}
 }
 
-func (f *fetcher) shouldResponseBeCached(resp *http.Response, upstreamHd *headers.HeaderDirectives) bool {
-	return upstreamHd.ShouldCache(f.cfg.Proxy.CachePolicy.IgnoreCacheControl.Read()) &&
-		resp.StatusCode == http.StatusOK &&
-		resp.Request.Method == http.MethodGet
+func normalizeVaryHeaderValues(values []string) string {
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		parts := make([]string, 0)
+		for part := range strings.SplitSeq(value, ",") {
+			part = strings.ToLower(strings.TrimSpace(part))
+			if part == "" {
+				continue
+			}
+			parts = append(parts, part)
+		}
+		normalized = append(normalized, strings.Join(parts, ","))
+	}
+	return strings.Join(normalized, ",")
+}
+
+func makeVariantCacheKey(req *http.Request, baseKey cache.CacheKey, vary []string) cache.CacheKey {
+	if len(vary) == 0 {
+		return baseKey
+	}
+
+	parts := []string{baseKey.Hex}
+	for _, headerName := range vary {
+		values := req.Header.Values(http.CanonicalHeaderKey(headerName))
+		parts = append(parts, headerName+"="+normalizeVaryHeaderValues(values))
+	}
+	return cache.FromString(strings.Join(parts, "|"))
+}
+
+func (f *fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cache.CacheKey {
+	f.variantMu.RLock()
+	vary := f.variantIndex[baseKey]
+	f.variantMu.RUnlock()
+
+	return makeVariantCacheKey(req, baseKey, vary)
+}
+
+func (f *fetcher) singleflightKey(req *http.Request, baseKey cache.CacheKey) string {
+	return makeVariantCacheKey(req, baseKey, supportedVaryHeaders).Hex
+}
+
+func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
+	f.variantMu.Lock()
+	defer f.variantMu.Unlock()
+
+	if len(vary) == 0 {
+		delete(f.variantIndex, baseKey)
+		return
+	}
+
+	copied := make([]string, len(vary))
+	copy(copied, vary)
+	f.variantIndex[baseKey] = copied
+}
+
+func (f *fetcher) closeIdleConnections() {
+	f.client.CloseIdleConnections()
 }
 
 func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[cachedRequestInfo], err error) {
@@ -54,15 +120,18 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 	return f.cache.Get(key)
 }
 
-func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[cachedRequestInfo], err error) {
-	slog.Debug("Handling 200 response from upstream", "url", req.URL, "key", key)
+func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[cachedRequestInfo], err error) {
+	slog.Debug("Handling 200 response from upstream", "url", req.URL, "key", lookupKey)
 
-	if !f.shouldResponseBeCached(resp, upstreamHd) {
-		slog.Debug("Got response code 200, but result is not cacheable", "status", resp.Status, "url", req.URL, "key", key)
+	decision := f.policy.Decide(req, resp, upstreamHd)
+	if !decision.Cacheable {
+		slog.Debug("Got response code 200, but result is not cacheable", "status", resp.Status, "url", req.URL, "key", lookupKey, "reason", decision.Reason)
 		return nil, nil
 	}
 
-	slog.Debug("Caching response...", "status", resp.Status, "url", req.URL, "key", key)
+	storeKey := makeVariantCacheKey(req, baseKey, decision.Vary)
+
+	slog.Debug("Caching response...", "status", resp.Status, "url", req.URL, "key", storeKey, "lookup_key", lookupKey)
 
 	lastModified := time.Now()
 	if t, err := http.ParseTime(resp.Header.Get("Last-Modified")); err == nil {
@@ -74,25 +143,23 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, key 
 	var bytesRead int
 	reader := countingreader.New(resp.Body, &bytesRead)
 
-	maxAge := upstreamHd.GetExpiresOrDefault(
-		f.cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Read(),
-		f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast(),
-	)
-	cached, err = f.cache.Cache(key, reader, maxAge, cachedRequestInfo{
+	cached, err = f.cache.Cache(storeKey, reader, decision.Expires, cachedRequestInfo{
 		ETag:         etag,
 		LastModified: lastModified,
 		Header:       resp.Header,
+		Vary:         decision.Vary,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCacheResponseFailed, err)
 	}
+	f.setVariantIndex(baseKey, decision.Vary)
 
 	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
-	slog.Info("Successfully cached response", "status", resp.Status, "url", req.URL, "key", key, "expires_in", maxAge)
+	slog.Info("Successfully cached response", "status", resp.Status, "url", req.URL, "key", storeKey, "expires", decision.Expires)
 	return cached, nil
 }
 
-func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, key cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
 	slog.Debug("Upstream responded with 416 Range Not Satisfiable, retrying without Range header...", "url", req.URL)
 
 	if noRetry {
@@ -113,21 +180,21 @@ func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, key 
 	}
 	*resp = *retryResp // Replace the original response with the new one
 
-	return f.handleUpstreamResponse(retryReq, resp, key, clientHd, true)
+	return f.handleUpstreamResponse(retryReq, resp, baseKey, lookupKey, clientHd, true)
 }
 
-func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response, key cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
 	slog.Debug("Preparing to handle upstream response...", "url", req.URL, "status", resp.StatusCode)
 
 	upstreamHd := headers.ParseHeaderDirective(resp.Header)
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return f.handleUpstream200(req, resp, key, upstreamHd)
+		return f.handleUpstream200(req, resp, baseKey, lookupKey, clientHd, upstreamHd)
 	case http.StatusNotModified:
-		return f.handleUpstream304(req, key)
+		return f.handleUpstream304(req, lookupKey)
 	case http.StatusRequestedRangeNotSatisfiable:
-		return f.handleUpstream416(req, resp, key, clientHd, noRetry)
+		return f.handleUpstream416(req, resp, baseKey, lookupKey, clientHd, noRetry)
 	default:
 		slog.Debug("Upstream returned non-cachable response", "url", req.URL, "status", resp.StatusCode)
 		return nil, nil
@@ -139,7 +206,7 @@ func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time
 	metrics.Global.Requests.UpstreamRequests.Increment()
 
 	startTime := time.Now()
-	resp, err := sendRequestToTarget(req, f.cfg.Proxy.UpstreamDefaultHttps.Read())
+	resp, err := sendRequestToTarget(f.client, req, f.cfg.Proxy.UpstreamDefaultHttps.Read())
 	latency := time.Since(startTime)
 
 	metrics.Global.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
@@ -151,7 +218,7 @@ func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time
 	return resp, latency, nil
 }
 
-func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
+func (f *fetcher) fetchUpstream(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
 	slog.Debug("Fetching from upstream...")
 
 	resp, upstreamLatency, err := f.sendRequestToUpstream(req)
@@ -160,7 +227,7 @@ func (f *fetcher) fetchUpstream(req *http.Request, key cache.CacheKey, clientHd 
 		return fetchResult{}, err
 	}
 
-	cached, err := f.handleUpstreamResponse(req, resp, key, clientHd, false)
+	cached, err := f.handleUpstreamResponse(req, resp, baseKey, lookupKey, clientHd, false)
 	if err != nil {
 		resp.Body.Close()
 		slog.Error("Error handling upstream response after cache miss", "url", req.URL, "error", err)
@@ -213,9 +280,9 @@ func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, err
 	return fetchResult{Type: fetchTypeDirect, Direct: directRes}, nil
 }
 
-func (f *fetcher) handleCacheMiss(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
-	slog.Debug("Cache miss, fetching upstream...", "url", req.URL, "key", key)
-	upFetch, err := f.fetchUpstream(req, key, clientHd)
+func (f *fetcher) handleCacheMiss(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
+	slog.Debug("Cache miss, fetching upstream...", "url", req.URL, "key", lookupKey)
+	upFetch, err := f.fetchUpstream(req, baseKey, lookupKey, clientHd)
 	if err != nil {
 		return fetchResult{}, err
 	}
@@ -224,14 +291,14 @@ func (f *fetcher) handleCacheMiss(req *http.Request, key cache.CacheKey, clientH
 }
 
 // Fetches the requested resource either from cache or upstream.
-func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
+func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
 	slog.Debug("Trying to get request from cache...")
 
-	cached, err := f.cache.Get(key)
+	cached, err := f.cache.Get(lookupKey)
 	if err != nil {
 		if errors.Is(err, cache.ErrCacheEntryNotFound) {
-			slog.Debug("Cache miss, will fetch from upstream.", "url", req.URL, "key", key)
-			res, err := f.handleCacheMiss(req, key, clientHd)
+			slog.Debug("Cache miss, will fetch from upstream.", "url", req.URL, "key", lookupKey)
+			res, err := f.handleCacheMiss(req, baseKey, lookupKey, clientHd)
 			if err != nil {
 				return fetchResult{}, err
 			}
@@ -248,14 +315,14 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 	}
 
 	if !cached.Stale {
-		slog.Debug("Cache hit, returning cached response.", "url", req.URL, "key", key)
+		slog.Debug("Cache hit, returning cached response.", "url", req.URL, "key", lookupKey)
 		fetchInfo := fetchInfo{Status: hitStatusHit}
 
 		cachedResult := cachedFetchResult{fetchInfo: fetchInfo, Entry: cached}
 		return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
 	}
 
-	slog.Debug("Cached response is stale, fetching upstream.", "url", req.URL, "key", key)
+	slog.Debug("Cached response is stale, fetching upstream.", "url", req.URL, "key", lookupKey)
 
 	// Close the stale file handle before fetching from upstream
 	if cached.Data != nil {
@@ -273,7 +340,7 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 		up.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 	}
 
-	fetch, err := f.fetchUpstream(up, key, clientHd)
+	fetch, err := f.fetchUpstream(up, baseKey, lookupKey, clientHd)
 	if err != nil {
 		return fetchResult{}, err
 	}
@@ -289,8 +356,15 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, key cache.CacheKey, cli
 
 // Will deduplicate cachable requests and otherwise return the bypassed upstream response.
 // IMPORTANT: Remember to close data streams!
-func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
+func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
 	slog.Debug("Attempting to dedup fetch...")
+	lookupKey := f.lookupCacheKey(req, baseKey)
+
+	if !f.policy.RequestAllowsSharedCache(req) {
+		slog.Debug("Request contains credentials, bypassing shared cache", "url", req.URL)
+		metrics.Global.Requests.NonCoalescedRequests.Increment()
+		return f.fetchDirectlyFromUpstream(req)
+	}
 
 	shouldCoalesce := !clientHd.Range.IsPresent() && req.Method == http.MethodGet
 	if !shouldCoalesce {
@@ -298,13 +372,13 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 		slog.Debug("Request can't be coalesced, fetching upstream...")
 		metrics.Global.Requests.NonCoalescedRequests.Increment()
 
-		return f.fetchUpstream(req, key, clientHd)
+		return f.fetchUpstream(req, baseKey, lookupKey, clientHd)
 	}
 
 	originalClientHd := *clientHd // Copy the original client headers so the shared requests don't get a modified version
 
-	fetchedObj, err, shared := f.group.Do(key.Hex, func() (any, error) {
-		return f.getFromCacheOrFetch(req, key, clientHd)
+	fetchedObj, err, shared := f.group.Do(f.singleflightKey(req, baseKey), func() (any, error) {
+		return f.getFromCacheOrFetch(req, baseKey, lookupKey, clientHd)
 	})
 	if err != nil {
 		if errors.Is(err, ErrNotCacheable) {
@@ -337,9 +411,10 @@ func (f *fetcher) dedupFetch(req *http.Request, key cache.CacheKey, clientHd *he
 				fetched.Cached.Entry.Data.Close()
 			}
 
-			cached, err := f.cache.Get(key)
+			freshLookupKey := f.lookupCacheKey(req, baseKey)
+			cached, err := f.cache.Get(freshLookupKey)
 			if err != nil {
-				slog.Error("Error getting newly cached response. Bypassing cache and fetching upstream...", "url", req.URL, "key", key, "error", err)
+				slog.Error("Error getting newly cached response. Bypassing cache and fetching upstream...", "url", req.URL, "key", freshLookupKey, "error", err)
 				return f.fetchDirectlyFromUpstream(req)
 			}
 			fetched.Cached.Entry = cached

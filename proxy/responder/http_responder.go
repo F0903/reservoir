@@ -32,8 +32,9 @@ func (c *HTTPResponder) AddHeader(name string, value string) {
 
 func (c *HTTPResponder) SetHeaders(headers http.Header) {
 	for key, values := range headers {
+		c.writer.Header().Del(key)
 		for _, value := range values {
-			c.SetHeader(key, value)
+			c.AddHeader(key, value)
 		}
 	}
 }

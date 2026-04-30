@@ -45,9 +45,13 @@ func TestParseRange(t *testing.T) {
 		// Invalid unit/format/value
 		{name: "bad-unit", rangeStr: "items=0-10", size: size, wantErr: ErrInvalidRangeUnit},
 		{name: "no-equals", rangeStr: "bytes0-10", size: size, wantErr: ErrInvalidRangeFormat},
+		{name: "empty-value", rangeStr: "bytes=", size: size, wantErr: ErrInvalidRangeValue},
+		{name: "missing-dash", rangeStr: "bytes=10", size: size, wantErr: ErrInvalidRangeFormat},
 		{name: "non-numeric", rangeStr: "bytes=a-b", size: size, wantErr: ErrInvalidRangeValue},
 		{name: "missing-end-digit", rangeStr: "bytes=10-x", size: size, wantErr: ErrInvalidRangeValue},
 		{name: "neg-start-format", rangeStr: "bytes=-1-10", size: size, wantErr: ErrInvalidRangeFormat},
+		{name: "trailing-garbage", rangeStr: "bytes=0-10x", size: size, wantErr: ErrInvalidRangeFormat},
+		{name: "suffix-trailing-garbage", rangeStr: "bytes=-10x", size: size, wantErr: ErrInvalidRangeFormat},
 
 		// Multiple ranges not supported
 		{name: "multiple", rangeStr: "bytes=0-10,20-30", size: size, wantErr: ErrMultipleRangesNotSupported},

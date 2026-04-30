@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"reservoir/utils/bytesize"
+	"sync/atomic"
 	"testing"
 )
 
@@ -131,6 +133,35 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 
 	if cfg.Logging.Level.Read() != slog.LevelDebug {
 		t.Errorf("Expected LogLevel to be DEBUG, got %v", cfg.Logging.Level.Read())
+	}
+}
+
+func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T) {
+	cfg := NewDefault()
+	originalSize := cfg.Cache.MaxCacheSize.Read()
+
+	var notified atomic.Bool
+	unsub := cfg.Cache.MaxCacheSize.OnChange(func(_ bytesize.ByteSize) {
+		notified.Store(true)
+	})
+	defer unsub()
+
+	status, err := UpdatePartialFromConfig(cfg, map[string]any{
+		"cache": map[string]any{
+			"max_cache_size": "0B",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected invalid update to return an error")
+	}
+	if status != UpdateStatusFailed {
+		t.Fatalf("expected failed status, got %v", status)
+	}
+	if got := cfg.Cache.MaxCacheSize.Read(); got != originalSize {
+		t.Fatalf("invalid update committed max cache size: got %s, want %s", got, originalSize)
+	}
+	if notified.Load() {
+		t.Fatal("invalid update fired runtime subscriber")
 	}
 }
 

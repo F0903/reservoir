@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync/atomic"
 	"testing"
 )
 
@@ -84,6 +85,137 @@ func TestRangeRequests(t *testing.T) {
 	body, _ = io.ReadAll(resp.Body)
 	if !bytes.Equal(body, content[10:20]) {
 		t.Errorf("Expected body %q, got %q", content[10:20], body)
+	}
+}
+
+func TestVaryAcceptEncodingUsesSeparateCacheVariants(t *testing.T) {
+	env := SetupTestEnv(t)
+
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.WriteHeader(http.StatusOK)
+
+		if r.Header.Get("Accept-Encoding") == "gzip" {
+			w.Write([]byte("gzip variant"))
+			return
+		}
+		w.Write([]byte("identity variant"))
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/vary-accept-encoding"
+	doRequest := func(acceptEncoding string) string {
+		req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Accept-Encoding", acceptEncoding)
+
+		resp, err := env.Client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		return string(body)
+	}
+
+	if got := doRequest("gzip"); got != "gzip variant" {
+		t.Fatalf("unexpected gzip variant body: %q", got)
+	}
+	if got := doRequest("identity"); got != "identity variant" {
+		t.Fatalf("unexpected identity variant body: %q", got)
+	}
+	if got := doRequest("gzip"); got != "gzip variant" {
+		t.Fatalf("unexpected cached gzip variant body: %q", got)
+	}
+	if got := upstreamRequests.Load(); got != 2 {
+		t.Fatalf("expected 2 upstream requests for 2 variants, got %d", got)
+	}
+}
+
+func TestCredentialedRequestsBypassCache(t *testing.T) {
+	env := SetupTestEnv(t)
+
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "response %d", count)
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/private"
+	doRequest := func() string {
+		req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+		if err != nil {
+			t.Fatalf("failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer test-token")
+
+		resp, err := env.Client.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		return string(body)
+	}
+
+	if got := doRequest(); got != "response 1" {
+		t.Fatalf("unexpected first response body: %q", got)
+	}
+	if got := doRequest(); got != "response 2" {
+		t.Fatalf("credentialed request was served from cache: %q", got)
+	}
+	if got := upstreamRequests.Load(); got != 2 {
+		t.Fatalf("expected 2 upstream requests, got %d", got)
+	}
+}
+
+func TestNoStoreCachesWhenAggressivePackageCacheEnabled(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(true)
+	env.Cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(true)
+
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "package %d", count)
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/package.deb"
+	for i := 0; i < 2; i++ {
+		resp, err := env.Client.Get(targetURL)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		if string(body) != "package 1" {
+			t.Fatalf("unexpected response body: %q", body)
+		}
+	}
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected aggressive package-cache mode to cache no-store response, got %d upstream requests", got)
 	}
 }
 
