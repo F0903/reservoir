@@ -17,6 +17,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Fix file and memory cache overwrite accounting so replacing a cached key updates size and entry metrics correctly.
 - [x] Fix direct upstream byte accounting for non-cached responses.
 - [x] Add optional file-cache metadata sidecars for restart continuity without turning the cache into long-lived storage. (?)
+- [x] Add proxy-level restart-continuity tests for file-cache sidecars with real cached response metadata.
 
 ## Dashboard 
 
