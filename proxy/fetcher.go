@@ -10,8 +10,8 @@ import (
 	"reservoir/metrics"
 	"reservoir/proxy/headers"
 	"reservoir/utils/countingreader"
+	"reservoir/utils/syncmap"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -25,8 +25,7 @@ type fetcher struct {
 	policy       cachePolicy
 	client       *http.Client
 	group        singleflight.Group
-	variantMu    sync.RWMutex
-	variantIndex map[cache.CacheKey][]string
+	variantIndex *syncmap.SyncMap[cache.CacheKey, []string]
 }
 
 func newFetcher(cacheStore cache.Cache[cachedRequestInfo], cfg *config.Config, upstreamClient *http.Client) fetcher {
@@ -40,7 +39,7 @@ func newFetcher(cacheStore cache.Cache[cachedRequestInfo], cfg *config.Config, u
 		policy:       newCachePolicy(cfg),
 		client:       upstreamClient,
 		group:        singleflight.Group{},
-		variantIndex: make(map[cache.CacheKey][]string),
+		variantIndex: syncmap.New[cache.CacheKey, []string](),
 	}
 }
 
@@ -74,10 +73,7 @@ func makeVariantCacheKey(req *http.Request, baseKey cache.CacheKey, vary []strin
 }
 
 func (f *fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cache.CacheKey {
-	f.variantMu.RLock()
-	vary := f.variantIndex[baseKey]
-	f.variantMu.RUnlock()
-
+	vary, _ := f.variantIndex.Get(baseKey)
 	return makeVariantCacheKey(req, baseKey, vary)
 }
 
@@ -86,17 +82,14 @@ func (f *fetcher) singleflightKey(req *http.Request, baseKey cache.CacheKey) str
 }
 
 func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
-	f.variantMu.Lock()
-	defer f.variantMu.Unlock()
-
 	if len(vary) == 0 {
-		delete(f.variantIndex, baseKey)
+		f.variantIndex.Delete(baseKey)
 		return
 	}
 
 	copied := make([]string, len(vary))
 	copy(copied, vary)
-	f.variantIndex[baseKey] = copied
+	f.variantIndex.Set(baseKey, copied)
 }
 
 func (f *fetcher) closeIdleConnections() {
