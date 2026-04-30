@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"reservoir/config"
@@ -112,5 +113,76 @@ func TestFileCache_OverwriteUpdatesAccounting(t *testing.T) {
 	}
 	if retrieved.Metadata.Object.ID != "second" {
 		t.Fatalf("expected replacement metadata, got %q", retrieved.Metadata.Object.ID)
+	}
+}
+
+func TestFileCache_LoadsMetadataSidecarsOnRestart(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.NewDefault()
+
+	tmpDir := t.TempDir()
+	key := FromString("restart-key")
+	data := []byte("restart body")
+	expires := time.Now().Add(time.Hour)
+
+	firstCache := NewFileCache[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	firstEntry, err := firstCache.Cache(key, bytes.NewReader(data), expires, TestMeta{ID: "restart-meta"})
+	if err != nil {
+		t.Fatalf("cache before restart failed: %v", err)
+	}
+	firstEntry.Data.Close()
+	firstCache.Destroy()
+
+	secondCache := NewFileCache[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	defer secondCache.Destroy()
+
+	retrieved, err := secondCache.Get(key)
+	if err != nil {
+		t.Fatalf("get after restart failed: %v", err)
+	}
+	defer retrieved.Data.Close()
+
+	content, err := io.ReadAll(retrieved.Data)
+	if err != nil {
+		t.Fatalf("failed to read restored data: %v", err)
+	}
+	if !bytes.Equal(content, data) {
+		t.Fatalf("expected restored data %q, got %q", data, content)
+	}
+	if retrieved.Metadata.Object.ID != "restart-meta" {
+		t.Fatalf("expected restored metadata, got %q", retrieved.Metadata.Object.ID)
+	}
+	if got := secondCache.byteSize.Get(); got != int64(len(data)) {
+		t.Fatalf("expected restored byte size %d, got %d", len(data), got)
+	}
+}
+
+func TestFileCache_RemovesExpiredSidecarsOnStartup(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.NewDefault()
+
+	tmpDir := t.TempDir()
+	key := FromString("expired-restart-key")
+	data := []byte("expired body")
+
+	firstCache := NewFileCache[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	firstEntry, err := firstCache.Cache(key, bytes.NewReader(data), time.Now().Add(-time.Hour), TestMeta{ID: "expired"})
+	if err != nil {
+		t.Fatalf("cache expired entry failed: %v", err)
+	}
+	firstEntry.Data.Close()
+	firstCache.Destroy()
+
+	secondCache := NewFileCache[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	defer secondCache.Destroy()
+
+	if _, err := secondCache.Get(key); !errors.Is(err, ErrCacheEntryNotFound) {
+		t.Fatalf("expected expired restored entry to be missing, got %v", err)
+	}
+	if _, err := os.Stat(secondCache.dataPath(key)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected expired data file to be removed, got %v", err)
+	}
+	if _, err := os.Stat(secondCache.metadataPath(key)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected expired metadata sidecar to be removed, got %v", err)
 	}
 }

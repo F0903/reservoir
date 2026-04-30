@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"reservoir/utils/assertedpath"
 	"reservoir/utils/atomics"
 	"reservoir/utils/bytesize"
+	"strings"
 	"sync"
 	"time"
 )
@@ -41,7 +44,7 @@ type FileCache[MetadataT any] struct {
 // NewFileCache creates a new FileCache instance with the specified root directory.
 func NewFileCache[MetadataT any](cfg *config.Config, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *FileCache[MetadataT] {
 	c := &FileCache[MetadataT]{
-		rootDir:         assertedpath.AssertDirectory(rootDir).EnsureCleared(),
+		rootDir:         assertedpath.AssertDirectory(rootDir),
 		entriesMetadata: make(map[CacheKey]*EntryMetadata[MetadataT]),
 		locks:           make([]sync.RWMutex, shardCount),
 		byteSize:        atomics.NewInt64(0),
@@ -51,6 +54,8 @@ func NewFileCache[MetadataT any](cfg *config.Config, rootDir string, maxCacheSiz
 	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
 		c.maxCacheSize.Set(newSize.Bytes())
 	}))
+
+	c.loadMetadataSidecars()
 
 	c.janitor = newCacheJanitor(cfg, cleanupInterval, cacheFunctions[MetadataT]{
 		cacheIterator: func(yield func(key CacheKey, metadata *EntryMetadata[MetadataT]) bool) {
@@ -79,6 +84,9 @@ func NewFileCache[MetadataT any](cfg *config.Config, rootDir string, maxCacheSiz
 			return getLock(c.locks, key)
 		},
 	})
+	if c.byteSize.Get() >= c.maxCacheSize.Get() {
+		c.janitor.evict(c.maxCacheSize.Get())
+	}
 	c.janitor.start(ctx)
 	return c
 }
@@ -86,6 +94,119 @@ func NewFileCache[MetadataT any](cfg *config.Config, rootDir string, maxCacheSiz
 func (c *FileCache[MetadataT]) Destroy() {
 	c.janitor.stop()
 	c.subs.UnsubscribeAll()
+}
+
+func (c *FileCache[MetadataT]) dataPath(key CacheKey) string {
+	return filepath.Join(c.rootDir.Path, key.Hex)
+}
+
+func (c *FileCache[MetadataT]) metadataPath(key CacheKey) string {
+	return filepath.Join(c.rootDir.Path, key.Hex+".meta.json")
+}
+
+func (c *FileCache[MetadataT]) loadMetadataSidecars() {
+	files, err := os.ReadDir(c.rootDir.Path)
+	if err != nil {
+		slog.Error("Failed to read file cache directory", "path", c.rootDir.Path, "error", err)
+		return
+	}
+
+	loaded := make(map[string]struct{})
+	now := time.Now()
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".meta.json") {
+			continue
+		}
+
+		keyHex := strings.TrimSuffix(file.Name(), ".meta.json")
+		if !isCacheDataFileName(keyHex) {
+			_ = removeIfExists(filepath.Join(c.rootDir.Path, file.Name()))
+			continue
+		}
+
+		key := CacheKey{Hex: keyHex}
+		if c.loadMetadataSidecar(key, now) {
+			loaded[keyHex] = struct{}{}
+		}
+	}
+
+	for _, file := range files {
+		if file.IsDir() || !isCacheDataFileName(file.Name()) {
+			continue
+		}
+		if _, ok := loaded[file.Name()]; ok {
+			continue
+		}
+		if err := removeIfExists(filepath.Join(c.rootDir.Path, file.Name())); err != nil {
+			slog.Error("Failed to remove orphaned cache data file", "file", file.Name(), "error", err)
+		}
+	}
+}
+
+func (c *FileCache[MetadataT]) loadMetadataSidecar(key CacheKey, now time.Time) bool {
+	metaPath := c.metadataPath(key)
+	dataPath := c.dataPath(key)
+
+	metaBytes, err := os.ReadFile(metaPath)
+	if err != nil {
+		slog.Error("Failed to read cache metadata sidecar", "key", key.Hex, "error", err)
+		_ = removeIfExists(dataPath)
+		_ = removeIfExists(metaPath)
+		return false
+	}
+
+	var meta EntryMetadata[MetadataT]
+	if err := json.Unmarshal(metaBytes, &meta); err != nil {
+		slog.Error("Failed to decode cache metadata sidecar", "key", key.Hex, "error", err)
+		_ = removeIfExists(dataPath)
+		_ = removeIfExists(metaPath)
+		return false
+	}
+
+	dataStat, err := os.Stat(dataPath)
+	if err != nil || dataStat.Size() == 0 || meta.Expires.Before(now) {
+		_ = removeIfExists(dataPath)
+		_ = removeIfExists(metaPath)
+		return false
+	}
+
+	meta.Size = dataStat.Size()
+	c.entriesMetadata[key] = &meta
+	addCacheSize(&c.byteSize, meta.Size)
+	incrementCacheEntries()
+	return true
+}
+
+func (c *FileCache[MetadataT]) writeMetadataSidecar(key CacheKey, meta *EntryMetadata[MetadataT]) {
+	metaFile, err := os.Create(c.metadataPath(key))
+	if err != nil {
+		slog.Error("Failed to create cache metadata sidecar", "key", key.Hex, "error", err)
+		return
+	}
+	defer metaFile.Close()
+
+	if err := json.NewEncoder(metaFile).Encode(meta); err != nil {
+		slog.Error("Failed to write cache metadata sidecar", "key", key.Hex, "error", err)
+	}
+}
+
+func (c *FileCache[MetadataT]) removeMetadataSidecar(key CacheKey) error {
+	return removeIfExists(c.metadataPath(key))
+}
+
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func isCacheDataFileName(name string) bool {
+	if len(name) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(name)
+	return err == nil
 }
 
 func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
@@ -116,11 +237,15 @@ func (c *FileCache[MetadataT]) ensureRemoveFile(path string) error {
 
 // Ensures that both the cached file, its metadata and lock are removed without acquiring a lock.
 func (c *FileCache[MetadataT]) ensureRemove(key CacheKey) error {
-	filePath := filepath.Join(c.rootDir.Path, key.Hex)
+	filePath := c.dataPath(key)
 
 	if fileErr := c.ensureRemoveFile(filePath); fileErr != nil {
 		slog.Error("Failed to remove cached file", "key", key.Hex, "error", fileErr)
 		return fmt.Errorf("%w: failed to remove cached file '%s'", fileErr, filePath)
+	}
+	if metaErr := c.removeMetadataSidecar(key); metaErr != nil {
+		slog.Error("Failed to remove cache metadata sidecar", "key", key.Hex, "error", metaErr)
+		return fmt.Errorf("%w: failed to remove cache metadata sidecar for key '%s'", ErrCacheFileRemove, key.Hex)
 	}
 
 	c.mu.Lock()
@@ -145,7 +270,7 @@ func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 		return nil, ErrCacheEntryNotFound
 	}
 
-	fileName := filepath.Join(c.rootDir.Path, key.Hex)
+	fileName := c.dataPath(key)
 	dataFile, err := os.Open(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
@@ -183,7 +308,7 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 	}
 	c.mu.RUnlock()
 
-	fileName := filepath.Join(c.rootDir.Path, key.Hex)
+	fileName := c.dataPath(key)
 	file, err := os.Create(fileName)
 	if err != nil {
 		metrics.Global.Cache.CacheErrors.Increment()
@@ -232,6 +357,7 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 		incrementCacheEntries()
 	}
 	addCacheSize(&c.byteSize, fileSize)
+	c.writeMetadataSidecar(key, meta)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
 
@@ -274,6 +400,7 @@ func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*Entry
 
 	modifier(meta)
 	meta.LastAccess = time.Now()
+	c.writeMetadataSidecar(key, meta)
 
 	metrics.Global.Cache.CacheHits.Increment()
 
