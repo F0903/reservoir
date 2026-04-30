@@ -15,9 +15,10 @@ func (e *LogoutEndpoint) Path() string {
 func (e *LogoutEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       "POST",
-			Func:         e.Post,
-			RequiresAuth: true,
+			Method:                      "POST",
+			Func:                        e.Post,
+			RequiresAuth:                true,
+			AllowPasswordChangeRequired: true,
 		},
 	}
 }

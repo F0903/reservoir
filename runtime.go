@@ -29,6 +29,16 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to migrate databases: %w", err)
 	}
 
+	if !cfg.Webserver.ApiDisabled.Read() {
+		bootstrap, err := auth.EnsureBootstrapAdmin()
+		if err != nil {
+			return nil, fmt.Errorf("failed to ensure bootstrap admin: %w", err)
+		}
+		if bootstrap != nil {
+			slog.Warn("Bootstrap admin credentials generated", "username", bootstrap.Username, "password_file", bootstrap.PasswordFile)
+		}
+	}
+
 	caCert := cfg.Proxy.CaCert.Read()
 	caKey := cfg.Proxy.CaKey.Read()
 	ca, err := certs.NewPrivateCA(caCert, caKey)

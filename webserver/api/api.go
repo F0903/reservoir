@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/config"
+	dbmodels "reservoir/db/models"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth"
 	configEndpoint "reservoir/webserver/api/endpoints/config"
@@ -18,6 +19,7 @@ var (
 	ErrEndpointNoMethod     = errors.New("endpoint has no method defined")
 	ErrEndpointNoFunction   = errors.New("endpoint has no function defined")
 	ErrEndpointUnauthorized = errors.New("authentication required")
+	ErrPasswordChangeNeeded = errors.New("password change required")
 )
 
 type API struct {
@@ -58,7 +60,22 @@ func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (status
 		return http.StatusUnauthorized, ErrEndpointUnauthorized
 	}
 
+	user, err := ctx.GetCurrentUser()
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if user == nil {
+		return http.StatusUnauthorized, ErrEndpointUnauthorized
+	}
+	if !passwordChangeAllowed(user, method) {
+		return http.StatusForbidden, ErrPasswordChangeNeeded
+	}
+
 	return http.StatusOK, nil
+}
+
+func passwordChangeAllowed(user *dbmodels.User, method apitypes.EndpointMethod) bool {
+	return !user.PasswordChangeRequired || method.AllowPasswordChangeRequired
 }
 
 func WrapHandler(cfg *config.Config, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
@@ -75,6 +92,10 @@ func WrapHandler(cfg *config.Config, methodFunc apitypes.MethodFunc, preRunHook 
 			if status, err := preRunHook(ctx); err != nil {
 				if err == ErrEndpointUnauthorized {
 					http.Error(w, "Unauthorized", status)
+					return
+				}
+				if err == ErrPasswordChangeNeeded {
+					http.Error(w, "Password change required", status)
 					return
 				}
 

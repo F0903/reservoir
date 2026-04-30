@@ -19,4 +19,4 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Use `context`/`errgroup`-style startup and shutdown orchestration with bounded graceful shutdown.
 - [ ] Replace or harden custom concurrency primitives such as `SyncMap` and event subscriptions. Started: `SyncMap` iteration and session access are hardened; event subscriptions remain.
 - [x] Make config updates transactional: validate staged changes before committing or firing runtime subscribers.
-- [ ] Treat security defaults as part of the architecture, including first-login setup, session handling, and conservative cache behavior. Started: shared-cache and variant safety improved; first-login/session defaults remain.
+- [x] Treat security defaults as part of the architecture, including first-login setup, session handling, and conservative cache behavior.

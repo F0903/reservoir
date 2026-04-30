@@ -8,9 +8,10 @@ import (
 type MethodFunc func(w http.ResponseWriter, r *http.Request, ctx Context)
 
 type EndpointMethod struct {
-	Method       string
-	Func         MethodFunc
-	RequiresAuth bool
+	Method                      string
+	Func                        MethodFunc
+	RequiresAuth                bool
+	AllowPasswordChangeRequired bool
 }
 
 type Endpoint interface {

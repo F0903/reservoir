@@ -62,6 +62,12 @@ func (s *UserStore) GetByID(id int64) (*models.User, error) {
 	return &user, nil
 }
 
+func (s *UserStore) Count() (int, error) {
+	var count int
+	err := s.db.Get(&count, "SELECT COUNT(*) FROM users")
+	return count, err
+}
+
 func (s *UserStore) Close() error {
 	return s.db.Close()
 }

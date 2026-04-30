@@ -116,6 +116,24 @@ func CreateSession(userId int64) *Session {
 	return sess
 }
 
+func DestroySessionsForUserExcept(userID int64, keepSessionID string) int {
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
+
+	deleted := 0
+	for item := range sessionStore.Items() {
+		if item.UserID != userID || item.ID == keepSessionID {
+			continue
+		}
+		sessionStore.Delete(item.ID)
+		deleted++
+	}
+	if deleted > 0 {
+		slog.Debug("Destroyed user sessions", "user_id", userID, "deleted", deleted)
+	}
+	return deleted
+}
+
 func SessionFromRequest(r *http.Request) (sess *Session, ok bool) {
 	sid, err := r.Cookie("reservoir.sid")
 	if errors.Is(err, http.ErrNoCookie) {

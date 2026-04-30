@@ -19,7 +19,11 @@ func CreateContext(r *http.Request, cfg *config.Config) (Context, error) {
 	sess, authorized := auth.SessionFromRequest(r)
 	var users *stores.UserStore
 	if authorized {
-		users, _ = stores.OpenUserStore()
+		var err error
+		users, err = stores.OpenUserStore()
+		if err != nil {
+			return Context{}, err
+		}
 	}
 
 	return Context{
@@ -35,6 +39,9 @@ func (c *Context) IsAuthenticated() bool {
 
 func (c *Context) GetCurrentUser() (*models.User, error) {
 	if !c.IsAuthenticated() {
+		return nil, auth.ErrNoSession
+	}
+	if c.UserStore == nil {
 		return nil, auth.ErrNoSession
 	}
 	return c.UserStore.GetByID(c.Session.UserID)

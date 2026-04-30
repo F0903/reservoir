@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reservoir/utils/phc"
 	"reservoir/webserver/api/apitypes"
+	coreauth "reservoir/webserver/auth"
 )
 
 var (
@@ -29,9 +30,10 @@ func (e *ChangePasswordEndpoint) Path() string {
 func (e *ChangePasswordEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       "PATCH",
-			Func:         e.Patch,
-			RequiresAuth: true,
+			Method:                      "PATCH",
+			Func:                        e.Patch,
+			RequiresAuth:                true,
+			AllowPasswordChangeRequired: true,
 		},
 	}
 }
@@ -77,6 +79,10 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+	if err := coreauth.ClearBootstrapPasswordFile(); err != nil {
+		slog.Error("Error removing bootstrap password file", "error", err)
+	}
+	coreauth.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
 
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -16,8 +16,3 @@ BEGIN
   UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
--- Create a default admin user with a secure password hash if it doesn't exist
--- Default password is 'placeholder'. User is forced to change it on first login.
-INSERT INTO users (username, password_hash, password_change_required)
-VALUES ('admin', '$argon2id$v=19$m=65536,t=1,p=4,l=32$weMSjfxU6+aXx8ylew5tAQ$oUu4uP4YwqXbDktayQKfj/mxKmR9fTUbghuIIReRaRA', 1)
-ON CONFLICT(username) DO NOTHING;
