@@ -3,6 +3,7 @@ package proxy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
@@ -18,6 +19,18 @@ import (
 )
 
 var ErrNotCacheable = errors.New("response not cacheable")
+
+type fetchedBytesReadCloser struct {
+	io.ReadCloser
+}
+
+func (r fetchedBytesReadCloser) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	if n > 0 {
+		metrics.Global.Requests.BytesFetched.Add(int64(n))
+	}
+	return n, err
+}
 
 type fetcher struct {
 	cache        cache.Cache[cachedRequestInfo]
@@ -94,6 +107,10 @@ func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
 
 func (f *fetcher) closeIdleConnections() {
 	f.client.CloseIdleConnections()
+}
+
+func trackFetchedBytes(body io.ReadCloser) io.ReadCloser {
+	return fetchedBytesReadCloser{ReadCloser: body}
 }
 
 func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[cachedRequestInfo], err error) {
@@ -230,11 +247,7 @@ func (f *fetcher) fetchUpstream(req *http.Request, baseKey cache.CacheKey, looku
 	if cached == nil {
 		slog.Debug("Upstream response is not cachable, returning direct result after cache miss...", "url", req.URL, "status", resp.StatusCode)
 
-		var bytesRead int
-		countingBody := countingreader.NewReadCloser(resp.Body, &bytesRead)
-		resp.Body = countingBody
-
-		metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
+		resp.Body = trackFetchedBytes(resp.Body)
 
 		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
@@ -261,11 +274,7 @@ func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, err
 		return fetchResult{}, err
 	}
 
-	var bytesRead int
-	countingBody := countingreader.NewReadCloser(resp.Body, &bytesRead)
-	resp.Body = countingBody
-
-	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
+	resp.Body = trackFetchedBytes(resp.Body)
 
 	slog.Debug("Returning direct fetch result", "url", req.URL, "status", resp.StatusCode)
 	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}

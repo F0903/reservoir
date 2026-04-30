@@ -15,7 +15,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Strengthen HTTP protocol boundaries so response/header state cannot leak across CONNECT tunnel requests.
 - [x] Make cache keys and stored metadata safe for variant and private responses.
 - [x] Fix file and memory cache overwrite accounting so replacing a cached key updates size and entry metrics correctly.
-- [ ] Fix direct upstream byte accounting for non-cached responses.
+- [x] Fix direct upstream byte accounting for non-cached responses.
 - [ ] Add optional file-cache metadata sidecars for restart continuity without turning the cache into long-lived storage. (?)
 
 ## Dashboard 
