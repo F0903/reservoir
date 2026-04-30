@@ -12,7 +12,7 @@ The dashboard is directly embedded into the executable, so the final build artif
 
 ## Requirements
 
-- Go 1.24 or newer (the latest version is recommended)
+- Go 1.26 or newer
 - OpenSSL (for generating CA cert/key)
 
 ## Usage Guide
@@ -71,6 +71,29 @@ If a setting is both specified in the configuration file and as a command-line a
 The configuration file is a JSON file that contains all the settings for the proxy.
 You can edit this file manually in ``var/config.json`` to change the configuration. If the ``var/`` folder or config does not exist, run the proxy once, and it will be created automatically.
 Some settings can also be changed in the Dashboard.
+
+### Dashboard Bootstrap Login
+
+When the API is enabled and the user database is empty, Reservoir creates a bootstrap admin user:
+
+- Username: `admin`
+- Password: written to `var/bootstrap-admin-password.txt`
+
+The bootstrap password is generated locally on startup and the user is required to change it before using authenticated API endpoints. After the password is changed, Reservoir removes the bootstrap password file. If an older install still has the legacy `admin` password `placeholder` marked as requiring a password change, Reservoir rotates it to a generated bootstrap password and writes the same password file.
+
+If the API is disabled, Reservoir does not create bootstrap dashboard credentials.
+
+### Package Cache Behavior
+
+Reservoir is tuned first as a shared package cache for package-manager traffic. By default the proxy cache policy favors useful package caching over strict upstream cache directives:
+
+- `proxy.cache_policy.ignore_cache_control` defaults to `true`, so package responses can still be cached when upstream sends directives such as `no-store`.
+- `proxy.cache_policy.force_default_max_age` defaults to `true`, so cached responses use `proxy.cache_policy.default_max_age` instead of upstream freshness metadata.
+- Requests containing `Authorization` or `Cookie` are not stored in the shared cache.
+- Responses with `Set-Cookie`, unsupported `Vary`, or unsafe content encoding metadata are not stored in the shared cache.
+- When a cached package response is stale and upstream revalidation fails with a server error or network failure, Reservoir serves the stale cached response.
+
+These defaults are intentional for package-cache deployments. If you need stricter general-purpose proxy semantics, disable `ignore_cache_control` and `force_default_max_age` in `var/config.json`.
 
 ### Command-Line Arguments
 
