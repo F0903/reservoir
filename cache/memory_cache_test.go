@@ -115,3 +115,63 @@ func TestMemoryCache_OverwriteUpdatesAccounting(t *testing.T) {
 		t.Fatalf("expected replacement metadata, got %q", retrieved.Metadata.Object.ID)
 	}
 }
+
+func TestMemoryCache_ClearRemovesEntriesAndUpdatesStats(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.NewDefault()
+	maxCacheSize := int64(1024 * 1024 * 1024)
+
+	c := NewMemoryCache[TestMeta](cfg, 1, maxCacheSize, time.Minute, 16, ctx)
+	defer c.Destroy()
+
+	firstData := []byte("first")
+	secondData := []byte("second body")
+	expires := time.Now().Add(time.Hour)
+
+	first, err := c.Cache(FromString("clear-memory-first"), bytes.NewReader(firstData), expires, TestMeta{ID: "first"})
+	if err != nil {
+		t.Fatalf("first cache failed: %v", err)
+	}
+	first.Data.Close()
+
+	second, err := c.Cache(FromString("clear-memory-second"), bytes.NewReader(secondData), expires, TestMeta{ID: "second"})
+	if err != nil {
+		t.Fatalf("second cache failed: %v", err)
+	}
+	second.Data.Close()
+
+	stats := c.Stats()
+	if stats.Entries != 2 {
+		t.Fatalf("expected 2 entries before clear, got %d", stats.Entries)
+	}
+	if stats.Bytes != int64(len(firstData)+len(secondData)) {
+		t.Fatalf("expected %d cached bytes before clear, got %d", len(firstData)+len(secondData), stats.Bytes)
+	}
+	if stats.MaxBytes != maxCacheSize {
+		t.Fatalf("expected max cache size %d, got %d", maxCacheSize, stats.MaxBytes)
+	}
+	if stats.MemoryCapBytes <= 0 {
+		t.Fatalf("expected positive memory cap, got %d", stats.MemoryCapBytes)
+	}
+
+	if err := c.Clear(); err != nil {
+		t.Fatalf("clear failed: %v", err)
+	}
+
+	stats = c.Stats()
+	if stats.Entries != 0 {
+		t.Fatalf("expected 0 entries after clear, got %d", stats.Entries)
+	}
+	if stats.Bytes != 0 {
+		t.Fatalf("expected 0 cached bytes after clear, got %d", stats.Bytes)
+	}
+	if _, err := c.Get(FromString("clear-memory-first")); err != ErrCacheEntryNotFound {
+		t.Fatalf("expected cleared first entry to be missing, got %v", err)
+	}
+	if _, err := c.Get(FromString("clear-memory-second")); err != ErrCacheEntryNotFound {
+		t.Fatalf("expected cleared second entry to be missing, got %v", err)
+	}
+	if err := c.Clear(); err != nil {
+		t.Fatalf("clear on empty cache failed: %v", err)
+	}
+}

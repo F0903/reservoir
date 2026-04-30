@@ -19,6 +19,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add optional file-cache metadata sidecars for restart continuity without turning the cache into long-lived storage. (?)
 - [x] Add proxy-level restart-continuity tests for file-cache sidecars with real cached response metadata.
 - [x] Document cache sidecar restart behavior, cache backend tradeoffs, and CLI/config boundaries.
+- [x] Add cache operations API endpoints for status inspection and manual clearing.
 
 ## Dashboard 
 

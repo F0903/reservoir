@@ -20,6 +20,12 @@ type Cache[MetadataT any] interface {
 	// Removes an entry from the cache by its input key.
 	Delete(key CacheKey) error
 
+	// Returns a point-in-time view of cache size and capacity.
+	Stats() Stats
+
+	// Removes all entries from the cache.
+	Clear() error
+
 	// Retrieves the metadata of an entry in the cache.
 	GetMetadata(key CacheKey) (meta *EntryMetadata[MetadataT], stale bool, err error)
 
@@ -28,4 +34,11 @@ type Cache[MetadataT any] interface {
 
 	// Calls any cleanup operations that might be necessary. The cache must not be used after this method is called.
 	Destroy()
+}
+
+type Stats struct {
+	Entries        int
+	Bytes          int64
+	MaxBytes       int64
+	MemoryCapBytes int64
 }

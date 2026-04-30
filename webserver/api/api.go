@@ -10,6 +10,7 @@ import (
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	authEndpoints "reservoir/webserver/api/auth"
+	cacheEndpoint "reservoir/webserver/api/endpoints/cache"
 	configEndpoint "reservoir/webserver/api/endpoints/config"
 	"reservoir/webserver/api/endpoints/log"
 	"reservoir/webserver/api/endpoints/metrics"
@@ -28,10 +29,11 @@ type API struct {
 	basePath  string
 	cfg       *config.Config
 	sessions  *coreauth.SessionManager
+	cache     apitypes.CacheController
 	endpoints []apitypes.Endpoint
 }
 
-func New(cfg *config.Config, sessions *coreauth.SessionManager) *API {
+func New(cfg *config.Config, sessions *coreauth.SessionManager, cacheController apitypes.CacheController) *API {
 	if sessions == nil {
 		sessions = coreauth.DefaultSessionManager()
 	}
@@ -40,9 +42,12 @@ func New(cfg *config.Config, sessions *coreauth.SessionManager) *API {
 		basePath: "/api",
 		cfg:      cfg,
 		sessions: sessions,
+		cache:    cacheController,
 		endpoints: []apitypes.Endpoint{
 			// Register all our current API endpoints here.
 			&version.VersionEndpoint{},
+			&cacheEndpoint.StatusEndpoint{},
+			&cacheEndpoint.ClearEndpoint{},
 			&metrics.AllMetricsEndpoint{},
 			&metrics.CacheMetricsEndpoint{},
 			&metrics.RequestsMetricsEndpoint{},
@@ -86,9 +91,9 @@ func passwordChangeAllowed(user *dbmodels.User, method apitypes.EndpointMethod) 
 	return !user.PasswordChangeRequired || method.AllowPasswordChangeRequired
 }
 
-func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
+func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, cacheController apitypes.CacheController, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := apitypes.CreateContext(r, cfg, sessions)
+		ctx, err := apitypes.CreateContext(r, cfg, sessions, cacheController)
 		if err != nil {
 			slog.Error("Error creating request context", "error", err)
 			apihttp.InternalServerError(w)
@@ -131,7 +136,7 @@ func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
-			mux.HandleFunc(pattern, WrapHandler(api.cfg, api.sessions, method.Func, func(ctx apitypes.Context) (int, error) {
+			mux.HandleFunc(pattern, WrapHandler(api.cfg, api.sessions, api.cache, method.Func, func(ctx apitypes.Context) (int, error) {
 				return EnsureAllowed(ctx, method)
 			}))
 			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())

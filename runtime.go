@@ -10,6 +10,7 @@ import (
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
 	"reservoir/webserver/api"
+	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/auth"
 	"reservoir/webserver/dashboard"
 
@@ -53,7 +54,7 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	}
 
 	sessions := auth.NewSessionManager()
-	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions)
+	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions, p)
 	if err != nil {
 		p.Destroy()
 		return nil, err
@@ -69,7 +70,7 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	}, nil
 }
 
-func buildWebServer(cfg *config.Config, sessions *auth.SessionManager) (*webserver.WebServer, bool, bool, error) {
+func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, cacheController apitypes.CacheController) (*webserver.WebServer, bool, bool, error) {
 	dashboardDisabled := cfg.Webserver.DashboardDisabled.Read()
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 
@@ -95,7 +96,7 @@ func buildWebServer(cfg *config.Config, sessions *auth.SessionManager) (*webserv
 	if apiDisabled {
 		slog.Info("API is disabled by configuration, skipping registration")
 	} else {
-		a := api.New(cfg, sessions)
+		a := api.New(cfg, sessions, cacheController)
 		if err := ws.Register(a); err != nil {
 			return nil, false, false, fmt.Errorf("failed to register API: %w", err)
 		}

@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -222,6 +223,43 @@ func (c *MemoryCache[MetadataT]) Delete(key CacheKey) error {
 	defer lock.Unlock()
 
 	return c.deleteInternal(key)
+}
+
+func (c *MemoryCache[MetadataT]) Stats() Stats {
+	c.mu.RLock()
+	entries := len(c.entries)
+	memoryCap := c.memoryCap
+	c.mu.RUnlock()
+
+	return Stats{
+		Entries:        entries,
+		Bytes:          c.byteSize.Get(),
+		MaxBytes:       c.maxCacheSize.Get(),
+		MemoryCapBytes: memoryCap,
+	}
+}
+
+func (c *MemoryCache[MetadataT]) Clear() error {
+	c.mu.RLock()
+	keys := make([]CacheKey, 0, len(c.entries))
+	for key := range c.entries {
+		keys = append(keys, key)
+	}
+	c.mu.RUnlock()
+
+	var errs []error
+	for _, key := range keys {
+		lock := getLock(c.locks, key)
+		lock.Lock()
+		err := c.deleteInternal(key)
+		lock.Unlock()
+
+		if err != nil && !errors.Is(err, ErrCacheEntryNotFound) {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func (c *MemoryCache[MetadataT]) deleteInternal(key CacheKey) error {

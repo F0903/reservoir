@@ -62,6 +62,14 @@ func (p *Proxy) Destroy() {
 	p.cache.Destroy()
 }
 
+func (p *Proxy) CacheStats() cache.Stats {
+	return p.cache.Stats()
+}
+
+func (p *Proxy) ClearCache() error {
+	return p.cache.Clear()
+}
+
 func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
 	return NewProxyWithUpstreamClient(cfg, ca, nil, ctx)
 }

@@ -3,20 +3,27 @@ package apitypes
 
 import (
 	"net/http"
+	"reservoir/cache"
 	"reservoir/config"
 	"reservoir/db/models"
 	"reservoir/db/stores"
 	"reservoir/webserver/auth"
 )
 
+type CacheController interface {
+	CacheStats() cache.Stats
+	ClearCache() error
+}
+
 type Context struct {
 	Session        *auth.Session
 	SessionManager *auth.SessionManager
 	UserStore      *stores.UserStore
 	Config         *config.Config
+	Cache          CacheController
 }
 
-func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager) (Context, error) {
+func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager, cacheController CacheController) (Context, error) {
 	if sessions == nil {
 		sessions = auth.DefaultSessionManager()
 	}
@@ -36,6 +43,7 @@ func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionMa
 		SessionManager: sessions,
 		UserStore:      users,
 		Config:         cfg,
+		Cache:          cacheController,
 	}, nil
 }
 

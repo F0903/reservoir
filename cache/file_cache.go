@@ -383,6 +383,41 @@ func (c *FileCache[MetadataT]) Delete(key CacheKey) error {
 	return c.ensureRemove(key)
 }
 
+func (c *FileCache[MetadataT]) Stats() Stats {
+	c.mu.RLock()
+	entries := len(c.entriesMetadata)
+	c.mu.RUnlock()
+
+	return Stats{
+		Entries:  entries,
+		Bytes:    c.byteSize.Get(),
+		MaxBytes: c.maxCacheSize.Get(),
+	}
+}
+
+func (c *FileCache[MetadataT]) Clear() error {
+	c.mu.RLock()
+	keys := make([]CacheKey, 0, len(c.entriesMetadata))
+	for key := range c.entriesMetadata {
+		keys = append(keys, key)
+	}
+	c.mu.RUnlock()
+
+	var errs []error
+	for _, key := range keys {
+		lock := getLock(c.locks, key)
+		lock.Lock()
+		err := c.ensureRemove(key)
+		lock.Unlock()
+
+		if err != nil && !errors.Is(err, ErrCacheEntryNotFound) {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
+
 func (c *FileCache[MetadataT]) UpdateMetadata(key CacheKey, modifier func(*EntryMetadata[MetadataT])) error {
 	lock := getLock(c.locks, key)
 	lock.Lock()
