@@ -1,10 +1,9 @@
 package metrics
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 	"reservoir/metrics"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
 
@@ -27,13 +26,5 @@ func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	metrics.Global.RunCollectors() // Run all collectors to make sure we get updated metrics
 
-	metricsJson, err := json.Marshal(metrics.Global)
-	if err != nil {
-		slog.Error("Error marshaling all metrics", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(metricsJson)
+	apihttp.WriteJSON(w, http.StatusOK, metrics.Global)
 }

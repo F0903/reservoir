@@ -1,10 +1,10 @@
 package config
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"reservoir/config"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
 
@@ -33,43 +33,30 @@ func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	responseJson, err := json.Marshal(ctx.Config)
-	if err != nil {
-		slog.Error("Error marshaling config to JSON", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(responseJson)
+	apihttp.WriteJSON(w, http.StatusOK, ctx.Config)
 }
 
 func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+	if !apihttp.RequireJSONContentType(w, r) {
 		return
 	}
 
-	// Parse JSON into a map
 	var updates map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		slog.Error("Error decoding JSON", "error", err)
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if !apihttp.DecodeJSON(w, r, &updates) {
 		return
 	}
 
 	status, err := config.UpdatePartialFromConfig(ctx.Config, updates)
 	if err != nil {
 		slog.Error("Failed to partially update config", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 
-	w.WriteHeader(http.StatusAccepted)
 	switch status {
 	case config.UpdateStatusSuccess:
-		w.Write([]byte(successResponse))
+		apihttp.WriteText(w, http.StatusAccepted, successResponse)
 	case config.UpdateStatusRestartRequired:
-		w.Write([]byte(restartRequiredResponse))
+		apihttp.WriteText(w, http.StatusAccepted, restartRequiredResponse)
 	}
 }

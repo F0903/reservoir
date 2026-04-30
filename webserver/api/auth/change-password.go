@@ -1,10 +1,10 @@
 package auth
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"reservoir/utils/phc"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	coreauth "reservoir/webserver/auth"
 )
@@ -39,36 +39,39 @@ func (e *ChangePasswordEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
+	if !apihttp.RequireJSONContentType(w, r) {
+		return
+	}
+
 	var req changePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if !apihttp.DecodeJSON(w, r, &req) {
 		return
 	}
 
 	if req.CurrentPassword == "" && req.NewPassword == "" {
-		http.Error(w, ErrMissingFields, http.StatusBadRequest)
+		apihttp.BadRequest(w, ErrMissingFields)
 		return
 	}
 	if req.CurrentPassword == "" {
-		http.Error(w, ErrEmptyCurrentPassword, http.StatusBadRequest)
+		apihttp.BadRequest(w, ErrEmptyCurrentPassword)
 		return
 	}
 	if req.NewPassword == "" {
-		http.Error(w, ErrEmptyNewPassword, http.StatusBadRequest)
+		apihttp.BadRequest(w, ErrEmptyNewPassword)
 		return
 	}
 
 	user, err := ctx.GetCurrentUser()
 	if err != nil {
 		slog.Error("Error retrieving current user", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 
 	passwordMatch := user.PasswordHash.VerifyArgon2id(req.CurrentPassword)
 	if !passwordMatch {
 		slog.Warn("Failed password change attempt", "user_id", user.ID)
-		http.Error(w, "Current password is incorrect", http.StatusBadRequest)
+		apihttp.BadRequest(w, "Current password is incorrect")
 		return
 	}
 
@@ -76,7 +79,7 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 	user.PasswordChangeRequired = false
 	if err := ctx.UserStore.Save(user); err != nil {
 		slog.Error("Error updating user password", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 	if err := coreauth.ClearBootstrapPasswordFile(); err != nil {
@@ -84,5 +87,5 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 	}
 	coreauth.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
 
-	w.WriteHeader(http.StatusNoContent)
+	apihttp.NoContent(w)
 }

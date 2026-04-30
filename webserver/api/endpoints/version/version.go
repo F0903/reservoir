@@ -1,9 +1,9 @@
 package version
 
 import (
-	"encoding/json"
 	"net/http"
 	"reservoir/version"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
 
@@ -24,6 +24,5 @@ func (e *VersionEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *VersionEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"version": version.Version})
+	apihttp.WriteJSON(w, http.StatusOK, map[string]string{"version": version.Version})
 }

@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth/models"
 )
@@ -29,25 +29,15 @@ func (e *MeEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Co
 	user, err := ctx.GetCurrentUser()
 	if err != nil {
 		slog.Error("Error retrieving current user", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 
-	userJson, err := json.Marshal(models.UserInfo{
+	apihttp.WriteJSON(w, http.StatusOK, models.UserInfo{
 		ID:                     user.ID,
 		Username:               user.Username,
 		PasswordChangeRequired: user.PasswordChangeRequired,
 		CreatedAt:              user.CreatedAt,
 		UpdatedAt:              user.UpdatedAt,
 	})
-
-	if err != nil {
-		slog.Error("Error marshaling user JSON", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(userJson)
 }

@@ -3,6 +3,7 @@ package log
 import (
 	"log/slog"
 	"net/http"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/streaming"
 	"time"
@@ -34,19 +35,19 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		slog.Error("response writer does not support flushing, so can't use SSE", "content-type", header.Get("Content-Type"))
-		http.Error(w, "Streaming Unsupported", http.StatusInternalServerError)
+		apihttp.Error(w, "Streaming Unsupported", http.StatusInternalServerError)
 		return
 	}
 
 	logFilePath := ctx.Config.Logging.File.Read()
 	if logFilePath == "" {
-		http.Error(w, "No Log File Configured", http.StatusNotFound)
+		apihttp.Error(w, "No Log File Configured", http.StatusNotFound)
 		return
 	}
 
 	tailer, err := newLogTailer(logFilePath)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 
@@ -54,7 +55,7 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 	defer sse.Close()
 	if err := sse.Start(); err != nil {
 		slog.Error("SSE stream failed", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 }

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"time"
 )
@@ -32,5 +33,5 @@ func (e *LogoutEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apityp
 	cookie.MaxAge = -1
 
 	http.SetCookie(w, cookie)
-	w.WriteHeader(http.StatusNoContent)
+	apihttp.NoContent(w)
 }

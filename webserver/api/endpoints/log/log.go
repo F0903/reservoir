@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"reservoir/logging"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
 
@@ -30,11 +31,11 @@ func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.C
 	if err != nil {
 		if errors.Is(err, logging.ErrNoLogFile) {
 			slog.Warn("tried to call /log but no log file is configured")
-			http.Error(w, "No Log File Configured", http.StatusNotFound)
+			apihttp.Error(w, "No Log File Configured", http.StatusNotFound)
 			return
 		}
 		slog.Error("failed to open log file", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 	defer logFile.Close()
@@ -42,7 +43,7 @@ func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.C
 	logFileStat, err := logFile.Stat()
 	if err != nil {
 		slog.Error("failed to stat log file", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		apihttp.InternalServerError(w)
 		return
 	}
 

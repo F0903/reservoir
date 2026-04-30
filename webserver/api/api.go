@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reservoir/config"
 	dbmodels "reservoir/db/models"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth"
 	configEndpoint "reservoir/webserver/api/endpoints/config"
@@ -83,7 +84,7 @@ func WrapHandler(cfg *config.Config, methodFunc apitypes.MethodFunc, preRunHook 
 		ctx, err := apitypes.CreateContext(r, cfg)
 		if err != nil {
 			slog.Error("Error creating request context", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			apihttp.InternalServerError(w)
 			return
 		}
 		defer ctx.Close()
@@ -91,16 +92,16 @@ func WrapHandler(cfg *config.Config, methodFunc apitypes.MethodFunc, preRunHook 
 		if preRunHook != nil {
 			if status, err := preRunHook(ctx); err != nil {
 				if err == ErrEndpointUnauthorized {
-					http.Error(w, "Unauthorized", status)
+					apihttp.Error(w, "Unauthorized", status)
 					return
 				}
 				if err == ErrPasswordChangeNeeded {
-					http.Error(w, "Password change required", status)
+					apihttp.Error(w, "Password change required", status)
 					return
 				}
 
 				slog.Warn("Pre-run hook failed", "error", err, "status", status)
-				http.Error(w, "Internal Server Error", status)
+				apihttp.Error(w, "Internal Server Error", status)
 				return
 			}
 		}

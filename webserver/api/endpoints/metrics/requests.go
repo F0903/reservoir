@@ -1,10 +1,9 @@
 package metrics
 
 import (
-	"encoding/json"
-	"log/slog"
 	"net/http"
 	"reservoir/metrics"
+	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
 
@@ -25,13 +24,5 @@ func (m *RequestsMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *RequestsMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	requestsJson, err := json.Marshal(metrics.Global.Requests)
-	if err != nil {
-		slog.Error("Error marshaling requests metrics", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(requestsJson)
+	apihttp.WriteJSON(w, http.StatusOK, metrics.Global.Requests)
 }
