@@ -1,6 +1,6 @@
 module reservoir
 
-go 1.26
+go 1.26.2
 
 require (
 	github.com/DeRuina/timberjack v1.3.9
