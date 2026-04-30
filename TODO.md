@@ -7,7 +7,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 ## Proxy
 - [x] Add focused `Range` behavior tests for valid ranges, invalid ranges, retry-on-invalid-range, and retry-on-416.
 - [x] Expand cache policy matrix tests for methods, statuses, auth/cookies, `no-store`, `private`, `Vary`, and content encoding.
-- [ ] Add revalidation/stale-cache behavior tests for expired cache hits, upstream failures, and metadata updates.
+- [x] Add revalidation/stale-cache behavior tests for expired cache hits, upstream failures, and metadata updates.
 - [ ] Add CONNECT/raw responder regression tests for repeated tunnel requests.
 - [ ] Add runtime shutdown integration tests for proxy, webserver, and session GC cancellation.
 - [x] Introduce a dedicated cache policy component that handles cacheability, `Cache-Control`, `Vary`, auth/cookie headers, content encoding, request methods, and response status.

@@ -290,6 +290,33 @@ func (f *fetcher) handleCacheMiss(req *http.Request, baseKey cache.CacheKey, loo
 	return upFetch, nil
 }
 
+func (f *fetcher) serveStaleCachedResponse(req *http.Request, lookupKey cache.CacheKey, upstreamStatus int, upstreamErr error) (fetchResult, error) {
+	if upstreamErr != nil {
+		slog.Warn("Serving stale cached response because upstream revalidation failed", "url", req.URL, "key", lookupKey, "error", upstreamErr)
+	} else {
+		slog.Warn("Serving stale cached response because upstream returned an error status", "url", req.URL, "key", lookupKey, "upstream_status", upstreamStatus)
+	}
+
+	cached, err := f.cache.Get(lookupKey)
+	if err != nil {
+		if upstreamErr != nil {
+			return fetchResult{}, upstreamErr
+		}
+		return fetchResult{}, err
+	}
+
+	return fetchResult{
+		Type: fetchTypeCached,
+		Cached: cachedFetchResult{
+			fetchInfo: fetchInfo{
+				UpstreamStatus: upstreamStatus,
+				Status:         hitStatusStale,
+			},
+			Entry: cached,
+		},
+	}, nil
+}
+
 // Fetches the requested resource either from cache or upstream.
 func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
 	slog.Debug("Trying to get request from cache...")
@@ -342,13 +369,20 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 
 	fetch, err := f.fetchUpstream(up, baseKey, lookupKey, clientHd)
 	if err != nil {
-		return fetchResult{}, err
+		return f.serveStaleCachedResponse(req, lookupKey, 0, err)
 	}
 	if fetch.Type == fetchTypeDirect {
-		fetch.Direct.Response.Body.Close()
-		return fetchResult{}, ErrNotCacheable
-	}
+		if fetch.Direct.UpstreamStatus >= 500 {
+			status := fetch.Direct.UpstreamStatus
+			fetch.Direct.Response.Body.Close()
+			return f.serveStaleCachedResponse(req, lookupKey, status, nil)
+		}
 
+		// The upstream response is authoritative but not cacheable. Return it
+		// directly instead of retrying a second upstream request.
+		slog.Debug("Stale revalidation returned a non-cacheable direct response", "url", req.URL, "status", fetch.Direct.UpstreamStatus)
+		return fetch, nil
+	}
 	fetch.getFetchInfoRef().Status = hitStatusRevalidated
 
 	return fetch, nil

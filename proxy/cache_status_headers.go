@@ -18,6 +18,7 @@ const (
 	hitStatusMiss hitStatus = iota
 	hitStatusRevalidated
 	hitStatusHit
+	hitStatusStale
 )
 
 type fwdReason int
@@ -48,6 +49,8 @@ func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[cachedRequestI
 		params = append(params, "hit; detail=\"revalidated\"")
 	case hitStatusMiss:
 		params = append(params, "miss")
+	case hitStatusStale:
+		params = append(params, "hit; detail=\"stale\"")
 	}
 
 	if cacheStatus.fwdReason.IsSome() {
@@ -71,7 +74,7 @@ func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[cachedRequestI
 		params = append(params, "stored")
 	}
 
-	if cached.IsSome() && (cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated) {
+	if cached.IsSome() && (cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated || cacheStatus.hitStatus == hitStatusStale) {
 		ttl := max(0, int(time.Until(cached.ForceUnwrap().Metadata.Expires).Seconds()))
 		params = append(params, fmt.Sprintf("ttl=%d", ttl))
 	}
@@ -124,6 +127,8 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 		xCache = "MISS"
 	case hitStatusRevalidated:
 		xCache = "REVALIDATED"
+	case hitStatusStale:
+		xCache = "STALE"
 	}
 	r.AddHeader("X-Cache", xCache)
 
@@ -132,7 +137,7 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 	if cached.IsSome() {
 		cached := cached.ForceUnwrap()
 
-		wasCached := cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated
+		wasCached := cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated || cacheStatus.hitStatus == hitStatusStale
 		justCached := cacheStatus.hitStatus == hitStatusHit && cacheStatus.stored
 		if wasCached || justCached {
 			currentAge := getCurrentAge(cached.Metadata.Object.Header, cached.Metadata.TimeWritten)
@@ -146,16 +151,17 @@ func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
 	fetchInfo := fetched.getFetchInfo()
 
 	isRevalidated := fetchInfo.Status == hitStatusRevalidated
+	isStale := fetchInfo.Status == hitStatusStale
 	isMiss := fetchInfo.Status == hitStatusMiss
 
 	fwdReason := typeutils.None[fwdReason]()
-	if isRevalidated {
+	if isRevalidated || isStale {
 		fwdReasonNum := fwdReasonStale
 		fwdReason = typeutils.Some(fwdReasonNum)
 	}
 
 	fwdStatus := typeutils.None[int]()
-	if isRevalidated || isMiss {
+	if (isRevalidated || isMiss || isStale) && fetchInfo.UpstreamStatus > 0 {
 		fwdStatusNum := fetchInfo.UpstreamStatus
 		fwdStatus = typeutils.Some(fwdStatusNum)
 	}
