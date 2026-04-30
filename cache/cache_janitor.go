@@ -44,10 +44,28 @@ func newCacheJanitor[MetadataT any](cfg *config.Config, interval time.Duration, 
 
 	j.subs.Add(cfg.Cache.CleanupInterval.OnChange(func(newInterval duration.Duration) {
 		slog.Info("Cache cleanup interval changed", "new_interval", newInterval)
-		j.intervalChanged <- newInterval.Cast()
+		j.updateInterval(newInterval.Cast())
 	}))
 
 	return j
+}
+
+func (j *cacheJanitor[MetadataT]) updateInterval(newInterval time.Duration) {
+	select {
+	case j.intervalChanged <- newInterval:
+		return
+	default:
+	}
+
+	select {
+	case <-j.intervalChanged:
+	default:
+	}
+
+	select {
+	case j.intervalChanged <- newInterval:
+	default:
+	}
 }
 
 func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {

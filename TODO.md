@@ -17,6 +17,6 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 ## Project Wide
 - [x] Add explicit lifecycle ownership for proxy, webserver, cache janitor, session GC, metrics collectors, and database handles. Current long-lived services are owned by the app lifecycle; add future collectors/DB close hooks there.
 - [x] Use `context`/`errgroup`-style startup and shutdown orchestration with bounded graceful shutdown.
-- [ ] Replace or harden custom concurrency primitives such as `SyncMap` and event subscriptions. Started: `SyncMap` iteration and session access are hardened; event subscriptions remain.
+- [x] Replace or harden custom concurrency primitives such as `SyncMap` and event subscriptions.
 - [x] Make config updates transactional: validate staged changes before committing or firing runtime subscribers.
 - [x] Treat security defaults as part of the architecture, including first-login setup, session handling, and conservative cache behavior.

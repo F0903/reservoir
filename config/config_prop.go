@@ -14,7 +14,10 @@ type ConfigProp[T comparable] struct {
 }
 
 func NewConfigProp[T comparable](value T) ConfigProp[T] {
-	return ConfigProp[T]{value: atomics.NewValue(NewCommitable(NewOverwritable(value)))}
+	return ConfigProp[T]{
+		value:    atomics.NewValue(NewCommitable(NewOverwritable(value))),
+		onChange: event.NewEvent[T](),
+	}
 }
 
 func (p *ConfigProp[T]) SetRequiresRestart() {
