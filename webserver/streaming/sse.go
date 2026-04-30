@@ -9,7 +9,7 @@ import (
 )
 
 type SseStreamer[Store any] interface {
-	Tick(w http.ResponseWriter, writeStream func([]byte) error, store *Store) error
+	Tick(w http.ResponseWriter, writeStream func([]byte) error, store Store) error
 }
 
 type SseStream[Store any] struct {
@@ -82,7 +82,7 @@ func (s *SseStream[Store]) Start() error {
 
 		case <-s.ticker.C:
 			slog.Debug("running SSE tick")
-			if err := s.streamer.Tick(s.writer, s.writeStream, &s.streamerStore); err != nil {
+			if err := s.streamer.Tick(s.writer, s.writeStream, s.streamerStore); err != nil {
 				slog.Error("SSE tick failed", "error", err)
 				return err
 			}
