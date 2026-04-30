@@ -14,6 +14,9 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add explicit network timeouts for proxy listeners and upstream HTTP clients.
 - [x] Strengthen HTTP protocol boundaries so response/header state cannot leak across CONNECT tunnel requests.
 - [x] Make cache keys and stored metadata safe for variant and private responses.
+- [x] Fix file and memory cache overwrite accounting so replacing a cached key updates size and entry metrics correctly.
+- [ ] Fix direct upstream byte accounting for non-cached responses.
+- [ ] Add optional file-cache metadata sidecars for restart continuity without turning the cache into long-lived storage. (?)
 
 ## Dashboard 
 
@@ -24,3 +27,6 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Replace or harden custom concurrency primitives such as `SyncMap` and event subscriptions.
 - [x] Make config updates transactional: validate staged changes before committing or firing runtime subscribers.
 - [x] Treat security defaults as part of the architecture, including first-login setup, session handling, and conservative cache behavior.
+- [ ] Extract and test log SSE tailing for rotation, truncation, partial lines, and transient read/stat failures.
+- [ ] Add API JSON/error response helpers and robust request content-type parsing.
+- [ ] Encapsulate session state and garbage collection in a runtime-owned session manager.

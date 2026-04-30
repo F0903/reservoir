@@ -141,7 +141,15 @@ func (c *MemoryCache[MetadataT]) cacheInternal(key CacheKey, data io.Reader, exp
 	maxCacheSize := c.maxCacheSize.Get()
 	limit := min(maxCacheSize, c.memoryCap)
 
-	if c.byteSize.Get() >= limit {
+	c.mu.RLock()
+	oldEntry, replacing := c.entries[key]
+	oldSize := int64(0)
+	if replacing {
+		oldSize = oldEntry.meta.Size
+	}
+	c.mu.RUnlock()
+
+	if c.byteSize.Get()-oldSize >= limit {
 		if evictIfFull {
 			c.janitor.evict(limit)
 			entry, err := c.cacheInternal(key, data, expires, metadata, false)
@@ -162,6 +170,12 @@ func (c *MemoryCache[MetadataT]) cacheInternal(key CacheKey, data io.Reader, exp
 		return nil, err
 	}
 
+	if c.byteSize.Get()-oldSize+count > limit {
+		if evictIfFull {
+			c.janitor.evict(limit)
+		}
+	}
+
 	dataBytes := buf.Bytes()
 	now := time.Now()
 	meta := &EntryMetadata[MetadataT]{
@@ -177,10 +191,15 @@ func (c *MemoryCache[MetadataT]) cacheInternal(key CacheKey, data io.Reader, exp
 	}
 
 	c.mu.Lock()
+	previousEntry, replaced := c.entries[key]
 	c.entries[key] = internalEntry
 	c.mu.Unlock()
 
-	incrementCacheEntries()
+	if replaced {
+		decrementCacheSize(&c.byteSize, previousEntry.meta.Size)
+	} else {
+		incrementCacheEntries()
+	}
 	addCacheSize(&c.byteSize, int64(count))
 
 	return &Entry[MetadataT]{

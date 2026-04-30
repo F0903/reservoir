@@ -171,14 +171,17 @@ func (c *FileCache[MetadataT]) Get(key CacheKey) (*Entry[MetadataT], error) {
 }
 
 func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*Entry[MetadataT], error) {
-	maxCacheSize := c.maxCacheSize.Get()
-	if c.byteSize.Get() >= maxCacheSize {
-		c.janitor.evict(maxCacheSize)
-	}
-
 	lock := getLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
+
+	c.mu.RLock()
+	oldMeta, replacing := c.entriesMetadata[key]
+	oldSize := int64(0)
+	if replacing {
+		oldSize = oldMeta.Size
+	}
+	c.mu.RUnlock()
 
 	fileName := filepath.Join(c.rootDir.Path, key.Hex)
 	file, err := os.Create(fileName)
@@ -213,11 +216,21 @@ func (c *FileCache[MetadataT]) Cache(key CacheKey, data io.Reader, expires time.
 		Object:      metadata,
 	}
 
+	maxCacheSize := c.maxCacheSize.Get()
+	if c.byteSize.Get()-oldSize+fileSize >= maxCacheSize {
+		c.janitor.evict(maxCacheSize)
+	}
+
 	c.mu.Lock()
+	previousMeta, replaced := c.entriesMetadata[key]
 	c.entriesMetadata[key] = meta
 	c.mu.Unlock()
 
-	incrementCacheEntries()
+	if replaced {
+		decrementCacheSize(&c.byteSize, previousMeta.Size)
+	} else {
+		incrementCacheEntries()
+	}
 	addCacheSize(&c.byteSize, fileSize)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
