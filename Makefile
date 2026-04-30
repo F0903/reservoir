@@ -6,10 +6,24 @@ build: build-proxy
 # Run all tests
 test: generate-csp test-proxy test-frontend
 
-test-proxy:
-	CGO_ENABLED=1 go test -v -race -count=1 ./...
+ci: check-frontend lint-frontend test-frontend generate-csp vet test-proxy build-proxy
 
-test-frontend:
+vet:
+	go vet ./...
+
+test-proxy:
+	go test -v -race -count=1 ./...
+
+frontend-install:
+	cd webserver/dashboard/frontend && pnpm install --frozen-lockfile
+
+check-frontend: frontend-install
+	cd webserver/dashboard/frontend && pnpm run check
+
+lint-frontend: frontend-install
+	cd webserver/dashboard/frontend && pnpm run lint
+
+test-frontend: frontend-install
 	cd webserver/dashboard/frontend && pnpm run test
 
 # Run all benchmarks
@@ -29,8 +43,8 @@ generate-csp: build-frontend
 	go generate ./webserver/dashboard/csp
 
 # Build the Svelte frontend
-build-frontend:
-	cd webserver/dashboard/frontend && pnpm install && pnpm run build
+build-frontend: frontend-install
+	cd webserver/dashboard/frontend && pnpm run build
 
 # Run the Svelte frontend in development mode
 dev-frontend:
@@ -41,4 +55,4 @@ clean:
 	rm -f reservoir.exe
 	rm -rf webserver/dashboard/frontend/build
 
-.PHONY: build build-proxy generate-csp build-frontend dev-frontend test test-proxy test-frontend bench bench-cache clean
+.PHONY: build build-proxy generate-csp build-frontend frontend-install check-frontend lint-frontend dev-frontend test ci vet test-proxy test-frontend bench bench-cache clean
