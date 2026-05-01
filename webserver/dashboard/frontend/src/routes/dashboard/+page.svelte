@@ -24,6 +24,10 @@
     function saveLayout(layout: DashboardWidgetLayout[]) {
         settings.dashboardSettings.fields.layout = layout;
     }
+
+    async function refreshMetrics() {
+        await metrics.refreshMetrics();
+    }
 </script>
 
 <main class="dashboard">
@@ -31,6 +35,8 @@
         elements={gridElements}
         layout={settings.dashboardSettings.fields.layout}
         onLayoutChange={saveLayout}
+        onRefresh={refreshMetrics}
+        refreshing={metrics.loading}
     />
 </main>
 

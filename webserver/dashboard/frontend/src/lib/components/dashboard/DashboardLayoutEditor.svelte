@@ -44,11 +44,15 @@
         elements,
         layout,
         onLayoutChange,
+        onRefresh,
+        refreshing = false,
         gap = 15,
     }: {
         elements: DashboardGridElement[];
         layout: DashboardWidgetLayout[];
         onLayoutChange: (_layout: DashboardWidgetLayout[]) => void;
+        onRefresh?: () => void | Promise<void>;
+        refreshing?: boolean;
         gap?: number;
     } = $props();
 
@@ -274,7 +278,9 @@
 
 <DashboardLayoutToolbar
     {editing}
+    {refreshing}
     onEdit={() => (editing = true)}
+    {onRefresh}
     onReset={resetLayout}
     onSave={() => (editing = false)}
 />

@@ -25,6 +25,7 @@ func (m *AllMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 
 func (m *AllMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
 	metrics.Global.RunCollectors() // Run all collectors to make sure we get updated metrics
+	collectCacheStorage(ctx)
 
 	apihttp.WriteJSON(w, http.StatusOK, metrics.Global)
 }

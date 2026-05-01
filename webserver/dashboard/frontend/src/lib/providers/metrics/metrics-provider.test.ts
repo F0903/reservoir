@@ -42,6 +42,13 @@ describe("MetricsProvider", () => {
                 cache_evictions: 0,
                 cache_hit_latency: 5,
                 cache_miss_latency: 100,
+                storage: {
+                    type: "memory",
+                    entries: 5,
+                    bytes: 1024,
+                    max_bytes: 2048,
+                    memory_cap_bytes: 4096,
+                },
             },
             requests: {
                 http_proxy_requests: 8,

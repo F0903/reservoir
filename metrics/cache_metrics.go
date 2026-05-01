@@ -2,17 +2,26 @@ package metrics
 
 import "reservoir/utils/atomics"
 
+type CacheStorageMetrics struct {
+	Type           string `json:"type"`
+	Entries        int    `json:"entries"`
+	Bytes          int64  `json:"bytes"`
+	MaxBytes       int64  `json:"max_bytes"`
+	MemoryCapBytes *int64 `json:"memory_cap_bytes,omitempty"`
+}
+
 type cacheMetrics struct {
-	CacheHits        atomics.Int64 `json:"cache_hits"`
-	CacheMisses      atomics.Int64 `json:"cache_misses"`
-	CacheErrors      atomics.Int64 `json:"cache_errors"`
-	CacheEntries     atomics.Int64 `json:"cache_entries"`
-	BytesCached      atomics.Int64 `json:"bytes_cached"`
-	CleanupRuns      atomics.Int64 `json:"cleanup_runs"`
-	BytesCleaned     atomics.Int64 `json:"bytes_cleaned"`
-	CacheEvictions   atomics.Int64 `json:"cache_evictions"`
-	CacheHitLatency  atomics.Int64 `json:"cache_hit_latency"`  // In nanoseconds
-	CacheMissLatency atomics.Int64 `json:"cache_miss_latency"` // In nanoseconds
+	CacheHits        atomics.Int64                      `json:"cache_hits"`
+	CacheMisses      atomics.Int64                      `json:"cache_misses"`
+	CacheErrors      atomics.Int64                      `json:"cache_errors"`
+	CacheEntries     atomics.Int64                      `json:"cache_entries"`
+	BytesCached      atomics.Int64                      `json:"bytes_cached"`
+	CleanupRuns      atomics.Int64                      `json:"cleanup_runs"`
+	BytesCleaned     atomics.Int64                      `json:"bytes_cleaned"`
+	CacheEvictions   atomics.Int64                      `json:"cache_evictions"`
+	CacheHitLatency  atomics.Int64                      `json:"cache_hit_latency"`  // In nanoseconds
+	CacheMissLatency atomics.Int64                      `json:"cache_miss_latency"` // In nanoseconds
+	Storage          atomics.Value[CacheStorageMetrics] `json:"storage"`
 }
 
 func NewCacheMetrics() cacheMetrics {
@@ -27,5 +36,10 @@ func NewCacheMetrics() cacheMetrics {
 		CacheEvictions:   atomics.NewInt64(0),
 		CacheHitLatency:  atomics.NewInt64(0),
 		CacheMissLatency: atomics.NewInt64(0),
+		Storage:          atomics.NewValue(CacheStorageMetrics{}),
 	}
+}
+
+func (c *cacheMetrics) SetStorage(storage CacheStorageMetrics) {
+	c.Storage.Store(storage)
 }

@@ -1,43 +1,30 @@
 <script lang="ts">
-    import { clearCache, getCacheStatus, type CacheStatus } from "$lib/api/objects/cache/cache";
+    import { clearCache } from "$lib/api/objects/cache/cache";
     import Loadable from "$lib/components/ui/Loadable.svelte";
     import Tooltip from "$lib/components/ui/Tooltip.svelte";
     import { getMetricsProvider, getToastProvider } from "$lib/context";
     import { formatBytesToLargest } from "$lib/utils/bytestring";
     import { log } from "$lib/utils/logger";
     import { Database, HardDrive, MemoryStick, RefreshCw, Trash2 } from "@lucide/svelte";
-    import { onMount } from "svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
 
     const metrics = getMetricsProvider();
     const toast = getToastProvider();
 
-    let status = $state<CacheStatus | null>(null);
-    let error = $state<string | null>(null);
-    let loading = $state(false);
     let clearing = $state(false);
+    const status = $derived(metrics.data?.cache.storage ?? null);
+    const missingStorageError = $derived(
+        metrics.data && !metrics.data.cache.storage
+            ? "Cache storage metrics are unavailable."
+            : null,
+    );
+    const error = $derived(metrics.error ?? missingStorageError);
+    const loading = $derived(metrics.loading);
 
     const fillPercent = $derived(
         status && status.max_bytes > 0 ? Math.min(100, (status.bytes / status.max_bytes) * 100) : 0,
     );
-
-    onMount(() => {
-        refreshStatus();
-    });
-
-    async function refreshStatus() {
-        loading = true;
-        try {
-            status = { ...(await getCacheStatus()) };
-            error = null;
-        } catch (err) {
-            log.error("Failed to refresh cache status:", err);
-            error = err instanceof Error ? err.message : String(err);
-        } finally {
-            loading = false;
-        }
-    }
 
     async function clearCurrentCache() {
         if (!window.confirm("Clear cached package data?")) {
@@ -48,7 +35,7 @@
         try {
             await clearCache();
             toast.success("Cache cleared.");
-            await Promise.all([refreshStatus(), metrics.refreshMetrics()]);
+            await metrics.refreshMetrics();
         } catch (err) {
             log.error("Failed to clear cache:", err);
             toast.error(err instanceof Error ? err.message : String(err));
@@ -61,16 +48,6 @@
 <Widget title="Cache Storage">
     {#snippet headerControls()}
         <div class="header-toolbar" aria-label="Cache storage actions">
-            <Tooltip text="Refresh cache status" align="end">
-                <button
-                    class="tool-button"
-                    onclick={refreshStatus}
-                    disabled={loading || clearing}
-                    aria-label="Refresh cache status"
-                >
-                    <RefreshCw size={14} class={loading ? "spin" : ""} />
-                </button>
-            </Tooltip>
             <Tooltip
                 text={(status?.entries ?? 0) === 0 ? "Cache is empty" : "Clear cache"}
                 align="end"

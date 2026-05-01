@@ -1,21 +1,39 @@
 <script lang="ts">
     import Tooltip from "$lib/components/ui/Tooltip.svelte";
-    import { Check, Pencil, RotateCcw } from "@lucide/svelte";
+    import { Check, Pencil, RefreshCw, RotateCcw } from "@lucide/svelte";
 
     let {
         editing,
+        refreshing = false,
         onEdit,
+        onRefresh,
         onReset,
         onSave,
     }: {
         editing: boolean;
+        refreshing?: boolean;
         onEdit: () => void;
+        onRefresh?: () => void | Promise<void>;
         onReset: () => void;
         onSave: () => void;
     } = $props();
 </script>
 
 <div class="dashboard-toolbar" aria-label="Dashboard layout controls">
+    {#if onRefresh}
+        <Tooltip text="Refresh dashboard metrics" align="end">
+            <button
+                class="dashboard-action"
+                onclick={onRefresh}
+                disabled={refreshing}
+                aria-label="Refresh dashboard metrics"
+            >
+                <RefreshCw size={15} class={refreshing ? "spin" : ""} />
+                <span>Refresh</span>
+            </button>
+        </Tooltip>
+    {/if}
+
     {#if editing}
         <Tooltip text="Reset dashboard layout" align="end">
             <button class="dashboard-action" onclick={onReset} aria-label="Reset dashboard layout">
@@ -79,10 +97,28 @@
         color: var(--secondary-300);
     }
 
+    .dashboard-action:disabled {
+        cursor: default;
+        opacity: 0.42;
+    }
+
     .dashboard-action.primary {
         color: var(--secondary-300);
         border-color: color-mix(in srgb, var(--secondary-300) 30%, transparent);
         background-color: color-mix(in srgb, var(--secondary-800) 28%, transparent);
+    }
+
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    :global(.spin) {
+        animation: spin 1s linear infinite;
     }
 
     @media (max-width: 768px) {

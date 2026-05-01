@@ -24,5 +24,7 @@ func (m *CacheMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *CacheMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
+	collectCacheStorage(ctx)
+
 	apihttp.WriteJSON(w, http.StatusOK, metrics.Global.Cache)
 }
