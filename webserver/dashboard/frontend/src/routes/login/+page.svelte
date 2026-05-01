@@ -115,7 +115,7 @@
                 {/if}
 
                 <Button
-                    onClick={onLogin}
+                    type="submit"
                     disabled={loggingIn}
                     --btn-width="100%"
                     --btn-padding="0.8rem"

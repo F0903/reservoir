@@ -81,7 +81,7 @@
                 {#if error}
                     <ErrorBox>{error}</ErrorBox>
                 {/if}
-                <Button onClick={onSubmit} --btn-margin="auto" disabled={processing}>Reset</Button>
+                <Button type="submit" --btn-margin="auto" disabled={processing}>Reset</Button>
             </div>
         </Form>
     </div>
