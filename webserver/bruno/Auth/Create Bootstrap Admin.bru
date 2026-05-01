@@ -1,13 +1,13 @@
 meta {
-  name: Login
+  name: Create Bootstrap Admin
   type: http
-  seq: 3
+  seq: 2
 }
 
 post {
-  url: {{url}}/api/auth/login
+  url: {{url}}/api/auth/bootstrap
   body: json
-  auth: inherit
+  auth: none
 }
 
 body:json {

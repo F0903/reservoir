@@ -24,6 +24,9 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 ## Dashboard 
 - [x] Add dashboard cache operations panel for cache status and manual clearing.
 - [x] Add first-run bootstrap page for creating the initial admin account.
+- [ ] Add dashboard settings controls for package-cache policy knobs (`ignore_cache_control`, `force_default_max_age`, and `default_max_age`).
+- [ ] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
+- [ ] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
 
 
 ## Project Wide
@@ -36,3 +39,4 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Extract and test log SSE tailing for rotation, truncation, partial lines, and transient read/stat failures.
 - [x] Add API JSON/error response helpers and robust request content-type parsing.
 - [x] Encapsulate session state and garbage collection in a runtime-owned session manager.
+- [x] Document the first-run bootstrap flow and add Bruno requests for bootstrap endpoints.

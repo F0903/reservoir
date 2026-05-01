@@ -74,14 +74,15 @@ Some settings can also be changed in the Dashboard.
 
 ### Dashboard Bootstrap Login
 
-When the API is enabled and the user database is empty, Reservoir creates a bootstrap admin user:
+When the API and dashboard are enabled and the user database is empty, Reservoir starts in first-run bootstrap mode. Open the dashboard and create the initial admin account at:
 
-- Username: `admin`
-- Password: written to `var/bootstrap-admin-password.txt`
+- `http://localhost:8080/bootstrap`
 
-The bootstrap password is generated locally on startup and the user is required to change it before using authenticated API endpoints. After the password is changed, Reservoir removes the bootstrap password file. If an older install still has the legacy `admin` password `placeholder` marked as requiring a password change, Reservoir rotates it to a generated bootstrap password and writes the same password file.
+The first admin username can be chosen during setup. The bootstrap password must be at least 12 characters, is never written to disk, and the created user is signed in immediately after setup. Once a user exists, the bootstrap endpoint returns a conflict and normal login is required.
 
-If the API is disabled, Reservoir does not create bootstrap dashboard credentials.
+Older installs that still have the legacy generated bootstrap admin may continue to receive a generated password in `var/bootstrap-admin-password.txt` until that account changes its password. New empty installs use the first-run bootstrap page instead.
+
+If the API is disabled, Reservoir cannot create dashboard users or accept dashboard logins.
 
 ### Package Cache Behavior
 
