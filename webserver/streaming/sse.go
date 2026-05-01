@@ -8,6 +8,7 @@ import (
 	"time"
 )
 
+// An object that can stream SSE events to a client.
 type SseStreamer[Store any] interface {
 	Tick(w http.ResponseWriter, writeStream func([]byte) error, store Store) error
 }
