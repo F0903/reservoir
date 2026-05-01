@@ -83,24 +83,6 @@ describe("dashboard layout", () => {
         expect(layout.at(-1)?.id).toBe("cache-storage");
     });
 
-    it("normalizes legacy cache operations widget layouts to cache storage", () => {
-        const layout = normalizeDashboardLayout([
-            {
-                id: "cache-operations",
-                span: { width: 4, height: 1 },
-                position: { column: 2, row: 4 },
-            },
-        ]);
-
-        expect(layout[0]).toEqual({
-            id: "cache-storage",
-            span: { width: 4, height: 1 },
-            mobileSpan: { width: 2, height: 2 },
-            position: { column: 2, row: 4 },
-        });
-        expect(layout.filter((item) => item.id === "cache-storage")).toHaveLength(1);
-    });
-
     it("sets widget spans within supported grid bounds", () => {
         const layout = setDashboardWidgetSpan(defaultDashboardLayout(), "system-info", {
             width: 3,

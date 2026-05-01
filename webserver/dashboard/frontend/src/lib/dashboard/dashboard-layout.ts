@@ -87,9 +87,6 @@ const maxSpan = 4;
 const defaultLayoutsById = new Map(
     dashboardWidgetDefinitions.map((definition) => [definition.id, cloneLayoutItem(definition)]),
 );
-const legacyDashboardWidgetIds = new Map<string, DashboardWidgetId>([
-    ["cache-operations", "cache-storage"],
-]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -116,13 +113,6 @@ export function isDashboardWidgetId(id: unknown): id is DashboardWidgetId {
 
 export function resolveDashboardWidgetId(id: string | undefined): DashboardWidgetId | null {
     return isDashboardWidgetId(id) ? id : null;
-}
-
-function resolveStoredDashboardWidgetId(id: unknown): DashboardWidgetId | null {
-    if (isDashboardWidgetId(id)) return id;
-    if (typeof id !== "string") return null;
-
-    return legacyDashboardWidgetIds.get(id) ?? null;
 }
 
 function clampCellSpan(value: unknown, fallback: DashboardCellSpan): DashboardCellSpan {
@@ -308,22 +298,21 @@ export function normalizeDashboardLayout(value: unknown): DashboardWidgetLayout[
                 continue;
             }
 
-            const id = resolveStoredDashboardWidgetId(entry.id);
-            if (!id || seen.has(id)) {
+            if (!isDashboardWidgetId(entry.id) || seen.has(entry.id)) {
                 continue;
             }
 
-            const fallback = defaultLayoutsById.get(id);
+            const fallback = defaultLayoutsById.get(entry.id);
             if (!fallback) continue;
 
             const position = normalizeGridPosition(entry.position);
             layout.push({
-                id,
+                id: entry.id,
                 span: normalizeSpan(entry.span, fallback.span),
                 mobileSpan: normalizeMobileSpan(entry.mobileSpan, fallback.mobileSpan),
                 ...(position ? { position } : {}),
             });
-            seen.add(id);
+            seen.add(entry.id);
         }
     }
 
