@@ -1,9 +1,12 @@
 package stores
 
 import (
+	"errors"
 	"reservoir/db"
 	"reservoir/db/models"
 )
+
+var ErrUserStoreNotEmpty = errors.New("user store is not empty")
 
 type UserStore struct {
 	db db.Database
@@ -34,6 +37,31 @@ func (s *UserStore) Save(user *models.User) error {
 		user.PasswordHash,
 		user.PasswordChangeRequired,
 	)
+}
+
+func (s *UserStore) CreateFirst(user *models.User) error {
+	result, err := s.db.ExecResult(
+		`
+		INSERT INTO users (username, password_hash, password_change_required)
+		SELECT ?, ?, ?
+		WHERE NOT EXISTS (SELECT 1 FROM users);
+		`,
+		user.Username,
+		user.PasswordHash,
+		user.PasswordChangeRequired,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return ErrUserStoreNotEmpty
+	}
+	return nil
 }
 
 // Returns the user with the given username, or nil if no such user exists.

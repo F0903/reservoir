@@ -13,6 +13,26 @@ export type Credentials = {
     password: string;
 };
 
+export type BootstrapStatus = {
+    bootstrap_required: boolean;
+};
+
+export type BootstrapRequest = {
+    username: string;
+    password: string;
+};
+
+export function bootstrapStatus(fetchFn: FetchFn = fetch): Promise<Readonly<BootstrapStatus>> {
+    return apiGet<BootstrapStatus>("/auth/bootstrap", fetchFn, null);
+}
+
+export function bootstrapAdmin(
+    req: BootstrapRequest,
+    fetchFn: FetchFn = fetch,
+): Promise<Readonly<UserInfo>> {
+    return apiPost<UserInfo>("/auth/bootstrap", req, fetchFn, null);
+}
+
 // Use the AuthProvider instead unless absolutely necessary
 export function login(creds: Credentials): Promise<Readonly<UserInfo>> {
     return apiPost<UserInfo>("/auth/login", creds, fetch, null);

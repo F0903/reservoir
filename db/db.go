@@ -66,6 +66,10 @@ func (db *Database) Exec(query string, args ...any) error {
 	return err
 }
 
+func (db *Database) ExecResult(query string, args ...any) (sql.Result, error) {
+	return db.raw.Exec(query, args...)
+}
+
 func (db *Database) Migrate() error {
 	slog.Debug("Migrating database...")
 	files, _ := migrationFs.ReadDir("migrations")

@@ -56,6 +56,7 @@ func New(cfg *config.Config, sessions *coreauth.SessionManager, cacheController 
 			&configEndpoint.RestartRequiredEndpoint{},
 			&log.LogEndpoint{},
 			&log.LogStreamEndpoint{},
+			&authEndpoints.BootstrapEndpoint{},
 			&authEndpoints.LoginEndpoint{},
 			&authEndpoints.LogoutEndpoint{},
 			&authEndpoints.MeEndpoint{},

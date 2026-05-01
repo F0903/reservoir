@@ -3,6 +3,10 @@
 # Build the entire project
 build: build-proxy
 
+# Run the Go backend and Svelte frontend in development mode
+dev:
+	$(MAKE) --no-print-directory -j2 dev-backend dev-frontend
+
 # Run all tests
 test: generate-csp test-proxy test-frontend
 
@@ -51,9 +55,13 @@ build-frontend: frontend-install
 dev-frontend:
 	cd webserver/dashboard/frontend && pnpm run dev $(ARGS)
 
+# Run the Go backend in development mode
+dev-backend:
+	go run .
+
 # Remove build artifacts
 clean:
 	rm -f reservoir.exe
 	rm -rf webserver/dashboard/frontend/build
 
-.PHONY: build build-proxy generate-csp build-frontend frontend-install check-frontend lint-frontend dev-frontend test ci vet test-proxy test-frontend bench bench-cache clean
+.PHONY: build dev dev-backend build-proxy generate-csp build-frontend frontend-install check-frontend lint-frontend dev-frontend test ci vet test-proxy test-frontend bench bench-cache clean

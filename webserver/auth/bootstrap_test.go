@@ -1,12 +1,14 @@
 package auth
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"reservoir/db/models"
+	"reservoir/db/stores"
 	"reservoir/utils/phc"
 )
 
@@ -44,7 +46,15 @@ func (s *fakeBootstrapUserStore) Save(user *models.User) error {
 	return nil
 }
 
-func TestEnsureBootstrapAdminCreatesAdminForEmptyStore(t *testing.T) {
+func (s *fakeBootstrapUserStore) CreateFirst(user *models.User) error {
+	if len(s.users) > 0 {
+		return stores.ErrUserStoreNotEmpty
+	}
+
+	return s.Save(user)
+}
+
+func TestEnsureBootstrapAdminReportsRequiredForEmptyStore(t *testing.T) {
 	store := newFakeBootstrapUserStore()
 	passwordFile := filepath.Join(t.TempDir(), "bootstrap-password.txt")
 
@@ -53,20 +63,15 @@ func TestEnsureBootstrapAdminCreatesAdminForEmptyStore(t *testing.T) {
 		t.Fatalf("ensureBootstrapAdmin returned error: %v", err)
 	}
 
-	if result == nil || !result.Created {
-		t.Fatalf("expected created bootstrap result, got %#v", result)
+	if result == nil || !result.Required {
+		t.Fatalf("expected bootstrap required result, got %#v", result)
 	}
-	admin := store.users[DefaultAdminUsername]
-	if admin == nil {
-		t.Fatal("expected admin user to be saved")
+	if store.saveCount != 0 {
+		t.Fatalf("expected empty store bootstrap check not to save users, saved %d times", store.saveCount)
 	}
-	if !admin.PasswordChangeRequired {
-		t.Fatal("expected bootstrap admin to require password change")
+	if _, err := os.Stat(passwordFile); !os.IsNotExist(err) {
+		t.Fatalf("expected no bootstrap password file to be written, got %v", err)
 	}
-	if !admin.PasswordHash.VerifyArgon2id("generated-password") {
-		t.Fatal("expected admin password to match generated password")
-	}
-	assertPasswordFileContains(t, passwordFile, "generated-password")
 }
 
 func TestEnsureBootstrapAdminDoesNotOverwriteConfiguredAdmin(t *testing.T) {
@@ -163,6 +168,68 @@ func TestEnsureBootstrapAdminKeepsExistingBootstrapPasswordFile(t *testing.T) {
 	}
 	if store.saveCount != 0 {
 		t.Fatalf("expected existing bootstrap admin to remain unchanged, saved %d times", store.saveCount)
+	}
+}
+
+func TestCreateBootstrapAdminCreatesFirstAdmin(t *testing.T) {
+	store := newFakeBootstrapUserStore()
+	passwordFile := filepath.Join(t.TempDir(), "bootstrap-password.txt")
+
+	user, err := createBootstrapAdmin(store, " admin ", "generated-password", passwordFile)
+	if err != nil {
+		t.Fatalf("createBootstrapAdmin returned error: %v", err)
+	}
+
+	if user == nil {
+		t.Fatal("expected created user")
+	}
+	if user.Username != DefaultAdminUsername {
+		t.Fatalf("expected trimmed username %q, got %q", DefaultAdminUsername, user.Username)
+	}
+	if user.PasswordChangeRequired {
+		t.Fatal("expected first-run admin password not to require immediate change")
+	}
+	if !user.PasswordHash.VerifyArgon2id("generated-password") {
+		t.Fatal("expected admin password to match chosen password")
+	}
+}
+
+func TestCreateBootstrapAdminRejectsExistingUsers(t *testing.T) {
+	store := newFakeBootstrapUserStore(&models.User{
+		Username:               "existing",
+		PasswordHash:           *phc.GenerateArgon2id("existing-password"),
+		PasswordChangeRequired: false,
+	})
+	passwordFile := filepath.Join(t.TempDir(), "bootstrap-password.txt")
+
+	_, err := createBootstrapAdmin(store, DefaultAdminUsername, "generated-password", passwordFile)
+	if !errors.Is(err, ErrBootstrapNotRequired) {
+		t.Fatalf("expected ErrBootstrapNotRequired, got %v", err)
+	}
+}
+
+func TestCreateBootstrapAdminValidatesInput(t *testing.T) {
+	tests := []struct {
+		name     string
+		username string
+		password string
+		wantErr  error
+	}{
+		{name: "empty username", username: " ", password: "generated-password", wantErr: ErrBootstrapUsernameEmpty},
+		{name: "empty password", username: DefaultAdminUsername, password: "", wantErr: ErrBootstrapPasswordEmpty},
+		{name: "short password", username: DefaultAdminUsername, password: "short", wantErr: ErrBootstrapPasswordTooShort},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newFakeBootstrapUserStore()
+			passwordFile := filepath.Join(t.TempDir(), "bootstrap-password.txt")
+
+			_, err := createBootstrapAdmin(store, tt.username, tt.password, passwordFile)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
 	}
 }
 

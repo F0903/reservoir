@@ -22,10 +22,13 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add cache operations API endpoints for status inspection and manual clearing.
 
 ## Dashboard 
+- [x] Add dashboard cache operations panel for cache status and manual clearing.
+- [x] Add first-run bootstrap page for creating the initial admin account.
 
 
 ## Project Wide
 - [x] Add explicit lifecycle ownership for proxy, webserver, cache janitor, session GC, metrics collectors, and database handles. Current long-lived services are owned by the app lifecycle; add future collectors/DB close hooks there.
+- [x] Add a Makefile dev target for running the Go backend and dashboard frontend together.
 - [x] Use `context`/`errgroup`-style startup and shutdown orchestration with bounded graceful shutdown.
 - [x] Replace or harden custom concurrency primitives such as `SyncMap` and event subscriptions.
 - [x] Make config updates transactional: validate staged changes before committing or firing runtime subscribers.

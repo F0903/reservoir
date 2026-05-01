@@ -1,6 +1,7 @@
 <script lang="ts">
     import CacheEfficiency from "$lib/components/widgets/CacheEfficiency.svelte";
     import CacheLatency from "$lib/components/widgets/CacheLatency.svelte";
+    import CacheOperations from "$lib/components/widgets/CacheOperations.svelte";
     import CacheStats from "$lib/components/widgets/CacheStats.svelte";
     import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
     import RequestVolume from "$lib/components/widgets/RequestVolume.svelte";
@@ -47,6 +48,11 @@
                 Comp: CacheStats,
                 span: { width: 3, height: 2 },
                 mobileSpan: { width: 2, height: 3 },
+            },
+            {
+                Comp: CacheOperations,
+                span: { width: 3, height: 2 },
+                mobileSpan: { width: 2, height: 2 },
             },
         ]}
     />

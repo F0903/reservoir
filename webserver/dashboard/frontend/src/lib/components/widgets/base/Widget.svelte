@@ -4,9 +4,11 @@
 
     let {
         title,
+        headerControls,
         children,
     }: {
         title: string;
+        headerControls?: Snippet;
         children: Snippet;
     } = $props();
 </script>
@@ -19,6 +21,11 @@
 >
     <div class="widget-header">
         <h2 class="title">{title}</h2>
+        {#if headerControls}
+            <div class="header-controls">
+                {@render headerControls()}
+            </div>
+        {/if}
     </div>
     <div class="widget-content">
         {@render children()}
@@ -27,6 +34,10 @@
 
 <style>
     .widget-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
         padding: 0.75rem 1rem;
         background-color: rgba(255, 255, 255, 0.03);
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -49,6 +60,13 @@
         letter-spacing: 0.05em;
         color: var(--secondary-300);
         text-align: left;
+        min-width: 0;
+    }
+
+    .header-controls {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
     }
 
     @media (max-width: 768px) {

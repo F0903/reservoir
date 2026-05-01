@@ -2,6 +2,9 @@ import { browser } from "$app/environment";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import {
+    bootstrapAdmin,
+    bootstrapStatus,
+    type BootstrapRequest,
     type Credentials,
     type UserInfo,
     changePassword,
@@ -10,6 +13,7 @@ import {
     me,
 } from "$lib/api/auth/auth";
 import { log } from "$lib/utils/logger";
+import UnauthorizedError from "$lib/api/unauthorized-error";
 
 export class AuthProvider {
     user = $state<UserInfo | null>(null);
@@ -30,10 +34,34 @@ export class AuthProvider {
             const userInfo = await me();
             this.user = userInfo;
             log.debug("Session verified, logged in as:", userInfo.username);
+        } catch (err) {
+            if (err instanceof UnauthorizedError) {
+                await this.redirectToBootstrapIfRequired();
+                return;
+            }
+            log.error("Failed to check session:", err);
         } finally {
             this.loading = false;
         }
     };
+
+    private redirectToBootstrapIfRequired = async () => {
+        const status = await bootstrapStatus();
+        if (!status.bootstrap_required) return;
+        if (window.location.pathname === "/bootstrap") return;
+
+        await goto(resolve("/bootstrap"), { replaceState: true });
+    };
+
+    bootstrap = async (req: BootstrapRequest): Promise<UserInfo> => {
+        log.debug("Creating bootstrap admin...");
+        const user = await bootstrapAdmin(req);
+        this.user = user;
+        log.debug("Bootstrap admin created:", user.username);
+        return user;
+    };
+
+    bootstrapStatus = () => bootstrapStatus();
 
     login = async (creds: Credentials): Promise<UserInfo> => {
         log.debug("Logging in...");
