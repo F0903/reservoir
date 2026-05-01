@@ -78,8 +78,6 @@ When the API and dashboard are enabled and the user database is empty, Reservoir
 
 The first admin username can be chosen during setup. The bootstrap password must be at least 12 characters, is never written to disk, and the created user is signed in immediately after setup. Once a user exists, the bootstrap endpoint returns a conflict and normal login is required.
 
-Older installs that still have the legacy generated bootstrap admin may continue to receive a generated password in `var/bootstrap-admin-password.txt` until that account changes its password. New empty installs use the first-run bootstrap page instead.
-
 If the API is disabled, Reservoir cannot create dashboard users or accept dashboard logins.
 
 ### Package Cache Behavior

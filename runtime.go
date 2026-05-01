@@ -39,8 +39,6 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		if bootstrap != nil {
 			if bootstrap.Required {
 				slog.Warn("Initial admin setup required", "bootstrap_path", "/bootstrap")
-			} else {
-				slog.Warn("Bootstrap admin credentials generated", "username", bootstrap.Username, "password_file", bootstrap.PasswordFile)
 			}
 		}
 	}

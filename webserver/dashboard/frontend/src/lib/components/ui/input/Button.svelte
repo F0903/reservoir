@@ -1,8 +1,22 @@
 <script lang="ts">
-    let { onClick, disabled = false, children } = $props();
+    import type { Snippet } from "svelte";
+
+    type ButtonType = "button" | "submit" | "reset";
+
+    let {
+        onClick,
+        disabled = false,
+        type = "button",
+        children,
+    }: {
+        onClick?: (_event: MouseEvent) => void | Promise<void>;
+        disabled?: boolean;
+        type?: ButtonType;
+        children: Snippet;
+    } = $props();
 </script>
 
-<button class="btn" onclick={onClick} {disabled}>
+<button class="btn" onclick={onClick} {disabled} {type}>
     {@render children()}
 </button>
 

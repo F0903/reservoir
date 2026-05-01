@@ -6,7 +6,6 @@ import (
 	"reservoir/utils/phc"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
-	coreauth "reservoir/webserver/auth"
 )
 
 var (
@@ -81,9 +80,6 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 		slog.Error("Error updating user password", "error", err)
 		apihttp.InternalServerError(w)
 		return
-	}
-	if err := coreauth.ClearBootstrapPasswordFile(); err != nil {
-		slog.Error("Error removing bootstrap password file", "error", err)
 	}
 	ctx.SessionManager.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
 

@@ -38,6 +38,9 @@
     });
 
     async function onBootstrap() {
+        if (loading || processing) {
+            return;
+        }
         if (password.length < 12) {
             error = "Password must be at least 12 characters.";
             return;
@@ -115,7 +118,7 @@
                 {/if}
 
                 <Button
-                    onClick={onBootstrap}
+                    type="submit"
                     disabled={loading || processing}
                     --btn-width="100%"
                     --btn-padding="0.8rem"

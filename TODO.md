@@ -20,6 +20,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add proxy-level restart-continuity tests for file-cache sidecars with real cached response metadata.
 - [x] Document cache sidecar restart behavior, cache backend tradeoffs, and CLI/config boundaries.
 - [x] Add cache operations API endpoints for status inspection and manual clearing.
+- [ ] Add "hybrid" cache backend that combines file and in-memory caching.
 
 ## Dashboard 
 - [x] Add dashboard cache operations panel for cache status and manual clearing.
@@ -27,6 +28,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [ ] Add dashboard settings controls for package-cache policy knobs (`ignore_cache_control`, `force_default_max_age`, and `default_max_age`).
 - [ ] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
 - [ ] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
+- [ ] Add a layout editor for the dashboard.
 
 
 ## Project Wide
