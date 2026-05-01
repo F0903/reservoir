@@ -1,27 +1,42 @@
 <script lang="ts">
-    import { onMount, type Component } from "svelte";
+    import { onMount, type Component, type Snippet } from "svelte";
     import type { IntRange } from "$lib/utils/type-utils";
     import { viewport } from "$lib/utils/viewport.svelte";
 
     type CellSpan = IntRange<1, 5>;
 
+    type SquaredGridElement = {
+        id?: string;
+        label?: string;
+        Comp: Component;
+        span: { width: CellSpan; height: CellSpan };
+        mobileSpan?: { width?: CellSpan; height?: CellSpan };
+        position?: { column: number; row: number };
+    };
+
+    type PlacedSquaredGridElement = SquaredGridElement & {
+        gridPosition: { column: number; row: number };
+        gridSpan: { width: number; height: number };
+    };
+
     let {
         elements,
         cellSize = 150,
         gap = 15,
+        children,
     }: {
-        elements: {
-            Comp: Component;
-            span: { width: CellSpan; height: CellSpan };
-            mobileSpan?: { width?: CellSpan; height?: CellSpan };
-        }[];
+        elements: SquaredGridElement[];
         cellSize?: number;
         gap?: number;
+        children?: Snippet<[SquaredGridElement]>;
     } = $props();
 
     let grid: HTMLDivElement;
 
     let parentWidth: number | undefined = $state();
+    let columns = $state(1);
+    let effectiveCellSize = $state(1);
+    const placedElements = $derived(resolveGridElements(elements, columns));
 
     onMount(() => {
         if (!grid.parentElement) return;
@@ -44,50 +59,142 @@
     $effect(() => {
         if (!parentWidth) return;
 
-        // On mobile, we use a smaller cell size to fit more content or at least not overflow
-        const effectiveCellSize = viewport.isMobile
-            ? Math.min(cellSize, (parentWidth - gap) / 2)
+        // On mobile, we use a smaller cell size to fit more content or at least not overflow.
+        effectiveCellSize = viewport.isMobile
+            ? Math.max(1, Math.min(cellSize, (parentWidth - gap) / 2))
             : cellSize;
         // Subtract one gap from total width because gaps only exist BETWEEN columns
-        const columns = Math.max(
-            1,
-            Math.floor((parentWidth - gap) / (effectiveCellSize + gap)) + 1,
-        );
-
-        // Explicitly set the amount of columns, and use gridAutoRows which can then automatically create rows as needed.
-        grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-        grid.style.gridAutoRows = `${effectiveCellSize}px`;
-        grid.style.gap = `${gap}px`;
-
-        // Update each grid element to cap its span to the number of columns
-        const elements = grid.querySelectorAll<HTMLDivElement>(".grid-elem");
-        elements.forEach((el) => {
-            const spanWidth = parseInt(
-                (viewport.isMobile ? el.dataset.mobileSpanWidth : null) ||
-                    el.dataset.spanWidth ||
-                    "1",
-            );
-            const spanHeight = parseInt(
-                (viewport.isMobile ? el.dataset.mobileSpanHeight : null) ||
-                    el.dataset.spanHeight ||
-                    "1",
-            );
-            el.style.gridColumn = `span ${Math.min(spanWidth, columns)}`;
-            el.style.gridRow = `span ${spanHeight}`;
-        });
+        columns = Math.max(1, Math.floor((parentWidth - gap) / (effectiveCellSize + gap)) + 1);
     });
+
+    function spanWidth(element: SquaredGridElement) {
+        return viewport.isMobile
+            ? (element.mobileSpan?.width ?? element.span.width)
+            : element.span.width;
+    }
+
+    function spanHeight(element: SquaredGridElement) {
+        return viewport.isMobile
+            ? (element.mobileSpan?.height ?? element.span.height)
+            : element.span.height;
+    }
+
+    function occupiedCellKey(column: number, row: number) {
+        return `${column}:${row}`;
+    }
+
+    function canPlaceElement(
+        occupiedCells: Set<string>,
+        position: { column: number; row: number },
+        span: { width: number; height: number },
+        gridColumns: number,
+    ) {
+        if (position.column < 1 || position.column + span.width - 1 > gridColumns) return false;
+
+        for (let row = position.row; row < position.row + span.height; row += 1) {
+            for (let column = position.column; column < position.column + span.width; column += 1) {
+                if (occupiedCells.has(occupiedCellKey(column, row))) return false;
+            }
+        }
+
+        return true;
+    }
+
+    function occupyElementCells(
+        occupiedCells: Set<string>,
+        position: { column: number; row: number },
+        span: { width: number; height: number },
+    ) {
+        for (let row = position.row; row < position.row + span.height; row += 1) {
+            for (let column = position.column; column < position.column + span.width; column += 1) {
+                occupiedCells.add(occupiedCellKey(column, row));
+            }
+        }
+    }
+
+    function clampPosition(
+        position: { column: number; row: number },
+        span: { width: number; height: number },
+        gridColumns: number,
+    ) {
+        const maxColumn = Math.max(1, gridColumns - span.width + 1);
+
+        return {
+            column: Math.min(maxColumn, Math.max(1, Math.round(position.column))),
+            row: Math.max(1, Math.round(position.row)),
+        };
+    }
+
+    function firstAvailablePosition(
+        occupiedCells: Set<string>,
+        span: { width: number; height: number },
+        gridColumns: number,
+    ) {
+        const maxColumn = Math.max(1, gridColumns - span.width + 1);
+
+        for (let row = 1; ; row += 1) {
+            for (let column = 1; column <= maxColumn; column += 1) {
+                const position = { column, row };
+                if (canPlaceElement(occupiedCells, position, span, gridColumns)) return position;
+            }
+        }
+    }
+
+    function resolveGridElements(
+        gridElements: SquaredGridElement[],
+        gridColumns: number,
+    ): PlacedSquaredGridElement[] {
+        if (gridColumns < 1) return [];
+
+        const occupiedCells = new Set<string>();
+        return gridElements.map((element) => {
+            const gridSpan = {
+                width: Math.min(spanWidth(element), gridColumns),
+                height: spanHeight(element),
+            };
+            const desiredPosition = element.position
+                ? clampPosition(element.position, gridSpan, gridColumns)
+                : undefined;
+            const gridPosition =
+                desiredPosition &&
+                canPlaceElement(occupiedCells, desiredPosition, gridSpan, gridColumns)
+                    ? desiredPosition
+                    : firstAvailablePosition(occupiedCells, gridSpan, gridColumns);
+
+            occupyElementCells(occupiedCells, gridPosition, gridSpan);
+
+            return {
+                ...element,
+                gridPosition,
+                gridSpan,
+            };
+        });
+    }
 </script>
 
-<div class="grid" bind:this={grid}>
-    {#each elements as { Comp, span: size, mobileSpan: mSize } (Comp)}
+<div
+    class="grid"
+    bind:this={grid}
+    data-squared-grid
+    data-grid-columns={columns}
+    data-grid-cell-size={effectiveCellSize}
+    data-grid-gap={gap}
+    style:grid-template-columns={`repeat(${columns}, 1fr)`}
+    style:grid-auto-rows={`${effectiveCellSize}px`}
+    style:gap={`${gap}px`}
+>
+    {#each placedElements as element (element.id ?? element.Comp)}
+        {@const { Comp } = element}
         <div
             class="grid-elem"
-            data-span-width={size.width}
-            data-span-height={size.height}
-            data-mobile-span-width={mSize?.width}
-            data-mobile-span-height={mSize?.height}
+            style:grid-column={`${element.gridPosition.column} / span ${element.gridSpan.width}`}
+            style:grid-row={`${element.gridPosition.row} / span ${element.gridSpan.height}`}
         >
-            <Comp />
+            {#if children}
+                {@render children(element)}
+            {:else}
+                <Comp />
+            {/if}
         </div>
     {/each}
 </div>

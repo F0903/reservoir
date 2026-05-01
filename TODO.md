@@ -28,7 +28,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add dashboard settings controls for package-cache policy knobs (`ignore_cache_control`, `force_default_max_age`, and `default_max_age`).
 - [x] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
 - [x] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
-- [ ] Add a layout editor for the dashboard.
+- [x] Add a layout editor for the dashboard.
 
 
 ## Project Wide
