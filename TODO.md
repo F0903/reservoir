@@ -40,3 +40,4 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add API JSON/error response helpers and robust request content-type parsing.
 - [x] Encapsulate session state and garbage collection in a runtime-owned session manager.
 - [x] Document the first-run bootstrap flow and add Bruno requests for bootstrap endpoints.
+- [ ] Code review recent Codex commits

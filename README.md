@@ -74,9 +74,7 @@ Some settings can also be changed in the Dashboard.
 
 ### Dashboard Bootstrap Login
 
-When the API and dashboard are enabled and the user database is empty, Reservoir starts in first-run bootstrap mode. Open the dashboard and create the initial admin account at:
-
-- `http://localhost:8080/bootstrap`
+When the API and dashboard are enabled and the user database is empty, Reservoir starts in first-run bootstrap mode.
 
 The first admin username can be chosen during setup. The bootstrap password must be at least 12 characters, is never written to disk, and the created user is signed in immediately after setup. Once a user exists, the bootstrap endpoint returns a conflict and normal login is required.
 
