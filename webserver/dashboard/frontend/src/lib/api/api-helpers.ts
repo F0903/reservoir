@@ -7,6 +7,7 @@ export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promis
 
 export type LoginRedirectOptions = { returnToLastWindow: boolean };
 export const DefaultRedirectOptions: LoginRedirectOptions = { returnToLastWindow: true };
+type JsonMutationMethod = "PATCH" | "POST";
 
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
@@ -49,10 +50,18 @@ async function assertResponse(
 
         throw new UnauthorizedError();
     } else if (!response.ok) {
-        throw new Error(
-            `Failed to fetch from '${response.url}': ${response.status} ${response.statusText}`,
-        );
+        throw new Error(await responseErrorMessage(response));
     }
+}
+
+async function responseErrorMessage(response: Response): Promise<string> {
+    const body = await response.text();
+    const detail = body.trim();
+    let message = `Failed to fetch from '${response.url}': ${response.status} ${response.statusText}`;
+    if (detail) {
+        message += `: ${detail}`;
+    }
+    return message;
 }
 
 async function getAssert(
@@ -81,24 +90,11 @@ export async function apiGetTextStream(
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<ReadableStream<string>> {
-    try {
-        const resp = await getAssert(endpoint, fetchFn);
-        if (!resp.body) {
-            throw new Error(`Body was empty when fetching text stream from '${endpoint}'`);
-        }
-        return resp.body.pipeThrough(new TextDecoderStream());
-    } catch (err) {
-        if (redirectOnUnauthorized && err instanceof UnauthorizedError) {
-            if (redirectOnUnauthorized) {
-                await redirectToLogin(redirectOnUnauthorized);
-                // We still continue to throw no matter what, so that the caller can handle it if they want to.
-            }
-
-            throw new UnauthorizedError();
-        } else {
-            throw err;
-        }
+    const resp = await getAssert(endpoint, fetchFn, redirectOnUnauthorized);
+    if (!resp.body) {
+        throw new Error(`Body was empty when fetching text stream from '${endpoint}'`);
     }
+    return resp.body.pipeThrough(new TextDecoderStream());
 }
 
 export async function apiGet<T>(
@@ -117,26 +113,7 @@ export async function apiPatch<T>(
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
-    const response = await fetchFn(`/api${endpoint}`, {
-        method: "PATCH",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "same-origin",
-        body: JSON.stringify(json),
-    });
-    await assertResponse(response, redirectOnUnauthorized);
-
-    const contentType = response.headers.get("Content-Type");
-    if (contentType && contentType.includes("application/json")) {
-        log.debug("Parsing JSON response from PATCH");
-        const respJson = await response.json();
-        return respJson as T;
-    }
-
-    log.debug("Unknown or no content type in response from PATCH, returning body text");
-    const respText = await response.text();
-    return respText as T;
+    return apiJsonMutation("PATCH", endpoint, json, fetchFn, redirectOnUnauthorized);
 }
 
 export async function apiPost<T>(
@@ -145,8 +122,18 @@ export async function apiPost<T>(
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
 ): Promise<T> {
+    return apiJsonMutation("POST", endpoint, json, fetchFn, redirectOnUnauthorized);
+}
+
+async function apiJsonMutation<T>(
+    method: JsonMutationMethod,
+    endpoint: string,
+    json: Record<string, unknown>,
+    fetchFn: FetchFn,
+    redirectOnUnauthorized: LoginRedirectOptions | null,
+): Promise<T> {
     const response = await fetchFn(`/api${endpoint}`, {
-        method: "POST",
+        method,
         headers: {
             "Content-Type": "application/json",
         },
@@ -155,14 +142,18 @@ export async function apiPost<T>(
     });
     await assertResponse(response, redirectOnUnauthorized);
 
+    return readMutationResponse<T>(response, method);
+}
+
+async function readMutationResponse<T>(response: Response, method: JsonMutationMethod): Promise<T> {
     const contentType = response.headers.get("Content-Type");
-    if (contentType && contentType.includes("application/json")) {
-        log.debug("Parsing JSON response from POST");
+    if (contentType?.includes("application/json")) {
+        log.debug(`Parsing JSON response from ${method}`);
         const respJson = await response.json();
         return respJson as T;
     }
 
-    log.debug("Unknown or no content type in response from POST, returning body text");
+    log.debug(`Unknown or no content type in response from ${method}, returning body text`);
     const respText = await response.text();
     return respText as T;
 }

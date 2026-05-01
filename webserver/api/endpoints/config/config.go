@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"reservoir/config"
@@ -48,6 +49,11 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apity
 
 	status, err := config.UpdatePartialFromConfig(ctx.Config, updates)
 	if err != nil {
+		if errors.Is(err, config.ErrValidationFailed) {
+			apihttp.BadRequest(w, err.Error())
+			return
+		}
+
 		slog.Error("Failed to partially update config", "error", err)
 		apihttp.InternalServerError(w)
 		return

@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ErrUpdateFailed = errors.New("failed to update config")
+	ErrUpdateFailed     = errors.New("failed to update config")
+	ErrValidationFailed = errors.New("config validation failed")
 )
 
 type UpdateStatus int
@@ -121,7 +122,7 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 
 	if updates == nil {
 		slog.Error("UpdatePartialFromConfig called with nil updates")
-		return UpdateStatusFailed, nil
+		return UpdateStatusFailed, fmt.Errorf("%w: updates cannot be nil", ErrValidationFailed)
 	}
 
 	slog.Debug("Setting properties from JSON map...", "updates", updates)
@@ -131,7 +132,7 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	candidateStagedProps, err := setPropsFromMapRecursive(reflect.ValueOf(candidate), updates)
+	candidateStagedProps, err := setPropsFromMap(candidate, updates)
 	if err != nil {
 		slog.Error("Failed to set properties from map", "error", err)
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
@@ -141,7 +142,7 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 
 	if err := candidate.verify(); err != nil {
 		slog.Error("Updated config failed verification", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrValidationFailed, err)
 	}
 
 	if err := candidate.persist(); err != nil {
@@ -149,7 +150,7 @@ func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus,
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
 	}
 
-	stagedProps, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), updates)
+	stagedProps, err := setPropsFromMap(cfg, updates)
 	if err != nil {
 		slog.Error("Failed to apply verified config update", "error", err)
 		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)

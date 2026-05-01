@@ -25,9 +25,9 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 ## Dashboard 
 - [x] Add dashboard cache operations panel for cache status and manual clearing.
 - [x] Add first-run bootstrap page for creating the initial admin account.
-- [ ] Add dashboard settings controls for package-cache policy knobs (`ignore_cache_control`, `force_default_max_age`, and `default_max_age`).
-- [ ] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
-- [ ] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
+- [x] Add dashboard settings controls for package-cache policy knobs (`ignore_cache_control`, `force_default_max_age`, and `default_max_age`).
+- [x] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
+- [x] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
 - [ ] Add a layout editor for the dashboard.
 
 

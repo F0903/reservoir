@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { apiGet, apiPost } from "./api-helpers";
+import { goto } from "$app/navigation";
+import { apiGet, apiGetTextStream, apiPatch, apiPost } from "./api-helpers";
 import UnauthorizedError from "./unauthorized-error";
 
 // Mock $app/navigation and $app/paths
@@ -39,10 +40,25 @@ describe("api-helpers", () => {
                 ok: false,
                 statusText: "Internal Server Error",
                 url: "http://localhost/api/test",
+                text: () => Promise.resolve(""),
             });
 
             await expect(apiGet("/test", fetchFn)).rejects.toThrow(
                 "Failed to fetch from 'http://localhost/api/test': 500 Internal Server Error",
+            );
+        });
+
+        it("should include response body on non-ok response when present", async () => {
+            const fetchFn = vi.fn().mockResolvedValue({
+                status: 400,
+                ok: false,
+                statusText: "Bad Request",
+                url: "http://localhost/api/test",
+                text: () => Promise.resolve("cache.max_cache_size must be greater than 0\n"),
+            });
+
+            await expect(apiGet("/test", fetchFn)).rejects.toThrow(
+                "Failed to fetch from 'http://localhost/api/test': 400 Bad Request: cache.max_cache_size must be greater than 0",
             );
         });
 
@@ -53,6 +69,20 @@ describe("api-helpers", () => {
             });
 
             await expect(apiGet("/test", fetchFn)).rejects.toThrow(UnauthorizedError);
+        });
+    });
+
+    describe("apiGetTextStream", () => {
+        it("should not redirect on 401 when redirect is disabled", async () => {
+            const fetchFn = vi.fn().mockResolvedValue({
+                status: 401,
+                ok: false,
+            });
+
+            await expect(apiGetTextStream("/stream", fetchFn, null)).rejects.toThrow(
+                UnauthorizedError,
+            );
+            expect(goto).not.toHaveBeenCalled();
         });
     });
 
@@ -79,6 +109,31 @@ describe("api-helpers", () => {
                 }),
             );
             expect(result).toEqual(mockData);
+        });
+    });
+
+    describe("apiPatch", () => {
+        it("should patch data successfully", async () => {
+            const fetchFn = vi.fn().mockResolvedValue({
+                status: 200,
+                ok: true,
+                headers: {
+                    get: () => "text/plain",
+                },
+                text: () => Promise.resolve("restart required"),
+            });
+
+            const payload = { key: "value" };
+            const result = await apiPatch<string>("/test", payload, fetchFn);
+
+            expect(fetchFn).toHaveBeenCalledWith(
+                "/api/test",
+                expect.objectContaining({
+                    method: "PATCH",
+                    body: JSON.stringify(payload),
+                }),
+            );
+            expect(result).toEqual("restart required");
         });
     });
 });

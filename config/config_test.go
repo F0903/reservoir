@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"reflect"
@@ -154,6 +155,9 @@ func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T
 	if err == nil {
 		t.Fatal("expected invalid update to return an error")
 	}
+	if !errors.Is(err, ErrValidationFailed) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
 	if status != UpdateStatusFailed {
 		t.Fatalf("expected failed status, got %v", status)
 	}
@@ -162,6 +166,19 @@ func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T
 	}
 	if notified.Load() {
 		t.Fatal("invalid update fired runtime subscriber")
+	}
+}
+
+func TestUpdatePartialFromConfig_NilUpdateReturnsValidationError(t *testing.T) {
+	status, err := UpdatePartialFromConfig(NewDefault(), nil)
+	if err == nil {
+		t.Fatal("expected nil update to return an error")
+	}
+	if !errors.Is(err, ErrValidationFailed) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if status != UpdateStatusFailed {
+		t.Fatalf("expected failed status, got %v", status)
 	}
 }
 

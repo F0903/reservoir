@@ -1,265 +1,28 @@
 <script lang="ts">
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import SettingInput from "$lib/components/ui/settings/SettingInput.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
     import { log } from "$lib/utils/logger";
     import { onMount, type Component } from "svelte";
-    import Toggle from "$lib/components/ui/input/Toggle.svelte";
-    import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
-    import { parseByteString } from "$lib/utils/bytestring";
-    import { patchConfig, type ConfigPropPath } from "$lib/api/objects/config/config";
-    import NumberInput from "$lib/components/ui/input/NumberInput.svelte";
-    import PercentInput from "$lib/components/ui/input/PercentInput.svelte";
     import { getSettingsProvider, getToastProvider } from "$lib/context";
-    import {
-        Globe,
-        Database,
-        FileText,
-        PanelsTopLeft,
-        Save,
-        RotateCcw,
-        RefreshCw,
-        TriangleAlert,
-    } from "@lucide/svelte";
+    import { Save, RotateCcw, RefreshCw, TriangleAlert } from "@lucide/svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
     import { fade, slide } from "svelte/transition";
-    import type { ComponentProps } from "svelte";
     import Tabs from "$lib/components/ui/Tabs.svelte";
+    import {
+        createInputInstances,
+        createSettingsSections,
+        tabs,
+        type SettingInputInstance,
+        type TabId,
+    } from "./settings-sections";
 
     const settings = getSettingsProvider();
     const toast = getToastProvider();
-
-    const optionalStringPattern = "^.*$";
-    const stringPattern = "^.+$";
-    const bytesizePattern = "^(\\d+)([BKMGT])$"; // eg. 100B, 1K, 1M, 1G, 1T
-    const durationPattern =
-        "^(?:\\+|-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$"; // eg. 100ms, 1s, 1m, 1h
-    const ipPortPattern =
-        "^((?:(?:\\d{1,3}\\.){3}\\d{1,3}|\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9._\\-]+)?\\])|(localhost))?:\\d{1,5}$"; // IP:port or [IPv6]:port
-
-    const tabs = [
-        { id: "dashboard", label: "Dashboard", icon: PanelsTopLeft },
-        { id: "network", label: "Network", icon: Globe },
-        { id: "cache", label: "Cache", icon: Database },
-        { id: "logging", label: "Logging", icon: FileText },
-    ] as const;
-
-    type TabId = (typeof tabs)[number]["id"];
+    const sections = createSettingsSections(settings);
     let activeTab = $state<TabId>("dashboard");
 
-    async function sendPatch(propName: ConfigPropPath, value: unknown) {
-        const status = await patchConfig(propName, value);
-        log.debug(`Patched config ${propName} with value ${value}, status: ${status}`);
-        if (status === "restart required") {
-            settings.proxySettings.needsRestart = true;
-        }
-    }
-
-    type SettingInputInstance = {
-        commit: () => Promise<void>;
-        reset: () => Promise<void>;
-        hasDiverged: () => boolean;
-    };
-
-    type InputSection<
-        C extends Component<CP, CE, "value">,
-        CP extends Record<string, unknown> = { [key: string]: unknown },
-        CE extends Record<string, unknown> = { [key: string]: unknown },
-        O = ComponentProps<C>["value"],
-    > = {
-        InputComponent: C;
-        get: () => ComponentProps<C>["value"];
-        valueTransform?: (_val: ComponentProps<C>["value"]) => O;
-        commit: (_val: O) => Promise<unknown>;
-        label: string;
-        pattern?: string;
-        tooltip?: string;
-    } & Omit<ComponentProps<C>, "value" | "label">;
-
-    type RegularInputProps<V> = {
-        label: string;
-        value: V;
-    };
-
-    type SetErrorProp = {
-        setError: (_error: string) => void;
-    };
-
-    const sections: {
-        [_K in (typeof tabs)[number]["id"]]: (
-            | InputSection<typeof NumberInput, RegularInputProps<number>>
-            | InputSection<typeof PercentInput, RegularInputProps<number>>
-            | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp>
-            | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp, number>
-            | InputSection<typeof Toggle, RegularInputProps<boolean>>
-            | InputSection<typeof Dropdown, RegularInputProps<string> & { options: string[] }>
-        )[][];
-    } = {
-        dashboard: [
-            [
-                {
-                    InputComponent: NumberInput,
-                    get: () => settings.dashboardSettings.fields.updateInterval,
-                    commit: async (val: number) => {
-                        settings.dashboardSettings.fields.updateInterval = val;
-                        settings.dashboardSettings.save();
-                    },
-                    label: "Update Interval",
-                    min: 500,
-                    tooltip: "Interval in milliseconds for dashboard data updates.",
-                },
-            ],
-        ],
-        network: [
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.proxy.listen,
-                    commit: async (val: string) => await sendPatch("proxy.listen", val),
-                    label: "Proxy Listen",
-                    pattern: ipPortPattern,
-                    tooltip: "IP and port for the proxy server.",
-                },
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.webserver.listen,
-                    commit: async (val: string) => await sendPatch("webserver.listen", val),
-                    label: "Webserver Listen",
-                    pattern: ipPortPattern,
-                    tooltip: "IP and port for the internal web server.",
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.proxy.ca_cert,
-                    commit: async (val: string) => await sendPatch("proxy.ca_cert", val),
-                    label: "CA Certificate Path",
-                    pattern: stringPattern,
-                },
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.proxy.ca_key,
-                    commit: async (val: string) => await sendPatch("proxy.ca_key", val),
-                    label: "CA Key Path",
-                    pattern: stringPattern,
-                },
-            ],
-            [
-                {
-                    InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.proxy.upstream_default_https,
-                    commit: async (val: boolean) =>
-                        await sendPatch("proxy.upstream_default_https", val),
-                    label: "Upstream Default HTTPS",
-                },
-                {
-                    InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.proxy.retry_on_range_416,
-                    commit: async (val: boolean) =>
-                        await sendPatch("proxy.retry_on_range_416", val),
-                    label: "Retry on Range 416",
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.proxy.cache_policy.default_max_age,
-                    commit: async (val: string) =>
-                        await sendPatch("proxy.cache_policy.default_max_age", val),
-                    label: "Default Max Age",
-                    pattern: durationPattern,
-                },
-                {
-                    InputComponent: Toggle,
-                    get: () =>
-                        settings.proxySettings.fields.proxy.cache_policy.ignore_cache_control,
-                    commit: async (val: boolean) =>
-                        await sendPatch("proxy.cache_policy.ignore_cache_control", val),
-                    label: "Ignore Cache Control",
-                },
-            ],
-        ],
-        cache: [
-            [
-                {
-                    InputComponent: Dropdown,
-                    get: () => settings.proxySettings.fields.cache.type,
-                    commit: async (val: string) => await sendPatch("cache.type", val),
-                    label: "Storage Type",
-                    options: ["memory", "file"],
-                },
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.cache.file.dir,
-                    commit: async (val: string) => await sendPatch("cache.file.dir", val),
-                    label: "Cache Directory",
-                    pattern: stringPattern,
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => String(settings.proxySettings.fields.cache.max_cache_size),
-                    valueTransform: (val: string) => parseByteString(val),
-                    commit: async (val: number) => await sendPatch("cache.max_cache_size", val),
-                    label: "Max Cache Size",
-                    pattern: bytesizePattern,
-                },
-                {
-                    InputComponent: PercentInput,
-                    get: () => settings.proxySettings.fields.cache.memory.memory_budget_percent,
-                    commit: async (val: number) =>
-                        await sendPatch("cache.memory.memory_budget_percent", val),
-                    label: "Memory Budget (%)",
-                },
-            ],
-        ],
-        logging: [
-            [
-                {
-                    InputComponent: Dropdown,
-                    options: ["DEBUG", "INFO", "WARN", "ERROR"],
-                    get: () => settings.proxySettings.fields.logging.level,
-                    commit: async (val: string) => await sendPatch("logging.level", val),
-                    label: "Log Level",
-                },
-                {
-                    InputComponent: Toggle,
-                    get: () => settings.proxySettings.fields.logging.to_stdout,
-                    commit: async (val: boolean) => await sendPatch("logging.to_stdout", val),
-                    label: "Log to Stdout",
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => settings.proxySettings.fields.logging.file,
-                    commit: async (val: string) => await sendPatch("logging.file", val),
-                    label: "Log File Path",
-                    pattern: optionalStringPattern,
-                },
-                {
-                    InputComponent: TextInput,
-                    get: () => String(settings.proxySettings.fields.logging.max_size),
-                    valueTransform: (val: string) => parseByteString(val),
-                    commit: async (val: number) => await sendPatch("logging.max_size", val),
-                    label: "Max File Size",
-                    pattern: bytesizePattern,
-                },
-            ],
-        ],
-    };
-
-    const inputInstances: Record<string, (SettingInputInstance | undefined)[][]> = $state(
-        Object.fromEntries(
-            Object.entries(sections).map(([tabId, tabSections]) => [
-                tabId,
-                tabSections.map((section) => new Array(section.length).fill(undefined)),
-            ]),
-        ),
-    );
+    const inputInstances = $state(createInputInstances(sections));
 
     let hasChanges = $state(false);
     let saving = $state(false);
@@ -271,31 +34,34 @@
         inputsDisabled = false;
     });
 
+    function allInputInstances() {
+        return Object.values(inputInstances)
+            .flat(2)
+            .filter((input): input is SettingInputInstance => input != null);
+    }
+
     function onChange(_different: boolean) {
-        // Check if ANY input across all tabs has diverged
-        const allInputs = Object.values(inputInstances).flat(2);
-        hasChanges = allInputs.some((i) => i?.hasDiverged?.());
+        hasChanges = allInputInstances().some((i) => i.hasDiverged());
     }
 
     async function commitChanges() {
         saving = true;
         try {
-            const allInputs = Object.values(inputInstances).flat(2);
-            await Promise.all(allInputs.map((i) => i?.commit()));
+            await Promise.all(allInputInstances().map((i) => i.commit()));
 
             toast.success("Settings saved successfully.");
             await settings.proxySettings.reload();
             await resetInputs();
         } catch (e) {
             log.error("Failed to save settings:", e);
+            toast.error(e instanceof Error ? e.message : String(e));
         } finally {
             saving = false;
         }
     }
 
     async function resetInputs() {
-        const allInputs = Object.values(inputInstances).flat(2);
-        await Promise.all(allInputs.map((i) => i?.reset()));
+        await Promise.all(allInputInstances().map((i) => i.reset()));
         hasChanges = false;
     }
 </script>

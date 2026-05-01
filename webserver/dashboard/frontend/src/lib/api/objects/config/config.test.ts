@@ -13,65 +13,39 @@ describe("config api object", () => {
     });
 
     describe("patchConfig", () => {
-        it("should correctly build a nested object for a deep property", async () => {
-            const apiPatchSpy = vi.mocked(apiHelpers.apiPatch);
-            apiPatchSpy.mockResolvedValue("success");
-
-            await patchConfig("proxy.listen", ":8888");
-
-            expect(apiPatchSpy).toHaveBeenCalledWith(
-                "/config",
+        it.each([
+            [
+                "proxy.listen",
+                ":8888",
                 {
                     proxy: {
                         listen: ":8888",
                     },
                 },
-                expect.any(Function),
-            );
-        });
-
-        it("should correctly build a nested object for another sub-config", async () => {
-            const apiPatchSpy = vi.mocked(apiHelpers.apiPatch);
-            apiPatchSpy.mockResolvedValue("success");
-
-            await patchConfig("cache.max_cache_size", 5000);
-
-            expect(apiPatchSpy).toHaveBeenCalledWith(
-                "/config",
+            ],
+            [
+                "proxy.cache_policy.ignore_cache_control",
+                true,
+                {
+                    proxy: {
+                        cache_policy: {
+                            ignore_cache_control: true,
+                        },
+                    },
+                },
+            ],
+            [
+                "cache.max_cache_size",
+                5000,
                 {
                     cache: {
                         max_cache_size: 5000,
                     },
                 },
-                expect.any(Function),
-            );
-        });
-
-        it("should correctly build a deeply nested object for logging", async () => {
-            const apiPatchSpy = vi.mocked(apiHelpers.apiPatch);
-            apiPatchSpy.mockResolvedValue("success");
-
-            await patchConfig("logging.level", "DEBUG");
-
-            expect(apiPatchSpy).toHaveBeenCalledWith(
-                "/config",
-                {
-                    logging: {
-                        level: "DEBUG",
-                    },
-                },
-                expect.any(Function),
-            );
-        });
-
-        it("should correctly build a deeply nested object for cache specific properties", async () => {
-            const apiPatchSpy = vi.mocked(apiHelpers.apiPatch);
-            apiPatchSpy.mockResolvedValue("success");
-
-            await patchConfig("cache.file.dir", "/new/path");
-
-            expect(apiPatchSpy).toHaveBeenCalledWith(
-                "/config",
+            ],
+            [
+                "cache.file.dir",
+                "/new/path",
                 {
                     cache: {
                         file: {
@@ -79,8 +53,41 @@ describe("config api object", () => {
                         },
                     },
                 },
-                expect.any(Function),
-            );
-        });
+            ],
+            [
+                "cache.memory.memory_budget_percent",
+                70,
+                {
+                    cache: {
+                        memory: {
+                            memory_budget_percent: 70,
+                        },
+                    },
+                },
+            ],
+            [
+                "logging.level",
+                "DEBUG",
+                {
+                    logging: {
+                        level: "DEBUG",
+                    },
+                },
+            ],
+        ] as const)(
+            "should build a nested patch body for %s",
+            async (keyPath, value, expectedBody) => {
+                const apiPatchSpy = vi.mocked(apiHelpers.apiPatch);
+                apiPatchSpy.mockResolvedValue("success");
+
+                await patchConfig(keyPath, value);
+
+                expect(apiPatchSpy).toHaveBeenCalledWith(
+                    "/config",
+                    expectedBody,
+                    expect.any(Function),
+                );
+            },
+        );
     });
 });

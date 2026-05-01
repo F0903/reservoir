@@ -62,18 +62,33 @@ type Leaves<T, P extends string = ""> = T extends object
       ? S
       : never;
 
+type ValueAtPath<T, P extends string> = P extends `${infer K}.${infer Rest}`
+    ? K extends keyof T
+        ? ValueAtPath<T[K], Rest>
+        : never
+    : P extends keyof T
+      ? T[P]
+      : never;
+
 export type ConfigPropPath = Leaves<Config>;
+export type ConfigPropValue<P extends ConfigPropPath> = ValueAtPath<Config, P>;
 
 export async function getConfig(fetchFn: FetchFn = fetch): Promise<Readonly<Config>> {
     return apiGet<Config>("/config", fetchFn);
 }
 
-export async function patchConfig(
-    keyPath: ConfigPropPath,
-    value: unknown,
+export async function patchConfig<P extends ConfigPropPath>(
+    keyPath: P,
+    value: ConfigPropValue<P>,
     fetchFn: FetchFn = fetch,
 ): Promise<string> {
-    // Create nested object from keyPath (e.g. "proxy.listen" -> { proxy: { listen: value } })
+    return apiPatch("/config", configPatchBody(keyPath, value), fetchFn);
+}
+
+function configPatchBody<P extends ConfigPropPath>(
+    keyPath: P,
+    value: ConfigPropValue<P>,
+): DeepPartial<Config> {
     const parts = keyPath.split(".");
     const body: Record<string, unknown> = {};
     let current = body;
@@ -87,5 +102,5 @@ export async function patchConfig(
     }
     current[parts[parts.length - 1]] = value;
 
-    return apiPatch("/config", body as DeepPartial<Config>, fetchFn);
+    return body as DeepPartial<Config>;
 }
