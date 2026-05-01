@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -86,7 +89,97 @@ func TestSessionManagerGetRejectsExpiredSessions(t *testing.T) {
 	if _, ok := manager.Get(session.ID); ok {
 		t.Fatal("expected expired session to be rejected")
 	}
-	if _, ok := manager.store.Get(session.ID); ok {
+	if _, ok := manager.store[session.ID]; ok {
 		t.Fatal("expected expired session to be removed")
+	}
+}
+
+func TestSessionManagerConcurrentGetExtendsSession(t *testing.T) {
+	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	manager := NewSessionManager()
+	manager.lifetime = time.Minute
+	manager.now = func() time.Time {
+		return now
+	}
+
+	session := manager.Create(1)
+	expectedExpiry := now.Add(time.Minute)
+	const goroutines = 16
+	const iterations = 200
+
+	var wg sync.WaitGroup
+	errs := make(chan string, goroutines)
+	for range goroutines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				got, ok := manager.Get(session.ID)
+				if !ok {
+					errs <- "expected session to remain available"
+					return
+				}
+				if !got.ExpiresAt.Equal(expectedExpiry) {
+					errs <- fmt.Sprintf("expected expiry %s, got %s", expectedExpiry, got.ExpiresAt)
+					return
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	if err := <-errs; err != "" {
+		t.Fatal(err)
+	}
+}
+
+func TestSessionManagerConcurrentMutations(t *testing.T) {
+	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	manager := NewSessionManager()
+	manager.now = func() time.Time {
+		return now
+	}
+	var nextID atomic.Int64
+	manager.newID = func() string {
+		return fmt.Sprintf("sid-%d", nextID.Add(1))
+	}
+
+	const goroutines = 16
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	errs := make(chan string, goroutines)
+	for worker := range goroutines {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			userID := int64(worker + 1)
+			for range iterations {
+				session := manager.Create(userID)
+				if _, ok := manager.Get(session.ID); !ok {
+					errs <- fmt.Sprintf("expected created session %q to be available", session.ID)
+					return
+				}
+				manager.DestroySessionsForUserExcept(userID, session.ID)
+				if _, ok := manager.Get(session.ID); !ok {
+					errs <- fmt.Sprintf("expected kept session %q to remain available", session.ID)
+					return
+				}
+				manager.Destroy(session)
+				if _, ok := manager.Get(session.ID); ok {
+					errs <- fmt.Sprintf("expected destroyed session %q to be unavailable", session.ID)
+					return
+				}
+			}
+		}(worker)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	if err := <-errs; err != "" {
+		t.Fatal(err)
 	}
 }

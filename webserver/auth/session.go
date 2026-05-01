@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"reservoir/utils/syncmap"
 	"sync"
 	"time"
 )
@@ -28,7 +27,8 @@ type Session struct {
 }
 
 type SessionManager struct {
-	store           *syncmap.SyncMap[string, *Session]
+	// We use a manual mutex instead of SyncMap since we might both read and write in the same method
+	store           map[string]*Session
 	mu              sync.Mutex
 	gcRunning       bool
 	lifetime        time.Duration
@@ -42,7 +42,7 @@ var defaultSessionManager = NewSessionManager()
 
 func NewSessionManager() *SessionManager {
 	return &SessionManager{
-		store:           syncmap.New[string, *Session](),
+		store:           make(map[string]*Session),
 		lifetime:        defaultLifetime,
 		extendThreshold: extendThreshold,
 		gcInterval:      gcInterval,
@@ -97,21 +97,20 @@ func (m *SessionManager) Get(sid string) (*Session, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	sess, ok := m.store.Get(sid)
+	sess, ok := m.store[sid]
 	if !ok {
 		return nil, false
 	}
 
 	now := m.now()
 	if !sess.ExpiresAt.After(now) {
-		m.store.Delete(sid)
+		delete(m.store, sid)
 		return nil, false
 	}
 
 	if sess.ExpiresAt.Sub(now) <= m.extendThreshold {
 		slog.Debug("Session close to expiring, extending expiration", "session_id", sid, "expires_at", sess.ExpiresAt)
 		sess.ExpiresAt = now.Add(m.lifetime)
-		m.store.Set(sid, sess)
 	}
 
 	sessCopy := *sess
@@ -133,7 +132,7 @@ func (m *SessionManager) Create(userID int64) *Session {
 		ExpiresAt: now.Add(m.lifetime),
 	}
 
-	m.store.Set(sid, sess)
+	m.store[sid] = sess
 	slog.Debug("Created new session", "session_id", sid, "expires_at", sess.ExpiresAt)
 
 	sessCopy := *sess
@@ -145,11 +144,11 @@ func (m *SessionManager) DestroySessionsForUserExcept(userID int64, keepSessionI
 	defer m.mu.Unlock()
 
 	deleted := 0
-	for item := range m.store.Items() {
+	for _, item := range m.store {
 		if item.UserID != userID || item.ID == keepSessionID {
 			continue
 		}
-		m.store.Delete(item.ID)
+		delete(m.store, item.ID)
 		deleted++
 	}
 	if deleted > 0 {
@@ -185,7 +184,7 @@ func (m *SessionManager) Destroy(sess *Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.store.Delete(sess.ID)
+	delete(m.store, sess.ID)
 	slog.Debug("Destroyed session", "session_id", sess.ID)
 }
 
@@ -193,9 +192,9 @@ func (m *SessionManager) deleteExpired(now time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for item := range m.store.Items() {
+	for _, item := range m.store {
 		if item.ExpiresAt.Before(now) {
-			m.store.Delete(item.ID)
+			delete(m.store, item.ID)
 			slog.Debug("Deleted expired session", "session_id", item.ID)
 		}
 	}
