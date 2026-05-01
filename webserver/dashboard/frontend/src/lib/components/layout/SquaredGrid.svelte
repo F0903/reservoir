@@ -31,23 +31,25 @@
         children?: Snippet<[SquaredGridElement]>;
     } = $props();
 
+    const initialColumns = 4;
+
     let grid: HTMLDivElement;
 
     let parentWidth: number | undefined = $state();
-    let columns = $state(1);
-    let effectiveCellSize = $state(1);
+    let columns = $state(initialColumns);
+    let measuredCellSize = $state(1);
+    let hasMeasured = $state(false);
+    const effectiveCellSize = $derived(hasMeasured ? measuredCellSize : cellSize);
     const placedElements = $derived(resolveGridElements(elements, columns));
 
     onMount(() => {
         if (!grid.parentElement) return;
 
-        // Set initial parent width
-        parentWidth = grid.parentElement.offsetWidth;
+        setParentWidth(grid.parentElement.offsetWidth);
 
         const parentObserver = new ResizeObserver((entries) => {
-            // Update parent width when resized
             const entry = entries[0];
-            parentWidth = entry.contentRect.width;
+            setParentWidth(entry.contentRect.width);
         });
         parentObserver.observe(grid.parentElement);
 
@@ -59,13 +61,30 @@
     $effect(() => {
         if (!parentWidth) return;
 
-        // On mobile, we use a smaller cell size to fit more content or at least not overflow.
-        effectiveCellSize = viewport.isMobile
-            ? Math.max(1, Math.min(cellSize, (parentWidth - gap) / 2))
-            : cellSize;
-        // Subtract one gap from total width because gaps only exist BETWEEN columns
-        columns = Math.max(1, Math.floor((parentWidth - gap) / (effectiveCellSize + gap)) + 1);
+        const dimensions = gridDimensions(parentWidth);
+        measuredCellSize = dimensions.cellSize;
+        columns = dimensions.columns;
     });
+
+    function setParentWidth(width: number) {
+        if (!Number.isFinite(width) || width <= 0) return;
+
+        parentWidth = width;
+        hasMeasured = true;
+    }
+
+    function gridDimensions(width: number) {
+        // On mobile, we use a smaller cell size to fit more content or at least not overflow.
+        const nextCellSize = viewport.isMobile
+            ? Math.max(1, Math.min(cellSize, (width - gap) / 2))
+            : cellSize;
+
+        return {
+            cellSize: nextCellSize,
+            // Subtract one gap from total width because gaps only exist BETWEEN columns.
+            columns: Math.max(1, Math.floor((width - gap) / (nextCellSize + gap)) + 1),
+        };
+    }
 
     function spanWidth(element: SquaredGridElement) {
         return viewport.isMobile
@@ -179,6 +198,7 @@
     data-grid-columns={columns}
     data-grid-cell-size={effectiveCellSize}
     data-grid-gap={gap}
+    aria-busy={!hasMeasured}
     style:grid-template-columns={`repeat(${columns}, 1fr)`}
     style:grid-auto-rows={`${effectiveCellSize}px`}
     style:gap={`${gap}px`}
@@ -190,10 +210,16 @@
             style:grid-column={`${element.gridPosition.column} / span ${element.gridSpan.width}`}
             style:grid-row={`${element.gridPosition.row} / span ${element.gridSpan.height}`}
         >
-            {#if children}
+            {#if hasMeasured && children}
                 {@render children(element)}
-            {:else}
+            {:else if hasMeasured}
                 <Comp />
+            {:else}
+                <div class="grid-placeholder" aria-hidden="true">
+                    <span class="placeholder-title"></span>
+                    <span class="placeholder-line"></span>
+                    <span class="placeholder-line short"></span>
+                </div>
             {/if}
         </div>
     {/each}
@@ -203,6 +229,47 @@
     .grid-elem {
         width: 100%;
         height: 100%;
+    }
+
+    .grid-placeholder {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 0.55rem;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        padding: 1rem;
+        border: 1px solid var(--primary-500);
+        border-radius: 15px;
+        background-color: var(--primary-500);
+    }
+
+    .placeholder-title,
+    .placeholder-line {
+        display: block;
+        border-radius: 999px;
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .placeholder-title {
+        position: absolute;
+        top: 0.95rem;
+        left: 1rem;
+        width: 38%;
+        height: 0.58rem;
+        background-color: color-mix(in srgb, var(--secondary-300) 22%, transparent);
+    }
+
+    .placeholder-line {
+        width: 52%;
+        height: 0.44rem;
+    }
+
+    .placeholder-line.short {
+        width: 34%;
+        background-color: rgba(255, 255, 255, 0.055);
     }
 
     .grid {
