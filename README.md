@@ -1,6 +1,6 @@
 # reservoir
 
-[![Build with SLSA](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml/badge.svg)](https://github.com/F0903/reservoir/actions/workflows/go-build-slsa3.yml)
+[![CI](https://github.com/F0903/reservoir/actions/workflows/ci.yml/badge.svg)](https://github.com/F0903/reservoir/actions/workflows/ci.yml)
 
 A caching and coalescing MITM (Man-in-the-Middle) HTTP(S) forward proxy with an embedded dashboard.
 
