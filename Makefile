@@ -5,7 +5,7 @@ build: build-proxy
 
 # Run the Go backend and Svelte frontend in development mode
 dev:
-	$(MAKE) --no-print-directory -j2 dev-backend dev-frontend
+	$(MAKE) --no-print-directory -j2 dev-backend-watch dev-frontend
 
 # Run all tests
 test: generate-csp test-proxy test-frontend
@@ -55,7 +55,11 @@ build-frontend: frontend-install
 dev-frontend:
 	cd webserver/dashboard/frontend && pnpm run dev $(ARGS)
 
-# Run the Go backend in development mode
+# Run the Go backend in development mode with file watching
+dev-backend-watch:
+	go tool air -c .air.toml
+
+# Run the Go backend once without file watching
 dev-backend:
 	go run .
 
@@ -64,4 +68,4 @@ clean:
 	rm -f reservoir.exe
 	rm -rf webserver/dashboard/frontend/build
 
-.PHONY: build dev dev-backend build-proxy generate-csp build-frontend frontend-install check-frontend lint-frontend dev-frontend test ci vet test-proxy test-frontend bench bench-cache clean
+.PHONY: build dev dev-backend-watch dev-backend build-proxy generate-csp build-frontend frontend-install check-frontend lint-frontend dev-frontend test ci vet test-proxy test-frontend bench bench-cache clean

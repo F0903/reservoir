@@ -10,6 +10,9 @@ __debug*
 # Dependency directories (vendor/)
 vendor/
 
+# Development watcher build output
+tmp/
+
 # Certs and keys
 ssl/
 
