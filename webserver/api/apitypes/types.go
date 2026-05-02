@@ -11,6 +11,7 @@ type EndpointMethod struct {
 	Method                      string
 	Func                        MethodFunc
 	RequiresAuth                bool
+	RequiresAdmin               bool
 	AllowPasswordChangeRequired bool
 }
 

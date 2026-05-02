@@ -28,6 +28,10 @@ vi.mock("$lib/api/auth/auth", () => ({
     me: vi.fn(),
     changePassword: vi.fn(),
     updateMe: vi.fn(),
+    listUsers: vi.fn(),
+    createUser: vi.fn(),
+    updateUser: vi.fn(),
+    deleteUser: vi.fn(),
 }));
 
 // Mock logger
@@ -145,5 +149,33 @@ describe("AuthProvider", () => {
 
         expect(authApi.changePassword).toHaveBeenCalledWith("old-password", "new-password");
         expect(provider.user).toEqual(refreshedUser);
+    });
+
+    it("should expose managed user operations", async () => {
+        const managedUser = { ...mockUser, id: 2, username: "operator", is_admin: false };
+        (authApi.listUsers as Mock).mockResolvedValue([mockUser]);
+        (authApi.createUser as Mock).mockResolvedValue(managedUser);
+        (authApi.updateUser as Mock).mockResolvedValue({ ...managedUser, is_admin: true });
+        (authApi.deleteUser as Mock).mockResolvedValue(undefined);
+        provider = new AuthProvider();
+        await vi.waitFor(() => expect(provider.loading).toBe(false));
+
+        await expect(provider.listUsers()).resolves.toEqual([mockUser]);
+        await expect(
+            provider.createUser({
+                username: "operator",
+                password: "generated-password",
+                is_admin: false,
+            }),
+        ).resolves.toEqual(managedUser);
+        await expect(provider.updateUser(2, { is_admin: true })).resolves.toMatchObject({
+            is_admin: true,
+        });
+        await provider.deleteUser(2);
+
+        expect(authApi.listUsers).toHaveBeenCalled();
+        expect(authApi.createUser).toHaveBeenCalled();
+        expect(authApi.updateUser).toHaveBeenCalledWith(2, { is_admin: true });
+        expect(authApi.deleteUser).toHaveBeenCalledWith(2);
     });
 });

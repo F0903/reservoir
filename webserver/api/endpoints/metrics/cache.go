@@ -16,9 +16,10 @@ func (m *CacheMetricsEndpoint) Path() string {
 func (m *CacheMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       "GET",
-			Func:         m.Get,
-			RequiresAuth: true,
+			Method:        "GET",
+			Func:          m.Get,
+			RequiresAuth:  true,
+			RequiresAdmin: true,
 		},
 	}
 }

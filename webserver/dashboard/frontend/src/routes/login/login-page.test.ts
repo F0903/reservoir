@@ -35,6 +35,7 @@ describe("login page", () => {
         contextMocks.auth.login.mockResolvedValue({
             id: 1,
             username: "admin",
+            is_admin: true,
             password_change_required: false,
             created_at: "2026-01-01T00:00:00Z",
             updated_at: "2026-01-01T00:00:00Z",
@@ -63,5 +64,33 @@ describe("login page", () => {
             replaceState: true,
             invalidateAll: true,
         });
+    });
+
+    it("redirects non-admin users to their account page", async () => {
+        contextMocks.auth.login.mockResolvedValue({
+            id: 2,
+            username: "operator",
+            is_admin: false,
+            password_change_required: false,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+        });
+        const user = userEvent.setup();
+        render(LoginPage, {
+            props: {
+                data: { return: null },
+                params: {},
+            },
+        });
+
+        await user.type(screen.getByLabelText("Username"), "operator");
+        await user.type(screen.getByLabelText("Password"), "secret{Enter}");
+
+        await waitFor(() =>
+            expect(goto).toHaveBeenCalledWith("/dashboard/user", {
+                replaceState: true,
+                invalidateAll: true,
+            }),
+        );
     });
 });

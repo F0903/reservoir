@@ -7,6 +7,7 @@ import (
 	"reservoir/config"
 	"reservoir/db/models"
 	"reservoir/db/stores"
+	"reservoir/utils/phc"
 	"reservoir/webserver/auth"
 )
 
@@ -15,10 +16,23 @@ type CacheController interface {
 	ClearCache() error
 }
 
+type UserStore interface {
+	Create(user *models.User) (*models.User, error)
+	List() ([]models.User, error)
+	GetByID(id int64) (*models.User, error)
+	GetByUsername(username string) (*models.User, error)
+	UpdateUsername(id int64, username string) (*models.User, error)
+	UpdateAdmin(id int64, isAdmin bool) (*models.User, error)
+	UpdatePassword(id int64, passwordHash phc.PHC, passwordChangeRequired bool) (*models.User, error)
+	Delete(id int64) error
+	Save(user *models.User) error
+	Close() error
+}
+
 type Context struct {
 	Session        *auth.Session
 	SessionManager *auth.SessionManager
-	UserStore      *stores.UserStore
+	UserStore      UserStore
 	Config         *config.Config
 	Cache          CacheController
 }
@@ -29,7 +43,7 @@ func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionMa
 	}
 
 	sess, authorized := sessions.SessionFromRequest(r)
-	var users *stores.UserStore
+	var users UserStore
 	if authorized {
 		var err error
 		users, err = stores.OpenUserStore()

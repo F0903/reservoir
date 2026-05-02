@@ -16,9 +16,10 @@ func (e *RestartRequiredEndpoint) Path() string {
 func (e *RestartRequiredEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       "GET",
-			Func:         e.Get,
-			RequiresAuth: true,
+			Method:        "GET",
+			Func:          e.Get,
+			RequiresAuth:  true,
+			RequiresAdmin: true,
 		},
 	}
 }

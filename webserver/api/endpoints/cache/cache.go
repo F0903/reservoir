@@ -17,9 +17,10 @@ func (e *StatusEndpoint) Path() string {
 func (e *StatusEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       http.MethodGet,
-			Func:         e.Get,
-			RequiresAuth: true,
+			Method:        http.MethodGet,
+			Func:          e.Get,
+			RequiresAuth:  true,
+			RequiresAdmin: true,
 		},
 	}
 }
@@ -62,9 +63,10 @@ func (e *ClearEndpoint) Path() string {
 func (e *ClearEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:       http.MethodPost,
-			Func:         e.Post,
-			RequiresAuth: true,
+			Method:        http.MethodPost,
+			Func:          e.Post,
+			RequiresAuth:  true,
+			RequiresAdmin: true,
 		},
 	}
 }

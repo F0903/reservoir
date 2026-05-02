@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { goto } from "$app/navigation";
-import { apiGet, apiGetTextStream, apiPatch, apiPost } from "./api-helpers";
+import { apiDelete, apiGet, apiGetTextStream, apiPatch, apiPost } from "./api-helpers";
 import UnauthorizedError from "./unauthorized-error";
 
 // Mock $app/navigation and $app/paths
@@ -134,6 +134,29 @@ describe("api-helpers", () => {
                 }),
             );
             expect(result).toEqual("restart required");
+        });
+    });
+
+    describe("apiDelete", () => {
+        it("should delete successfully", async () => {
+            const fetchFn = vi.fn().mockResolvedValue({
+                status: 204,
+                ok: true,
+                headers: {
+                    get: () => null,
+                },
+                text: () => Promise.resolve(""),
+            });
+
+            await apiDelete<void>("/test", fetchFn);
+
+            expect(fetchFn).toHaveBeenCalledWith(
+                "/api/test",
+                expect.objectContaining({
+                    method: "DELETE",
+                    credentials: "same-origin",
+                }),
+            );
         });
     });
 });

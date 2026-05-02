@@ -1,13 +1,31 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
+    import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
+    import { page } from "$app/state";
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
-    import { LayoutDashboard, Logs, Settings, UserRound } from "@lucide/svelte";
+    import { getAuthProvider } from "$lib/context";
+    import { LayoutDashboard, Logs, Settings, UsersRound } from "@lucide/svelte";
 
     let { children } = $props();
 
+    const auth = getAuthProvider();
+    const isAdmin = $derived(!!auth.user && auth.user.is_admin !== false);
     let isMenuOpen = $state(false);
+
+    $effect(() => {
+        if (!browser || auth.loading || !auth.user || isAdmin) {
+            return;
+        }
+
+        const userPath = resolve("/dashboard/user");
+        if (page.url.pathname !== userPath) {
+            void goto(userPath, { replaceState: true });
+        }
+    });
 
     function toggleMenu() {
         isMenuOpen = !isMenuOpen;
@@ -18,28 +36,30 @@
     }
 </script>
 
-<div class="layout-grid">
+<div class="layout-grid" class:no-sidenav={!isAdmin}>
     <div class="header-area">
         <Header onToggleMenu={toggleMenu} />
     </div>
-    <div class="sidenav-area" class:open={isMenuOpen}>
-        <SideNav>
-            <SideNavButton url="/dashboard" onClick={closeMenu}>
-                <LayoutDashboard />Dashboard
-            </SideNavButton>
-            <SideNavButton url="/dashboard/settings" onClick={closeMenu}>
-                <Settings />Settings
-            </SideNavButton>
-            <SideNavButton url="/dashboard/user" onClick={closeMenu}>
-                <UserRound />User
-            </SideNavButton>
-            <SideNavButton url="/dashboard/log" onClick={closeMenu}>
-                <Logs />Log
-            </SideNavButton>
-        </SideNav>
-    </div>
+    {#if isAdmin}
+        <div class="sidenav-area" class:open={isMenuOpen}>
+            <SideNav>
+                <SideNavButton url="/dashboard" onClick={closeMenu}>
+                    <LayoutDashboard />Dashboard
+                </SideNavButton>
+                <SideNavButton url="/dashboard/settings" onClick={closeMenu}>
+                    <Settings />Settings
+                </SideNavButton>
+                <SideNavButton url="/dashboard/users" onClick={closeMenu}>
+                    <UsersRound />Users
+                </SideNavButton>
+                <SideNavButton url="/dashboard/log" onClick={closeMenu}>
+                    <Logs />Log
+                </SideNavButton>
+            </SideNav>
+        </div>
+    {/if}
 
-    {#if isMenuOpen}
+    {#if isAdmin && isMenuOpen}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="menu-backdrop" onclick={closeMenu}></div>
@@ -72,6 +92,13 @@
         min-width: 0;
         width: 100%;
         z-index: 50;
+    }
+
+    .layout-grid.no-sidenav {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "header"
+            "main";
     }
 
     .sidenav-area {

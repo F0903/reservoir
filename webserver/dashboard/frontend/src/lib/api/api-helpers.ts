@@ -8,6 +8,7 @@ export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promis
 export type LoginRedirectOptions = { returnToLastWindow: boolean };
 export const DefaultRedirectOptions: LoginRedirectOptions = { returnToLastWindow: true };
 type JsonMutationMethod = "PATCH" | "POST";
+type MutationMethod = JsonMutationMethod | "DELETE";
 
 async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     const params = new URLSearchParams();
@@ -125,6 +126,20 @@ export async function apiPost<T>(
     return apiJsonMutation("POST", endpoint, json, fetchFn, redirectOnUnauthorized);
 }
 
+export async function apiDelete<T>(
+    endpoint: string,
+    fetchFn: FetchFn = fetch,
+    redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
+): Promise<T> {
+    const response = await fetchFn(`/api${endpoint}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+    });
+    await assertResponse(response, redirectOnUnauthorized);
+
+    return readMutationResponse<T>(response, "DELETE");
+}
+
 async function apiJsonMutation<T>(
     method: JsonMutationMethod,
     endpoint: string,
@@ -145,7 +160,7 @@ async function apiJsonMutation<T>(
     return readMutationResponse<T>(response, method);
 }
 
-async function readMutationResponse<T>(response: Response, method: JsonMutationMethod): Promise<T> {
+async function readMutationResponse<T>(response: Response, method: MutationMethod): Promise<T> {
     const contentType = response.headers.get("Content-Type");
     if (contentType?.includes("application/json")) {
         log.debug(`Parsing JSON response from ${method}`);

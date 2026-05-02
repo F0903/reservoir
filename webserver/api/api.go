@@ -19,10 +19,11 @@ import (
 )
 
 var (
-	ErrEndpointNoMethod     = errors.New("endpoint has no method defined")
-	ErrEndpointNoFunction   = errors.New("endpoint has no function defined")
-	ErrEndpointUnauthorized = errors.New("authentication required")
-	ErrPasswordChangeNeeded = errors.New("password change required")
+	ErrEndpointNoMethod      = errors.New("endpoint has no method defined")
+	ErrEndpointNoFunction    = errors.New("endpoint has no function defined")
+	ErrEndpointUnauthorized  = errors.New("authentication required")
+	ErrEndpointAdminRequired = errors.New("administrator access required")
+	ErrPasswordChangeNeeded  = errors.New("password change required")
 )
 
 type API struct {
@@ -61,6 +62,8 @@ func New(cfg *config.Config, sessions *coreauth.SessionManager, cacheController 
 			&authEndpoints.LogoutEndpoint{},
 			&authEndpoints.MeEndpoint{},
 			&authEndpoints.ChangePasswordEndpoint{},
+			&authEndpoints.UsersEndpoint{},
+			&authEndpoints.UserEndpoint{},
 		},
 	}
 }
@@ -81,6 +84,9 @@ func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (status
 	if user == nil {
 		return http.StatusUnauthorized, ErrEndpointUnauthorized
 	}
+	if !adminAllowed(user, method) {
+		return http.StatusForbidden, ErrEndpointAdminRequired
+	}
 	if !passwordChangeAllowed(user, method) {
 		return http.StatusForbidden, ErrPasswordChangeNeeded
 	}
@@ -90,6 +96,10 @@ func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (status
 
 func passwordChangeAllowed(user *dbmodels.User, method apitypes.EndpointMethod) bool {
 	return !user.PasswordChangeRequired || method.AllowPasswordChangeRequired
+}
+
+func adminAllowed(user *dbmodels.User, method apitypes.EndpointMethod) bool {
+	return !method.RequiresAdmin || user.IsAdmin
 }
 
 func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, cacheController apitypes.CacheController, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
@@ -110,6 +120,10 @@ func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, cacheCon
 				}
 				if err == ErrPasswordChangeNeeded {
 					apihttp.Error(w, "Password change required", status)
+					return
+				}
+				if err == ErrEndpointAdminRequired {
+					apihttp.Error(w, "Administrator access required", status)
 					return
 				}
 

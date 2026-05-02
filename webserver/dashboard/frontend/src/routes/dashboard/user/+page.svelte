@@ -1,4 +1,7 @@
 <script lang="ts">
+    import ContentShell from "$lib/components/layout/ContentShell.svelte";
+    import PagePanel from "$lib/components/layout/PagePanel.svelte";
+    import PanelHeading from "$lib/components/layout/PanelHeading.svelte";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
@@ -100,109 +103,116 @@
 </script>
 
 <main class="user-page">
-    <PageTitle --pagetitle-margin-bottom="0">User</PageTitle>
+    <ContentShell maxWidth="980px" gap="1.25rem">
+        <PageTitle --pagetitle-margin-bottom="0">User</PageTitle>
 
-    <div class="account-grid">
-        <section class="panel">
-            <div class="panel-header">
-                <UserRound size={18} />
-                <div>
-                    <h2>Profile</h2>
-                    <p>Update the username used for dashboard sign-in.</p>
-                </div>
-            </div>
+        <div class="account-grid">
+            <PagePanel gap="1.2rem" padding="1.2rem" mobilePadding="1rem">
+                <PanelHeading
+                    title="Profile"
+                    description="Update the username used for dashboard sign-in."
+                >
+                    {#snippet icon()}
+                        <UserRound size={18} />
+                    {/snippet}
+                </PanelHeading>
 
-            <Form onSubmit={saveUsername}>
-                <div class="form-stack">
-                    <TextInput
-                        label="Username"
-                        bind:value={username}
-                        placeholder="admin"
-                        maxCharacters={64}
-                        disabled={savingUsername || auth.loading}
-                    />
+                <Form onSubmit={saveUsername}>
+                    <div class="form-stack">
+                        <TextInput
+                            label="Username"
+                            bind:value={username}
+                            placeholder="admin"
+                            maxCharacters={64}
+                            disabled={savingUsername || auth.loading}
+                        />
 
-                    {#if usernameError}
-                        <ErrorBox>{usernameError}</ErrorBox>
-                    {/if}
+                        {#if usernameError}
+                            <ErrorBox>{usernameError}</ErrorBox>
+                        {/if}
 
-                    <div class="actions">
-                        <Button type="submit" disabled={!usernameChanged || savingUsername}>
-                            <span class="button-inner">
-                                {#if savingUsername}
-                                    <RefreshCw size={16} class="spin" />
-                                    Saving...
-                                {:else}
-                                    <Save size={16} />
-                                    Save Username
-                                {/if}
-                            </span>
-                        </Button>
+                        <div class="actions">
+                            <Button type="submit" disabled={!usernameChanged || savingUsername}>
+                                <span class="button-inner">
+                                    {#if savingUsername}
+                                        <RefreshCw size={16} class="spin" />
+                                        Saving...
+                                    {:else}
+                                        <Save size={16} />
+                                        Save Username
+                                    {/if}
+                                </span>
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </Form>
-        </section>
+                </Form>
+            </PagePanel>
 
-        <section class="panel">
-            <div class="panel-header">
-                <KeyRound size={18} />
-                <div>
-                    <h2>Password</h2>
-                    <p>Change your password and keep the current session active.</p>
-                </div>
-            </div>
+            <PagePanel gap="1.2rem" padding="1.2rem" mobilePadding="1rem">
+                <PanelHeading
+                    title="Password"
+                    description="Change your password and keep the current session active."
+                >
+                    {#snippet icon()}
+                        <KeyRound size={18} />
+                    {/snippet}
+                </PanelHeading>
 
-            <Form onSubmit={savePassword}>
-                <div class="form-stack">
-                    <TextInput
-                        label="Current Password"
-                        bind:value={currentPassword}
-                        placeholder="Current password"
-                        censor={true}
-                        maxCharacters={128}
-                        boxWidthCh={30}
-                        disabled={changingPassword}
-                    />
-                    <TextInput
-                        label="New Password"
-                        bind:value={newPassword}
-                        placeholder="New password"
-                        censor={true}
-                        maxCharacters={128}
-                        boxWidthCh={30}
-                        disabled={changingPassword}
-                    />
-                    <TextInput
-                        label="Confirm Password"
-                        bind:value={confirmPassword}
-                        placeholder="Repeat new password"
-                        censor={true}
-                        maxCharacters={128}
-                        boxWidthCh={30}
-                        disabled={changingPassword}
-                    />
+                <Form onSubmit={savePassword}>
+                    <div class="form-stack">
+                        <TextInput
+                            label="Current Password"
+                            bind:value={currentPassword}
+                            placeholder="Current password"
+                            censor={true}
+                            maxCharacters={128}
+                            boxWidthCh={30}
+                            disabled={changingPassword}
+                        />
+                        <TextInput
+                            label="New Password"
+                            bind:value={newPassword}
+                            placeholder="New password"
+                            censor={true}
+                            maxCharacters={128}
+                            boxWidthCh={30}
+                            disabled={changingPassword}
+                        />
+                        <TextInput
+                            label="Confirm Password"
+                            bind:value={confirmPassword}
+                            placeholder="Repeat new password"
+                            censor={true}
+                            maxCharacters={128}
+                            boxWidthCh={30}
+                            disabled={changingPassword}
+                        />
 
-                    {#if passwordError}
-                        <ErrorBox>{passwordError}</ErrorBox>
-                    {/if}
+                        {#if passwordError}
+                            <ErrorBox>{passwordError}</ErrorBox>
+                        {/if}
 
-                    <div class="actions">
-                        <Button type="submit" disabled={!passwordFormFilled || changingPassword}>
-                            <span class="button-inner">
-                                {#if changingPassword}
-                                    <RefreshCw size={16} class="spin" />
-                                    Updating...
-                                {:else}
-                                    <KeyRound size={16} />
-                                    Update Password
-                                {/if}
-                            </span>
-                        </Button>
+                        <div class="actions">
+                            <Button
+                                type="submit"
+                                disabled={!passwordFormFilled || changingPassword}
+                            >
+                                <span class="button-inner">
+                                    {#if changingPassword}
+                                        <RefreshCw size={16} class="spin" />
+                                        Updating...
+                                    {:else}
+                                        <KeyRound size={16} />
+                                        Update Password
+                                    {/if}
+                                </span>
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </Form>
-        </section>
-    </div>
+                </Form>
+            </PagePanel>
+        </div>
+    </ContentShell>
 </main>
 
 <style>
@@ -217,39 +227,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
         gap: 1rem;
-        width: min(100%, 980px);
-    }
-
-    .panel {
-        display: flex;
-        flex-direction: column;
-        gap: 1.2rem;
-        padding: 1.2rem;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 8px;
-        background-color: var(--primary-500);
-    }
-
-    .panel-header {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-start;
-        color: var(--secondary-300);
-    }
-
-    .panel-header h2 {
-        color: var(--secondary-300);
-        font-size: 0.95rem;
-        font-weight: 800;
-        line-height: 1.1;
-        text-transform: uppercase;
-    }
-
-    .panel-header p {
-        margin-top: 0.35rem;
-        color: rgba(255, 255, 255, 0.52);
-        font-size: 0.85rem;
-        line-height: 1.4;
+        width: 100%;
     }
 
     .form-stack {
@@ -286,10 +264,6 @@
     @media (max-width: 768px) {
         .account-grid {
             gap: 0.75rem;
-        }
-
-        .panel {
-            padding: 1rem;
         }
 
         .actions :global(.btn) {

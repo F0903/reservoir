@@ -18,7 +18,7 @@ func FromUser(user *dbmodels.User) UserInfo {
 	return UserInfo{
 		ID:                     user.ID,
 		Username:               user.Username,
-		IsAdmin:                true,
+		IsAdmin:                user.IsAdmin,
 		PasswordChangeRequired: user.PasswordChangeRequired,
 		CreatedAt:              user.CreatedAt,
 		UpdatedAt:              user.UpdatedAt,

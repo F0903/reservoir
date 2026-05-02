@@ -5,13 +5,19 @@ import {
     bootstrapAdmin,
     bootstrapStatus,
     type BootstrapRequest,
+    type CreateUserRequest,
     type Credentials,
+    type UpdateUserRequest,
     type UserInfo,
     changePassword,
+    createUser as createManagedUser,
+    deleteUser as deleteManagedUser,
+    listUsers as listManagedUsers,
     login,
     logout,
     me,
     updateMe,
+    updateUser as updateManagedUser,
 } from "$lib/api/auth/auth";
 import { log } from "$lib/utils/logger";
 import UnauthorizedError from "$lib/api/unauthorized-error";
@@ -95,5 +101,33 @@ export class AuthProvider {
         this.user = user;
         log.debug("Username updated:", user.username);
         return user;
+    };
+
+    listUsers = async (): Promise<UserInfo[]> => {
+        log.debug("Listing users...");
+        return [...(await listManagedUsers())];
+    };
+
+    createUser = async (req: CreateUserRequest): Promise<UserInfo> => {
+        log.debug("Creating managed user...");
+        return createManagedUser(req);
+    };
+
+    updateUser = async (id: number, req: UpdateUserRequest): Promise<UserInfo> => {
+        log.debug("Updating managed user...");
+        const user = await updateManagedUser(id, req);
+        if (this.user?.id === user.id) {
+            this.user = user;
+        }
+        return user;
+    };
+
+    deleteUser = async (id: number): Promise<void> => {
+        log.debug("Deleting managed user...");
+        await deleteManagedUser(id);
+        if (this.user?.id === id) {
+            this.user = null;
+            await goto(resolve("/login"));
+        }
     };
 }

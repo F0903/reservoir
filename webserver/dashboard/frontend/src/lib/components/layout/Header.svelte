@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
+    import { resolve } from "$app/paths";
     import { version } from "$lib/api/objects/version/version";
     import { onMount } from "svelte";
     import { getAuthProvider } from "$lib/context";
@@ -18,19 +20,25 @@
         let version_obj = await version();
         version_string = version_obj.version;
     });
+
+    async function openUserPage() {
+        await goto(resolve("/dashboard/user"));
+    }
 </script>
 
 <header>
     <div class="title-section">
-        <button class="menu-toggle" onclick={onToggleMenu} aria-label="Toggle menu">
-            <Menu size={24} />
-        </button>
+        {#if isAdmin}
+            <button class="menu-toggle" onclick={onToggleMenu} aria-label="Toggle menu">
+                <Menu size={24} />
+            </button>
+        {/if}
         <h1>reservoir <span class="version-string">{version_string}</span></h1>
     </div>
 
     {#if session.user}
         <div class="user-section">
-            <div class="user-info">
+            <button class="user-info" onclick={openUserPage} aria-label="Open user profile">
                 <User size={18} />
                 <span class="username">{session.user.username}</span>
                 {#if isAdmin}
@@ -39,7 +47,7 @@
                         <span class="admin-badge-text">Admin</span>
                     </span>
                 {/if}
-            </div>
+            </button>
             <button class="logout-btn" onclick={session.logout} title="Logout">
                 <LogOut size={18} />
                 <span class="logout-text">Logout</span>
@@ -99,8 +107,21 @@
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        padding: 0.35rem 0.45rem;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
         color: var(--text-400);
+        cursor: pointer;
         font-size: 0.9rem;
+        transition:
+            background-color 120ms ease,
+            color 120ms ease;
+    }
+
+    .user-info:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: var(--secondary-300);
     }
 
     .username {

@@ -69,6 +69,7 @@ func TestEnsureBootstrapAdminReportsRequiredForEmptyStore(t *testing.T) {
 func TestEnsureBootstrapAdminDoesNothingWhenUsersExist(t *testing.T) {
 	store := newFakeBootstrapUserStore(&models.User{
 		Username: DefaultAdminUsername,
+		IsAdmin:  true,
 	})
 
 	result, err := ensureBootstrapAdmin(store)
@@ -101,6 +102,9 @@ func TestCreateBootstrapAdminCreatesFirstAdmin(t *testing.T) {
 	if user.PasswordChangeRequired {
 		t.Fatal("expected first-run admin password not to require immediate change")
 	}
+	if !user.IsAdmin {
+		t.Fatal("expected bootstrap user to be an admin")
+	}
 	if !user.PasswordHash.VerifyArgon2id("generated-password") {
 		t.Fatal("expected admin password to match chosen password")
 	}
@@ -109,6 +113,7 @@ func TestCreateBootstrapAdminCreatesFirstAdmin(t *testing.T) {
 func TestCreateBootstrapAdminRejectsExistingUsers(t *testing.T) {
 	store := newFakeBootstrapUserStore(&models.User{
 		Username: "existing",
+		IsAdmin:  true,
 	})
 
 	_, err := createBootstrapAdmin(store, DefaultAdminUsername, "generated-password")

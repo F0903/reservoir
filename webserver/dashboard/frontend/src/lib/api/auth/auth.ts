@@ -1,9 +1,9 @@
-import { apiGet, apiPatch, apiPost, type FetchFn } from "../api-helpers";
+import { apiDelete, apiGet, apiPatch, apiPost, type FetchFn } from "../api-helpers";
 
 export type UserInfo = {
     id: number;
     username: string;
-    is_admin?: boolean;
+    is_admin: boolean;
     password_change_required: boolean;
     created_at: string;
     updated_at: string;
@@ -25,6 +25,20 @@ export type BootstrapRequest = {
 
 export type UpdateMeRequest = {
     username: string;
+};
+
+export type CreateUserRequest = {
+    username: string;
+    password: string;
+    is_admin: boolean;
+    password_change_required?: boolean;
+};
+
+export type UpdateUserRequest = {
+    username?: string;
+    password?: string;
+    is_admin?: boolean;
+    password_change_required?: boolean;
 };
 
 export function bootstrapStatus(fetchFn: FetchFn = fetch): Promise<Readonly<BootstrapStatus>> {
@@ -65,4 +79,20 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
         { current_password: currentPassword, new_password: newPassword },
         fetch,
     );
+}
+
+export function listUsers(fetchFn: FetchFn = fetch): Promise<Readonly<UserInfo[]>> {
+    return apiGet<UserInfo[]>("/auth/users", fetchFn);
+}
+
+export function createUser(req: CreateUserRequest): Promise<Readonly<UserInfo>> {
+    return apiPost<UserInfo>("/auth/users", req);
+}
+
+export function updateUser(id: number, req: UpdateUserRequest): Promise<Readonly<UserInfo>> {
+    return apiPatch<UserInfo>(`/auth/users/${id}`, req);
+}
+
+export function deleteUser(id: number): Promise<void> {
+    return apiDelete<void>(`/auth/users/${id}`);
 }

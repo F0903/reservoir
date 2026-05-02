@@ -115,6 +115,7 @@ func createBootstrapAdmin(users bootstrapCreateUserStore, username string, passw
 	user := &models.User{
 		Username:               username,
 		PasswordHash:           *phc.GenerateArgon2id(password),
+		IsAdmin:                true,
 		PasswordChangeRequired: false,
 	}
 	if err := users.CreateFirst(user); err != nil {

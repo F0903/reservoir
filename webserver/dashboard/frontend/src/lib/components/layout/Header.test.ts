@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { goto } from "$app/navigation";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Header from "./Header.svelte";
 
@@ -18,6 +19,14 @@ const contextMocks = vi.hoisted(() => ({
 
 vi.mock("$lib/context", () => ({
     getAuthProvider: () => contextMocks.auth,
+}));
+
+vi.mock("$app/navigation", () => ({
+    goto: vi.fn(),
+}));
+
+vi.mock("$app/paths", () => ({
+    resolve: (path: string) => path,
 }));
 
 vi.mock("$lib/api/objects/version/version", () => ({
@@ -51,5 +60,13 @@ describe("Header", () => {
         render(Header);
 
         expect(screen.queryByLabelText("Administrator")).not.toBeInTheDocument();
+    });
+
+    it("opens the user page from the header user button", async () => {
+        render(Header);
+
+        await fireEvent.click(screen.getByRole("button", { name: /open user profile/i }));
+
+        await waitFor(() => expect(goto).toHaveBeenCalledWith("/dashboard/user"));
     });
 });

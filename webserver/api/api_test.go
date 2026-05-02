@@ -33,3 +33,30 @@ func TestPasswordChangeAllowedAllowsConfiguredUsers(t *testing.T) {
 		t.Fatal("expected configured user to access regular endpoint")
 	}
 }
+
+func TestAdminAllowedBlocksNonAdminsWhenConfigured(t *testing.T) {
+	user := &dbmodels.User{IsAdmin: false}
+	method := apitypes.EndpointMethod{RequiresAuth: true, RequiresAdmin: true}
+
+	if adminAllowed(user, method) {
+		t.Fatal("expected non-admin to be blocked from admin endpoint")
+	}
+}
+
+func TestAdminAllowedAllowsAdmins(t *testing.T) {
+	user := &dbmodels.User{IsAdmin: true}
+	method := apitypes.EndpointMethod{RequiresAuth: true, RequiresAdmin: true}
+
+	if !adminAllowed(user, method) {
+		t.Fatal("expected admin to be allowed")
+	}
+}
+
+func TestAdminAllowedAllowsRegularEndpoints(t *testing.T) {
+	user := &dbmodels.User{IsAdmin: false}
+	method := apitypes.EndpointMethod{RequiresAuth: true}
+
+	if !adminAllowed(user, method) {
+		t.Fatal("expected regular endpoint to be allowed")
+	}
+}
