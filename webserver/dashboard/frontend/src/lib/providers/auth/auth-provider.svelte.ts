@@ -11,6 +11,7 @@ import {
     login,
     logout,
     me,
+    updateMe,
 } from "$lib/api/auth/auth";
 import { log } from "$lib/utils/logger";
 import UnauthorizedError from "$lib/api/unauthorized-error";
@@ -84,6 +85,15 @@ export class AuthProvider {
     changePassword = async (currentPassword: string, newPassword: string) => {
         log.debug("Changing password...");
         await changePassword(currentPassword, newPassword);
+        this.user = await me();
         log.debug("Password changed successfully");
+    };
+
+    updateUsername = async (username: string): Promise<UserInfo> => {
+        log.debug("Updating username...");
+        const user = await updateMe({ username });
+        this.user = user;
+        log.debug("Username updated:", user.username);
+        return user;
     };
 }

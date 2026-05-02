@@ -3,7 +3,7 @@
     import SideNav from "$lib/components/layout/SideNav.svelte";
     import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
-    import { LayoutDashboard, Logs, Settings } from "@lucide/svelte";
+    import { LayoutDashboard, Logs, Settings, UserRound } from "@lucide/svelte";
 
     let { children } = $props();
 
@@ -29,6 +29,9 @@
             </SideNavButton>
             <SideNavButton url="/dashboard/settings" onClick={closeMenu}>
                 <Settings />Settings
+            </SideNavButton>
+            <SideNavButton url="/dashboard/user" onClick={closeMenu}>
+                <UserRound />User
             </SideNavButton>
             <SideNavButton url="/dashboard/log" onClick={closeMenu}>
                 <Logs />Log

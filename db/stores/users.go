@@ -4,9 +4,15 @@ import (
 	"errors"
 	"reservoir/db"
 	"reservoir/db/models"
+	"strings"
 )
 
-var ErrUserStoreNotEmpty = errors.New("user store is not empty")
+var (
+	ErrUserStoreNotEmpty = errors.New("user store is not empty")
+	ErrUserNotFound      = errors.New("user not found")
+	ErrUsernameEmpty     = errors.New("username must not be empty")
+	ErrUsernameTaken     = errors.New("username is already taken")
+)
 
 type UserStore struct {
 	db db.Database
@@ -88,6 +94,36 @@ func (s *UserStore) GetByID(id int64) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (s *UserStore) UpdateUsername(id int64, username string) (*models.User, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return nil, ErrUsernameEmpty
+	}
+
+	existing, err := s.GetByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil && existing.ID != id {
+		return nil, ErrUsernameTaken
+	}
+
+	result, err := s.db.ExecResult("UPDATE users SET username = ? WHERE id = ?", username, id)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rowsAffected == 0 {
+		return nil, ErrUserNotFound
+	}
+
+	return s.GetByID(id)
 }
 
 func (s *UserStore) Count() (int, error) {

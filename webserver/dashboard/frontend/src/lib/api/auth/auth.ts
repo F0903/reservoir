@@ -23,6 +23,10 @@ export type BootstrapRequest = {
     password: string;
 };
 
+export type UpdateMeRequest = {
+    username: string;
+};
+
 export function bootstrapStatus(fetchFn: FetchFn = fetch): Promise<Readonly<BootstrapStatus>> {
     return apiGet<BootstrapStatus>("/auth/bootstrap", fetchFn, null);
 }
@@ -42,6 +46,11 @@ export function login(creds: Credentials): Promise<Readonly<UserInfo>> {
 // Use the AuthProvider instead unless absolutely necessary
 export function me(fetchFn: FetchFn = fetch): Promise<Readonly<UserInfo>> {
     return apiGet<UserInfo>("/auth/me", fetchFn, null);
+}
+
+// Use the AuthProvider instead unless absolutely necessary
+export function updateMe(req: UpdateMeRequest): Promise<Readonly<UserInfo>> {
+    return apiPatch<UserInfo>("/auth/me", req, fetch);
 }
 
 // Use the AuthProvider instead unless absolutely necessary

@@ -27,6 +27,7 @@ vi.mock("$lib/api/auth/auth", () => ({
     logout: vi.fn(),
     me: vi.fn(),
     changePassword: vi.fn(),
+    updateMe: vi.fn(),
 }));
 
 // Mock logger
@@ -119,5 +120,30 @@ describe("AuthProvider", () => {
 
         expect(authApi.logout).toHaveBeenCalled();
         expect(provider.user).toBeNull();
+    });
+
+    it("should update username and store the returned user", async () => {
+        const updatedUser = { ...mockUser, username: "renamed" };
+        (authApi.updateMe as Mock).mockResolvedValue(updatedUser);
+        provider = new AuthProvider();
+        await vi.waitFor(() => expect(provider.loading).toBe(false));
+
+        const user = await provider.updateUsername("renamed");
+
+        expect(authApi.updateMe).toHaveBeenCalledWith({ username: "renamed" });
+        expect(provider.user).toEqual(updatedUser);
+        expect(user).toEqual(updatedUser);
+    });
+
+    it("should refresh user state after changing password", async () => {
+        const refreshedUser = { ...mockUser, updated_at: "2024-01-02T00:00:00Z" };
+        (authApi.me as Mock).mockResolvedValueOnce(mockUser).mockResolvedValueOnce(refreshedUser);
+        provider = new AuthProvider();
+        await vi.waitFor(() => expect(provider.loading).toBe(false));
+
+        await provider.changePassword("old-password", "new-password");
+
+        expect(authApi.changePassword).toHaveBeenCalledWith("old-password", "new-password");
+        expect(provider.user).toEqual(refreshedUser);
     });
 });
