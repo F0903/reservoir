@@ -8,48 +8,23 @@
     const metrics = getMetricsProvider();
 </script>
 
-<Widget title="Cache Statistics">
+<Widget title="Cache Maintenance">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const fillPercent =
-                data.cache.storage.max_bytes > 0
-                    ? (data.cache.storage.bytes / data.cache.storage.max_bytes) * 100
-                    : 0}
             <div class="metrics-grid">
-                <MetricCard
-                    label="Cache Entries"
-                    value={data.cache.cache_entries.toLocaleString()}
-                />
-                <MetricCard
-                    label="Request Hits"
-                    value={(
-                        data.cache.cache_request_hits +
-                        data.cache.cache_request_revalidations +
-                        data.cache.cache_request_stales
-                    ).toLocaleString()}
-                    --metric-value-color="var(--success-color)"
-                />
-                <MetricCard
-                    label="Request Misses"
-                    value={data.cache.cache_request_misses.toLocaleString()}
-                />
-                <MetricCard
-                    label="Revalidations"
-                    value={data.cache.cache_request_revalidations.toLocaleString()}
-                />
-                <MetricCard
-                    label="Stale Responses"
-                    value={data.cache.cache_request_stales.toLocaleString()}
-                />
-                <MetricCard
-                    label="Bytes Cached"
-                    value={formatBytesToLargest(data.cache.bytes_cached)}
-                />
-                <MetricCard label="Storage Used" value={`${fillPercent.toFixed(1)}%`} />
                 <MetricCard label="Cleanup Runs" value={data.cache.cleanup_runs.toLocaleString()} />
                 <MetricCard
-                    label="Cache Evictions"
+                    label="Bytes Cleaned"
+                    value={formatBytesToLargest(data.cache.bytes_cleaned)}
+                />
+                <MetricCard
+                    label="Entries Evicted"
                     value={data.cache.cache_evictions.toLocaleString()}
+                />
+                <MetricCard
+                    label="Cache Errors"
+                    value={data.cache.cache_errors.toLocaleString()}
+                    --metric-value-color="var(--log-error-color)"
                 />
             </div>
         {/snippet}
@@ -59,16 +34,16 @@
 <style>
     .metrics-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(3, 1fr);
-        gap: 0.5rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
         height: 100%;
         width: 100%;
     }
 
     @media (max-width: 768px) {
         .metrics-grid {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             grid-template-rows: auto;
         }
     }

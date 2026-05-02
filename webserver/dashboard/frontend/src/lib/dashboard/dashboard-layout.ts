@@ -26,7 +26,6 @@ export const dashboardWidgetDefinitions = [
         span: { width: 3, height: 3 },
         mobileSpan: { width: 1 },
     },
-    { id: "cache-activity", label: "Cache Activity", span: { width: 3, height: 2 } },
     { id: "cache-latency", label: "Cache Latency", span: { width: 2, height: 2 } },
     {
         id: "request-latency",
@@ -61,9 +60,9 @@ export const dashboardWidgetDefinitions = [
     },
     {
         id: "cache-stats",
-        label: "Cache Statistics",
-        span: { width: 3, height: 2 },
-        mobileSpan: { width: 2, height: 3 },
+        label: "Cache Maintenance",
+        span: { width: 2, height: 2 },
+        mobileSpan: { width: 2, height: 2 },
     },
     {
         id: "cache-storage",

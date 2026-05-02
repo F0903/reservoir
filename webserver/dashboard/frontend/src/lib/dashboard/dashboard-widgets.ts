@@ -1,4 +1,3 @@
-import CacheActivity from "$lib/components/widgets/CacheActivity.svelte";
 import CacheEfficiency from "$lib/components/widgets/CacheEfficiency.svelte";
 import CacheLatency from "$lib/components/widgets/CacheLatency.svelte";
 import CacheStorage from "$lib/components/widgets/CacheStorage.svelte";
@@ -23,7 +22,6 @@ export type DashboardGridElement = DashboardWidgetLayout & {
 
 const widgetComponents: Record<DashboardWidgetId, Component> = {
     "cache-efficiency": CacheEfficiency,
-    "cache-activity": CacheActivity,
     "cache-latency": CacheLatency,
     "request-latency": RequestLatency,
     "request-volume": RequestVolume,

@@ -37,7 +37,6 @@ describe("dashboard layout", () => {
 
         expect(layout.map((item) => item.id)).toEqual([
             "cache-efficiency",
-            "cache-activity",
             "cache-latency",
             "request-latency",
             "request-volume",
@@ -82,7 +81,6 @@ describe("dashboard layout", () => {
 
         expect(layout[0].id).toBe("system-info");
         expect(layout.at(-1)?.id).toBe("cache-storage");
-        expect(layout.some((item) => item.id === "cache-activity")).toBe(true);
     });
 
     it("sets widget spans within supported grid bounds", () => {
