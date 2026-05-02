@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"time"
 )
 
 var (
@@ -27,7 +28,7 @@ type Responder interface {
 	GetHeaders() http.Header
 
 	// Writes the response with the given status code and body.
-	Write(status int, body io.Reader) (written int64, err error)
+	Write(status int, body io.Reader) (written int64, writeDuration time.Duration, err error)
 
 	// Writes an empty response with the given status code.
 	// Useful for responses that do not require a body.

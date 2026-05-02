@@ -7,6 +7,7 @@
     import { log } from "$lib/utils/logger";
     import { Database, HardDrive, MemoryStick, RefreshCw, Trash2 } from "@lucide/svelte";
     import Widget from "./base/Widget.svelte";
+    import CapacityMetricCard from "./utils/CapacityMetricCard.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
 
     const metrics = getMetricsProvider();
@@ -22,8 +23,15 @@
     const error = $derived(metrics.error ?? missingStorageError);
     const loading = $derived(metrics.loading);
 
+    const activeLimitBytes = $derived(
+        status
+            ? status.type === "memory"
+                ? Math.min(status.max_bytes, status.memory_cap_bytes ?? status.max_bytes)
+                : status.max_bytes
+            : 0,
+    );
     const fillPercent = $derived(
-        status && status.max_bytes > 0 ? Math.min(100, (status.bytes / status.max_bytes) * 100) : 0,
+        status && activeLimitBytes > 0 ? Math.min(100, (status.bytes / activeLimitBytes) * 100) : 0,
     );
 
     async function clearCurrentCache() {
@@ -70,6 +78,29 @@
 
     <Loadable state={status} {error}>
         {#snippet children(data)}
+            {@const isMemoryBackend = data.type === "memory"}
+            {@const cardActiveLimitBytes = isMemoryBackend
+                ? Math.min(data.max_bytes, data.memory_cap_bytes ?? data.max_bytes)
+                : data.max_bytes}
+            {@const footerItems = [
+                ...(isMemoryBackend &&
+                data.memory_cap_bytes !== undefined &&
+                cardActiveLimitBytes !== data.max_bytes
+                    ? [{ label: "Active Limit", value: formatBytesToLargest(cardActiveLimitBytes) }]
+                    : []),
+                {
+                    label: isMemoryBackend ? "Cache Max" : "Storage Limit",
+                    value: formatBytesToLargest(data.max_bytes),
+                },
+                ...(isMemoryBackend && data.memory_cap_bytes !== undefined
+                    ? [
+                          {
+                              label: "Memory Budget",
+                              value: formatBytesToLargest(data.memory_cap_bytes),
+                          },
+                      ]
+                    : []),
+            ]}
             <div class="storage-panel">
                 <div class="summary-grid">
                     <MetricCard
@@ -84,30 +115,13 @@
                     />
                 </div>
 
-                <div class="capacity-panel">
-                    <div class="capacity-topline">
-                        <div class="used-block">
-                            <span class="panel-label">Used</span>
-                            <strong>{formatBytesToLargest(data.bytes)}</strong>
-                        </div>
-                        <span class="fill-percent">{fillPercent.toFixed(1)}%</span>
-                    </div>
-
-                    <div class="capacity-track" aria-label="Cache fill">
-                        <div class="capacity-fill" style:width={`${fillPercent}%`}></div>
-                    </div>
-
-                    <div class="capacity-meta">
-                        <span>Max <strong>{formatBytesToLargest(data.max_bytes)}</strong></span>
-                        {#if data.memory_cap_bytes !== undefined}
-                            <span
-                                >Memory <strong
-                                    >{formatBytesToLargest(data.memory_cap_bytes)}</strong
-                                ></span
-                            >
-                        {/if}
-                    </div>
-                </div>
+                <CapacityMetricCard
+                    label="Used"
+                    value={formatBytesToLargest(data.bytes)}
+                    percent={fillPercent}
+                    progressLabel={isMemoryBackend ? "Memory cache fill" : "File cache fill"}
+                    {footerItems}
+                />
             </div>
         {/snippet}
     </Loadable>
@@ -134,86 +148,6 @@
         --metric-value-size: 0.95rem;
         --metric-label-size: 0.58rem;
         min-height: 3.6rem;
-    }
-
-    .capacity-panel {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        gap: 0.7rem;
-        min-height: 0;
-        height: 100%;
-        padding: 0.8rem;
-        border-radius: 8px;
-        border: 1px solid var(--primary-500);
-        background-color: var(--primary-600);
-    }
-
-    .capacity-topline {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
-    .used-block {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        min-width: 0;
-    }
-
-    .panel-label {
-        color: rgba(255, 255, 255, 0.4);
-        font-size: 0.58rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        line-height: 1;
-        text-transform: uppercase;
-    }
-
-    .used-block strong {
-        color: var(--secondary-300);
-        font-size: 1.2rem;
-        font-weight: 700;
-        line-height: 1;
-        white-space: nowrap;
-    }
-
-    .fill-percent {
-        color: var(--secondary-300);
-        font-family: "Chivo Mono Variable", monospace;
-        font-size: 0.8rem;
-        font-weight: 700;
-    }
-
-    .capacity-track {
-        height: 0.5rem;
-        overflow: hidden;
-        border-radius: 999px;
-        background-color: var(--primary-700);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .capacity-fill {
-        height: 100%;
-        border-radius: inherit;
-        background-color: var(--secondary-300);
-        transition: width 160ms ease;
-    }
-
-    .capacity-meta {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem 0.8rem;
-        color: rgba(255, 255, 255, 0.4);
-        font-size: 0.68rem;
-        font-weight: 600;
-    }
-
-    .capacity-meta strong {
-        color: var(--secondary-300);
-        font-weight: 700;
     }
 
     .header-toolbar {
@@ -276,14 +210,6 @@
     @media (max-width: 768px) {
         .storage-panel {
             gap: 0.6rem;
-        }
-
-        .capacity-panel {
-            padding: 0.7rem;
-        }
-
-        .used-block strong {
-            font-size: 1.15rem;
         }
     }
 </style>

@@ -6,7 +6,9 @@ export type RequestMetrics = {
     bytes_served: number;
     bytes_fetched: number;
     upstream_requests: number;
+    client_responses: number;
     client_request_latency: number;
+    client_response_latency: number;
     upstream_request_latency: number;
     coalesced_requests: number;
     non_coalesced_requests: number;

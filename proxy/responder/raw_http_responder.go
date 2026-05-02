@@ -8,6 +8,7 @@ import (
 	"reservoir/utils/countingreader"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // A responder that manually constructs and writes HTTP responses.
@@ -72,23 +73,29 @@ func (c *RawHTTPResponder) GetHeaders() http.Header {
 	return c.response.Header
 }
 
-func (c *RawHTTPResponder) writeResponse() error {
+func (c *RawHTTPResponder) writeResponse() (time.Duration, error) {
 	// If Content-Length is unknown, we must either use chunked encoding or close the connection.
 	if c.response.ContentLength < 0 {
 		c.response.TransferEncoding = []string{"chunked"}
 	}
 
-	if err := c.response.Write(c.writer); err != nil {
-		return err
+	timed := &timedWriter{writer: c.writer}
+	if err := c.response.Write(timed); err != nil {
+		return timed.duration, err
 	}
 	if buf, ok := c.writer.(*bufio.Writer); ok {
-		buf.Flush()
+		flushStart := time.Now()
+		err := buf.Flush()
+		timed.duration += time.Since(flushStart)
+		if err != nil {
+			return timed.duration, err
+		}
 	}
 
-	return nil
+	return timed.duration, nil
 }
 
-func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
+func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, writeDuration time.Duration, err error) {
 	defer c.resetResponse()
 
 	resp := c.response
@@ -98,8 +105,8 @@ func (c *RawHTTPResponder) Write(status int, body io.Reader) (written int64, err
 	resp.StatusCode = status
 	c.parseAndSetContentLength()
 
-	err = c.writeResponse()
-	return int64(read), err
+	writeDuration, err = c.writeResponse()
+	return int64(read), writeDuration, err
 }
 
 func (c *RawHTTPResponder) WriteEmpty(status int) error {
@@ -113,7 +120,8 @@ func (c *RawHTTPResponder) WriteEmpty(status int) error {
 	h.Set("Content-Length", "0") // Explicitly set Content-Length to 0 for empty responses
 	resp.ContentLength = 0
 
-	return c.writeResponse()
+	_, err := c.writeResponse()
+	return err
 }
 
 func (c *RawHTTPResponder) WriteError(message string, errorCode int) error {
@@ -128,7 +136,8 @@ func (c *RawHTTPResponder) WriteError(message string, errorCode int) error {
 	h.Set("Content-Type", "text/plain; charset=utf-8")
 	h.Set("X-Content-Type-Options", "nosniff")
 
-	return c.writeResponse()
+	_, err := c.writeResponse()
+	return err
 }
 
 func (c *RawHTTPResponder) Hijack() (net.Conn, *bufio.ReadWriter, error) {

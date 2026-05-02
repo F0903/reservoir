@@ -3,7 +3,7 @@
     import type { IntRange } from "$lib/utils/type-utils";
     import { viewport } from "$lib/utils/viewport.svelte";
 
-    type CellSpan = IntRange<1, 5>;
+    type CellSpan = IntRange<1, 9>;
 
     type SquaredGridElement = {
         id?: string;
@@ -21,7 +21,7 @@
 
     let {
         elements,
-        cellSize = 150,
+        cellSize = 67.5,
         gap = 15,
         children,
     }: {
@@ -31,7 +31,7 @@
         children?: Snippet<[SquaredGridElement]>;
     } = $props();
 
-    const initialColumns = 4;
+    const initialColumns = 8;
 
     let grid: HTMLDivElement;
 

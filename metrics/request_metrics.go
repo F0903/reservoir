@@ -8,8 +8,10 @@ type requestMetrics struct {
 	BytesServed                 atomics.Int64 `json:"bytes_served"`
 	BytesFetched                atomics.Int64 `json:"bytes_fetched"`
 	UpstreamRequests            atomics.Int64 `json:"upstream_requests"`
-	ClientRequestLatency        atomics.Int64 `json:"client_request_latency"`   // ns
-	UpstreamRequestLatency      atomics.Int64 `json:"upstream_request_latency"` // ns
+	ClientResponses             atomics.Int64 `json:"client_responses"`
+	ClientRequestLatency        atomics.Int64 `json:"client_request_latency"`   // ns, full proxy request duration
+	ClientResponseLatency       atomics.Int64 `json:"client_response_latency"`  // ns, response write to client
+	UpstreamRequestLatency      atomics.Int64 `json:"upstream_request_latency"` // ns, upstream fetch duration
 	CoalescedRequests           atomics.Int64 `json:"coalesced_requests"`
 	NonCoalescedRequests        atomics.Int64 `json:"non_coalesced_requests"`
 	CoalescedCacheHits          atomics.Int64 `json:"coalesced_cache_hits"`
@@ -27,7 +29,9 @@ func NewRequestMetrics() requestMetrics {
 		BytesServed:                 atomics.NewInt64(0),
 		BytesFetched:                atomics.NewInt64(0),
 		UpstreamRequests:            atomics.NewInt64(0),
+		ClientResponses:             atomics.NewInt64(0),
 		ClientRequestLatency:        atomics.NewInt64(0),
+		ClientResponseLatency:       atomics.NewInt64(0),
 		UpstreamRequestLatency:      atomics.NewInt64(0),
 		CoalescedRequests:           atomics.NewInt64(0),
 		NonCoalescedRequests:        atomics.NewInt64(0),

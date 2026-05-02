@@ -1,4 +1,4 @@
-export type DashboardCellSpan = 1 | 2 | 3 | 4;
+export type DashboardCellSpan = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type DashboardSpan = {
     width: DashboardCellSpan;
@@ -23,52 +23,52 @@ export const dashboardWidgetDefinitions = [
     {
         id: "cache-efficiency",
         label: "Cache Efficiency",
-        span: { width: 3, height: 3 },
-        mobileSpan: { width: 1 },
+        span: { width: 6, height: 6 },
+        mobileSpan: { width: 2 },
     },
-    { id: "cache-latency", label: "Cache Latency", span: { width: 2, height: 2 } },
+    { id: "cache-latency", label: "Cache Latency", span: { width: 4, height: 4 } },
     {
         id: "request-latency",
         label: "Request Latency",
-        span: { width: 3, height: 3 },
-        mobileSpan: { width: 3, height: 2 },
+        span: { width: 6, height: 6 },
+        mobileSpan: { width: 6, height: 4 },
     },
     {
         id: "request-volume",
         label: "Request Volume",
-        span: { width: 3, height: 3 },
-        mobileSpan: { width: 1 },
+        span: { width: 6, height: 6 },
+        mobileSpan: { width: 2 },
     },
-    { id: "response-status", label: "Response Status", span: { width: 2, height: 2 } },
+    { id: "response-status", label: "Response Status", span: { width: 4, height: 4 } },
     {
         id: "request-coalescing",
         label: "Request Coalescing",
-        span: { width: 4, height: 3 },
-        mobileSpan: { height: 2 },
+        span: { width: 8, height: 6 },
+        mobileSpan: { height: 4 },
     },
     {
         id: "data-transfer",
         label: "Data Transfer",
-        span: { width: 2, height: 3 },
-        mobileSpan: { height: 3 },
+        span: { width: 4, height: 6 },
+        mobileSpan: { height: 6 },
     },
     {
-        id: "system-info",
-        label: "System Info",
-        span: { width: 1, height: 3 },
-        mobileSpan: { width: 1 },
+        id: "process-info",
+        label: "Process Info",
+        span: { width: 6, height: 4 },
+        mobileSpan: { width: 2, height: 6 },
     },
     {
-        id: "cache-stats",
+        id: "cache-maintenance",
         label: "Cache Maintenance",
-        span: { width: 2, height: 2 },
-        mobileSpan: { width: 2, height: 2 },
+        span: { width: 4, height: 3 },
+        mobileSpan: { width: 4, height: 3 },
     },
     {
         id: "cache-storage",
         label: "Cache Storage",
-        span: { width: 2, height: 2 },
-        mobileSpan: { width: 2, height: 2 },
+        span: { width: 4, height: 4 },
+        mobileSpan: { width: 4, height: 4 },
     },
 ] as const satisfies readonly DashboardWidgetDefinition[];
 
@@ -82,7 +82,7 @@ export type DashboardWidgetLayout = {
 };
 
 const minSpan = 1;
-const maxSpan = 4;
+const maxSpan = 8;
 
 const defaultLayoutsById = new Map(
     dashboardWidgetDefinitions.map((definition) => [definition.id, cloneLayoutItem(definition)]),
@@ -298,21 +298,24 @@ export function normalizeDashboardLayout(value: unknown): DashboardWidgetLayout[
                 continue;
             }
 
-            if (!isDashboardWidgetId(entry.id) || seen.has(entry.id)) {
+            const id = resolveDashboardWidgetId(
+                typeof entry.id === "string" ? entry.id : undefined,
+            );
+            if (!id || seen.has(id)) {
                 continue;
             }
 
-            const fallback = defaultLayoutsById.get(entry.id);
+            const fallback = defaultLayoutsById.get(id);
             if (!fallback) continue;
 
             const position = normalizeGridPosition(entry.position);
             layout.push({
-                id: entry.id,
+                id,
                 span: normalizeSpan(entry.span, fallback.span),
                 mobileSpan: normalizeMobileSpan(entry.mobileSpan, fallback.mobileSpan),
                 ...(position ? { position } : {}),
             });
-            seen.add(entry.id);
+            seen.add(id);
         }
     }
 

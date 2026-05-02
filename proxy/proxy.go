@@ -132,7 +132,9 @@ func finalizeAndRespond(r responder.Responder, resp io.Reader, status int, req *
 		metrics.Global.Requests.StatusServerErrorResponses.Increment()
 	}
 
-	written, err := r.Write(status, body)
+	written, writeDuration, err := r.Write(status, body)
+	metrics.Global.Requests.ClientResponseLatency.Add(writeDuration.Nanoseconds())
+	metrics.Global.Requests.ClientResponses.Increment()
 	if err != nil {
 		slog.Error("Error writing response", "url", req.URL, "error", err)
 		return err

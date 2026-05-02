@@ -1,13 +1,13 @@
 import CacheEfficiency from "$lib/components/widgets/CacheEfficiency.svelte";
 import CacheLatency from "$lib/components/widgets/CacheLatency.svelte";
 import CacheStorage from "$lib/components/widgets/CacheStorage.svelte";
-import CacheStats from "$lib/components/widgets/CacheStats.svelte";
+import CacheMaintenance from "$lib/components/widgets/CacheMaintenance.svelte";
 import DataTransfer from "$lib/components/widgets/DataTransfer.svelte";
 import RequestCoalescing from "$lib/components/widgets/RequestCoalescing.svelte";
 import RequestLatency from "$lib/components/widgets/RequestLatency.svelte";
 import RequestVolume from "$lib/components/widgets/RequestVolume.svelte";
 import ResponseStatus from "$lib/components/widgets/ResponseStatus.svelte";
-import SystemInfo from "$lib/components/widgets/SystemInfo.svelte";
+import ProcessInfo from "$lib/components/widgets/ProcessInfo.svelte";
 import type { Component } from "svelte";
 import {
     dashboardWidgetDefinitions,
@@ -28,8 +28,8 @@ const widgetComponents: Record<DashboardWidgetId, Component> = {
     "response-status": ResponseStatus,
     "request-coalescing": RequestCoalescing,
     "data-transfer": DataTransfer,
-    "system-info": SystemInfo,
-    "cache-stats": CacheStats,
+    "process-info": ProcessInfo,
+    "cache-maintenance": CacheMaintenance,
     "cache-storage": CacheStorage,
 };
 

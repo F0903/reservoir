@@ -43,18 +43,18 @@ describe("dashboard layout", () => {
             "response-status",
             "request-coalescing",
             "data-transfer",
-            "system-info",
-            "cache-stats",
+            "process-info",
+            "cache-maintenance",
             "cache-storage",
         ]);
-        expect(layout[0].span).toEqual({ width: 3, height: 3 });
+        expect(layout[0].span).toEqual({ width: 6, height: 6 });
     });
 
     it("normalizes saved order and clamps saved spans and positions", () => {
         const layout = normalizeDashboardLayout([
             {
                 id: "cache-storage",
-                span: { width: 9, height: -1 },
+                span: { width: 12, height: -1 },
                 mobileSpan: { width: 12 },
                 position: { column: -4, row: 2.6 },
             },
@@ -65,8 +65,8 @@ describe("dashboard layout", () => {
 
         expect(layout[0]).toEqual({
             id: "cache-storage",
-            span: { width: 4, height: 1 },
-            mobileSpan: { width: 4 },
+            span: { width: 8, height: 1 },
+            mobileSpan: { width: 8 },
             position: { column: 1, row: 3 },
         });
         expect(layout[1].id).toBe("cache-efficiency");
@@ -76,31 +76,31 @@ describe("dashboard layout", () => {
 
     it("appends missing widgets after saved widgets", () => {
         const layout = normalizeDashboardLayout([
-            { id: "system-info", span: { width: 2, height: 2 } },
+            { id: "process-info", span: { width: 4, height: 4 } },
         ]);
 
-        expect(layout[0].id).toBe("system-info");
+        expect(layout[0].id).toBe("process-info");
         expect(layout.at(-1)?.id).toBe("cache-storage");
     });
 
     it("sets widget spans within supported grid bounds", () => {
-        const layout = setDashboardWidgetSpan(defaultDashboardLayout(), "system-info", {
-            width: 3,
-            height: 12,
+        const layout = setDashboardWidgetSpan(defaultDashboardLayout(), "process-info", {
+            width: 6,
+            height: 16,
         });
 
-        expect(layout.find((item) => item.id === "system-info")?.span).toEqual({
-            width: 3,
-            height: 4,
+        expect(layout.find((item) => item.id === "process-info")?.span).toEqual({
+            width: 6,
+            height: 8,
         });
     });
 
     it("packs dashboard widgets into explicit non-overlapping grid positions", () => {
-        const layout = packDashboardLayout(defaultDashboardLayout().slice(0, 4), 4);
+        const layout = packDashboardLayout(defaultDashboardLayout().slice(0, 4), 8);
 
         expect(layout.every((widget) => widget.position)).toBe(true);
         expect(layout[0].position).toEqual({ column: 1, row: 1 });
-        occupiedCells(layout, 4);
+        occupiedCells(layout, 8);
     });
 
     it("places a dragged widget at the requested grid cell and packs other widgets around it", () => {
@@ -108,28 +108,28 @@ describe("dashboard layout", () => {
             defaultDashboardLayout().slice(0, 5),
             "response-status",
             { column: 2, row: 2 },
-            4,
+            8,
         );
 
         expect(layout.find((widget) => widget.id === "response-status")?.position).toEqual({
             column: 2,
             row: 2,
         });
-        occupiedCells(layout, 4);
+        occupiedCells(layout, 8);
     });
 
     it("clamps placed widgets to the available column range", () => {
         const layout = placeDashboardWidget(
             defaultDashboardLayout().slice(0, 3),
             "cache-efficiency",
-            { column: 8, row: 2 },
-            4,
+            { column: 16, row: 2 },
+            8,
         );
 
         expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
-            column: 2,
+            column: 3,
             row: 2,
         });
-        occupiedCells(layout, 4);
+        occupiedCells(layout, 8);
     });
 });

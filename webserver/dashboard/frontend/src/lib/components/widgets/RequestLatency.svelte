@@ -13,11 +13,16 @@
 <Widget title="Request Latency">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const totalClientRequests = data.requests.http_proxy_requests}
+            {@const totalProxiedRequests = data.requests.http_proxy_requests}
+            {@const totalClientResponses = data.requests.client_responses}
             {@const totalUpstreamRequests = data.requests.upstream_requests}
-            {@const avgClientLatencyMs =
-                totalClientRequests > 0
-                    ? nanosToMillis(data.requests.client_request_latency / totalClientRequests)
+            {@const avgEndToEndLatencyMs =
+                totalProxiedRequests > 0
+                    ? nanosToMillis(data.requests.client_request_latency / totalProxiedRequests)
+                    : 0}
+            {@const avgClientResponseLatencyMs =
+                totalClientResponses > 0
+                    ? nanosToMillis(data.requests.client_response_latency / totalClientResponses)
                     : 0}
             {@const avgUpstreamLatencyMs =
                 totalUpstreamRequests > 0
@@ -27,21 +32,24 @@
             <div class="latency-wrapper">
                 <div class="cards">
                     <MetricCard
-                        label="Client ↔ Reservoir"
-                        value={`${avgClientLatencyMs.toFixed(2)} ms`}
+                        label="End-to-End Request"
+                        value={`${avgEndToEndLatencyMs.toFixed(2)} ms`}
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard
-                        label="Reservoir ↔ Upstream"
-                        value={`${avgUpstreamLatencyMs.toFixed(2)} ms`}
+                        label="Reservoir to Client"
+                        value={`${avgClientResponseLatencyMs.toFixed(2)} ms`}
                         --metric-value-color="var(--tertiary-400)"
                     />
-                    <div class="double-span">
-                        <MetricCard
-                            label="Upstream Calls"
-                            value={totalUpstreamRequests.toLocaleString()}
-                        />
-                    </div>
+                    <MetricCard
+                        label="Upstream Fetch"
+                        value={`${avgUpstreamLatencyMs.toFixed(2)} ms`}
+                        --metric-value-color="var(--tertiary-600)"
+                    />
+                    <MetricCard
+                        label="Upstream Calls"
+                        value={totalUpstreamRequests.toLocaleString()}
+                    />
                 </div>
 
                 <div class="chart-container hide-on-mobile">
@@ -51,9 +59,14 @@
                             labels: ["Average Latency"],
                             datasets: [
                                 {
-                                    label: "Client",
-                                    data: [avgClientLatencyMs],
+                                    label: "End-to-End",
+                                    data: [avgEndToEndLatencyMs],
                                     backgroundColor: "var(--tertiary-400)",
+                                },
+                                {
+                                    label: "Reservoir to Client",
+                                    data: [avgClientResponseLatencyMs],
+                                    backgroundColor: "var(--secondary-400)",
                                 },
                                 {
                                     label: "Upstream",
@@ -94,10 +107,6 @@
         gap: 0.75rem;
     }
 
-    .double-span {
-        grid-column: span 2;
-    }
-
     .chart-container {
         flex: 1;
         min-height: 0;
@@ -113,12 +122,6 @@
             flex: 1;
             min-height: 0;
             height: 100%;
-        }
-
-        .double-span {
-            grid-column: span 2;
-            height: 100%;
-            display: flex;
         }
     }
 </style>

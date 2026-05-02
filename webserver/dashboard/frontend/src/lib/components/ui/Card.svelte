@@ -15,8 +15,11 @@
 
         padding: var(--card-padding, 1.5rem);
         border: 1px solid rgba(255, 255, 255, 0.05);
+        border-top: var(--card-border-top, inherit);
         border-radius: var(--card-border-radius, 15px);
         background-color: var(--card-background, var(--primary-400));
+
+        overflow: var(--card-overflow, inherit);
 
         display: flex;
         flex-direction: column;

@@ -33,14 +33,14 @@ func TestRawHTTPResponderDoesNotLeakHeadersBetweenResponses(t *testing.T) {
 	responder := NewRawHTTPResponder(&buf)
 
 	responder.SetHeader("X-First", "1")
-	if written, err := responder.Write(http.StatusOK, strings.NewReader("first")); err != nil {
+	if written, _, err := responder.Write(http.StatusOK, strings.NewReader("first")); err != nil {
 		t.Fatalf("failed to write first response: %v", err)
 	} else if written != int64(len("first")) {
 		t.Fatalf("first response reported %d bytes written", written)
 	}
 
 	responder.SetHeader("X-Second", "2")
-	if written, err := responder.Write(http.StatusOK, strings.NewReader("second")); err != nil {
+	if written, _, err := responder.Write(http.StatusOK, strings.NewReader("second")); err != nil {
 		t.Fatalf("failed to write second response: %v", err)
 	} else if written != int64(len("second")) {
 		t.Fatalf("second response reported %d bytes written", written)

@@ -18,27 +18,47 @@
         --card-height="100%"
         --card-width="var(--metric-width, 100%)"
         --card-text-align="var(--metric-text-align, left)"
-        --card-padding="var(--metric-padding, 0.75rem 1rem)"
+        --card-padding="var(--metric-padding, 0.7rem 0.75rem)"
         --card-background="var(--metric-background, var(--primary-600))"
         --card-border="var(--metric-border, 1px solid var(--primary-500))"
-        --card-border-radius="var(--metric-border-radius, 12px)"
+        --card-border-radius="var(--metric-border-radius, 0 0 12px 12px)"
         --card-justify-content="flex-start"
         --card-gap="0.25rem"
+        --card-overflow="hidden"
     >
         <div class="accent-bar"></div>
-        <div class="metric-header">
-            <span class="metric-label">{label}</span>
+        <div class="content-row">
+            <div class="metric-pair">
+                <span class="metric-label">{label}</span>
+                <div class="metric-value">{value}</div>
+            </div>
             {#if Icon}
                 <div class="icon-container hide-on-mobile">
                     <Icon size={14} />
                 </div>
             {/if}
         </div>
-        <div class="metric-value">{value}</div>
     </Card>
 </div>
 
 <style>
+    .content-row {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: start;
+
+        width: 100%;
+    }
+
+    .metric-pair {
+        display: flex;
+        flex-direction: column;
+        gap: var(--card-metric-gap, 0.3rem);
+
+        width: 100%;
+    }
+
     .metric-card-wrapper {
         container-type: inline-size;
         display: flex;
@@ -56,22 +76,16 @@
     }
 
     .accent-bar {
+        --width-offset: 2px;
         position: absolute;
-        top: 0;
-        left: 0;
+        top: -2px;
+        left: calc(var(--width-offset) / 2);
         right: 0;
         height: 2px;
+        width: calc(100% - var(--width-offset));
         background-color: var(--metric-value-color, var(--secondary-300));
         opacity: 0.6;
         border-radius: 12px 12px 0 0;
-    }
-
-    .metric-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        margin-bottom: 0.1rem;
     }
 
     .icon-container {

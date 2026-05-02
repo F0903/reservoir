@@ -60,7 +60,9 @@ describe("MetricsProvider", () => {
                 bytes_served: 1000,
                 bytes_fetched: 800,
                 upstream_requests: 6,
+                client_responses: 8,
                 client_request_latency: 50,
+                client_response_latency: 20,
                 upstream_request_latency: 40,
                 coalesced_requests: 2,
                 non_coalesced_requests: 10,
@@ -76,6 +78,8 @@ describe("MetricsProvider", () => {
                 mem_alloc_bytes: 1024,
                 mem_total_alloc_bytes: 2048,
                 mem_sys_bytes: 4096,
+                mem_total_bytes: 8192,
+                cores_available: 4,
                 start_time: new Date().toISOString(),
             },
         };

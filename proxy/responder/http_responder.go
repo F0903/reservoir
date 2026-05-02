@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"time"
 )
 
 // Essentially a simple wrapper around http.ResponseWriter
@@ -43,15 +44,21 @@ func (c *HTTPResponder) GetHeaders() http.Header {
 	return c.writer.Header()
 }
 
-func (c *HTTPResponder) writeStatusHeader(status int) {
+func (c *HTTPResponder) writeStatusHeader(status int) time.Duration {
 	if status != http.StatusOK {
+		start := time.Now()
 		c.writer.WriteHeader(status)
+		return time.Since(start)
 	}
+
+	return 0
 }
 
-func (c *HTTPResponder) Write(status int, body io.Reader) (written int64, err error) {
-	c.writeStatusHeader(status)
-	return io.Copy(c.writer, body)
+func (c *HTTPResponder) Write(status int, body io.Reader) (written int64, writeDuration time.Duration, err error) {
+	writeDuration = c.writeStatusHeader(status)
+	timed := &timedWriter{writer: c.writer}
+	written, err = io.Copy(timed, body)
+	return written, writeDuration + timed.duration, err
 }
 
 func (c *HTTPResponder) WriteEmpty(status int) error {

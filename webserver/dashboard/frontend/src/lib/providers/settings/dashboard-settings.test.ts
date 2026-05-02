@@ -24,7 +24,7 @@ describe("DashboardSettings", () => {
             "dashboardConfig",
             JSON.stringify({
                 updateInterval: 5000,
-                layout: [{ id: "system-info", span: { width: 2, height: 2 } }],
+                layout: [{ id: "process-info", span: { width: 4, height: 4 } }],
             }),
         );
 
@@ -32,9 +32,9 @@ describe("DashboardSettings", () => {
 
         expect(settings.fields.updateInterval).toBe(5000);
         expect(settings.fields.layout[0]).toEqual({
-            id: "system-info",
-            span: { width: 2, height: 2 },
-            mobileSpan: { width: 1 },
+            id: "process-info",
+            span: { width: 4, height: 4 },
+            mobileSpan: { width: 2, height: 6 },
         });
     });
 
@@ -56,7 +56,7 @@ describe("DashboardSettings", () => {
             "dashboardConfig",
             JSON.stringify({
                 updateInterval: 7500,
-                layout: [{ id: "cache-storage", span: { width: 4, height: 1 } }],
+                layout: [{ id: "cache-storage", span: { width: 8, height: 2 } }],
             }),
         );
         await settings.reload();
@@ -64,8 +64,8 @@ describe("DashboardSettings", () => {
         expect(settings.fields.updateInterval).toBe(7500);
         expect(settings.fields.layout[0]).toEqual({
             id: "cache-storage",
-            span: { width: 4, height: 1 },
-            mobileSpan: { width: 2, height: 2 },
+            span: { width: 8, height: 2 },
+            mobileSpan: { width: 4, height: 4 },
         });
     });
 
