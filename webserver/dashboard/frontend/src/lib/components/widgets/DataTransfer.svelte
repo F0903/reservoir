@@ -11,10 +11,9 @@
 <Widget title="Data Transfer">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const totalRequests =
-                data.requests.http_proxy_requests + data.requests.https_proxy_requests}
+            {@const proxiedRequests = data.requests.http_proxy_requests}
             {@const avgBytesPerRequest =
-                totalRequests > 0 ? data.requests.bytes_served / totalRequests : 0}
+                proxiedRequests > 0 ? data.requests.bytes_served / proxiedRequests : 0}
             {@const startTime = data.system?.start_time ? new Date(data.system.start_time) : null}
             {@const uptimeSeconds = startTime
                 ? Math.max((Date.now() - startTime.getTime()) / 1000, 1)
@@ -23,7 +22,7 @@
                 uptimeSeconds > 0 ? data.requests.bytes_served / uptimeSeconds : 0}
             {@const fetchedPerSecond =
                 uptimeSeconds > 0 ? data.requests.bytes_fetched / uptimeSeconds : 0}
-            {@const requestsPerSecond = uptimeSeconds > 0 ? totalRequests / uptimeSeconds : 0}
+            {@const requestsPerSecond = uptimeSeconds > 0 ? proxiedRequests / uptimeSeconds : 0}
 
             <div class="cards">
                 <MetricCard
@@ -51,8 +50,8 @@
                 />
                 <MetricCard label="Requests / s" value={requestsPerSecond.toFixed(2)} />
                 <MetricCard
-                    label="Total Requests"
-                    value={totalRequests.toLocaleString()}
+                    label="Proxied Requests"
+                    value={proxiedRequests.toLocaleString()}
                     --metric-value-color="var(--tertiary-400)"
                 />
                 <MetricCard

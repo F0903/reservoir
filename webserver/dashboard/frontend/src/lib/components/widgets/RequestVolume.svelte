@@ -11,38 +11,34 @@
 <Widget title="Request Volume">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const httpRequests = data.requests.http_proxy_requests}
-            {@const httpsRequests = data.requests.https_proxy_requests}
-            {@const totalRequests = httpRequests + httpsRequests}
-            {@const httpShare = totalRequests > 0 ? (httpRequests / totalRequests) * 100 : 0}
-            {@const httpsShare = totalRequests > 0 ? (httpsRequests / totalRequests) * 100 : 0}
+            {@const proxiedRequests = data.requests.http_proxy_requests}
+            {@const connectTunnels = data.requests.https_proxy_requests}
+            {@const upstreamRequests = data.requests.upstream_requests}
 
             <div class="volume-wrapper">
                 <div class="metric-cards-container">
                     <MetricCard
-                        label="Total Requests"
-                        value={totalRequests.toLocaleString()}
+                        label="Proxied Requests"
+                        value={proxiedRequests.toLocaleString()}
                         --metric-value-color="var(--tertiary-400)"
                     />
-                    <MetricCard label="HTTP Share" value={`${httpShare.toFixed(1)}%`} />
-                    <MetricCard label="HTTPS Share" value={`${httpsShare.toFixed(1)}%`} />
+                    <MetricCard label="CONNECT Tunnels" value={connectTunnels.toLocaleString()} />
+                    <MetricCard
+                        label="Upstream Requests"
+                        value={upstreamRequests.toLocaleString()}
+                    />
                 </div>
 
                 <div class="chart-container hide-on-mobile">
                     <Chart
                         type="bar"
                         data={{
-                            labels: ["Requests"],
+                            labels: ["Proxied", "CONNECT", "Upstream"],
                             datasets: [
                                 {
-                                    label: "HTTP",
-                                    data: [httpRequests],
+                                    label: "Count",
+                                    data: [proxiedRequests, connectTunnels, upstreamRequests],
                                     backgroundColor: "var(--secondary-400)",
-                                },
-                                {
-                                    label: "HTTPS",
-                                    data: [httpsRequests],
-                                    backgroundColor: "var(--secondary-300)",
                                 },
                             ],
                         }}
@@ -50,14 +46,10 @@
                             indexAxis: "y",
                             scales: {
                                 x: {
-                                    stacked: true,
                                     title: {
                                         display: true,
                                         text: "Count",
                                     },
-                                },
-                                y: {
-                                    stacked: true,
                                 },
                             },
                         }}

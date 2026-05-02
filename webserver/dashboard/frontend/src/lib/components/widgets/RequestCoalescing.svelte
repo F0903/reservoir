@@ -36,12 +36,9 @@
                         value={coalescingRate.toFixed(1) + "%"}
                         --metric-value-color="var(--tertiary-400)"
                     />
+                    <MetricCard label="Joined Requests" value={totalCoalescedRequests.toString()} />
                     <MetricCard
-                        label="Coalesced Requests"
-                        value={totalCoalescedRequests.toString()}
-                    />
-                    <MetricCard
-                        label="Cache Hit Rate"
+                        label="Joined Hit Rate"
                         value={coalescedCacheHitRate.toFixed(1) + "%"}
                         --metric-value-color="var(--success-color)"
                     />
@@ -55,7 +52,7 @@
                     <Chart
                         type="bar"
                         data={{
-                            labels: ["Coalesced Requests"],
+                            labels: ["Joined Requests"],
                             datasets: [
                                 {
                                     label: "Cache Hits",

@@ -228,11 +228,18 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	}
 
 	fetchInfo := fetched.getFetchInfo()
-	if fetchInfo.Status == hitStatusMiss {
-		metrics.Global.Cache.CacheMisses.Increment()
+	switch fetchInfo.Status {
+	case hitStatusMiss:
+		metrics.Global.Cache.CacheRequestMisses.Increment()
 		metrics.Global.Cache.CacheMissLatency.Add(latency.Nanoseconds())
-	} else {
-		metrics.Global.Cache.CacheHits.Increment()
+	case hitStatusRevalidated:
+		metrics.Global.Cache.CacheRequestRevalidations.Increment()
+		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
+	case hitStatusStale:
+		metrics.Global.Cache.CacheRequestStales.Increment()
+		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
+	default:
+		metrics.Global.Cache.CacheRequestHits.Increment()
 		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	}
 

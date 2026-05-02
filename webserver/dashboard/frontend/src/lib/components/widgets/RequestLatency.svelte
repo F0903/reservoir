@@ -13,8 +13,7 @@
 <Widget title="Request Latency">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const totalClientRequests =
-                data.requests.http_proxy_requests + data.requests.https_proxy_requests}
+            {@const totalClientRequests = data.requests.http_proxy_requests}
             {@const totalUpstreamRequests = data.requests.upstream_requests}
             {@const avgClientLatencyMs =
                 totalClientRequests > 0
@@ -24,27 +23,23 @@
                 totalUpstreamRequests > 0
                     ? nanosToMillis(data.requests.upstream_request_latency / totalUpstreamRequests)
                     : 0}
-            {@const clientContribution =
-                avgClientLatencyMs + avgUpstreamLatencyMs > 0
-                    ? (avgClientLatencyMs / (avgClientLatencyMs + avgUpstreamLatencyMs)) * 100
-                    : 0}
 
             <div class="latency-wrapper">
                 <div class="cards">
                     <MetricCard
-                        label="Client → Reservoir"
+                        label="Client ↔ Reservoir"
                         value={`${avgClientLatencyMs.toFixed(2)} ms`}
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <MetricCard
-                        label="Reservoir → Upstream"
+                        label="Reservoir ↔ Upstream"
                         value={`${avgUpstreamLatencyMs.toFixed(2)} ms`}
                         --metric-value-color="var(--tertiary-400)"
                     />
                     <div class="double-span">
                         <MetricCard
-                            label="Client Share"
-                            value={`${clientContribution.toFixed(0)}%`}
+                            label="Upstream Calls"
+                            value={totalUpstreamRequests.toLocaleString()}
                         />
                     </div>
                 </div>
@@ -71,14 +66,10 @@
                             indexAxis: "y",
                             scales: {
                                 x: {
-                                    stacked: true,
                                     title: {
                                         display: true,
                                         text: "Milliseconds",
                                     },
-                                },
-                                y: {
-                                    stacked: true,
                                 },
                             },
                         }}

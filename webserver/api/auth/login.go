@@ -55,11 +55,5 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 	sess := ctx.SessionManager.Create(user.ID)
 	http.SetCookie(w, sess.BuildSessionCookie())
 
-	apihttp.WriteJSON(w, http.StatusOK, models.UserInfo{
-		ID:                     user.ID,
-		Username:               user.Username,
-		PasswordChangeRequired: user.PasswordChangeRequired,
-		CreatedAt:              user.CreatedAt,
-		UpdatedAt:              user.UpdatedAt,
-	})
+	apihttp.WriteJSON(w, http.StatusOK, models.FromUser(user))
 }

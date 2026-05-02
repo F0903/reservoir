@@ -42,6 +42,7 @@ describe("AuthProvider", () => {
     const mockUser: authApi.UserInfo = {
         id: 1,
         username: "testuser",
+        is_admin: true,
         password_change_required: false,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",

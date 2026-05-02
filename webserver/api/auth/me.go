@@ -33,11 +33,5 @@ func (e *MeEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Co
 		return
 	}
 
-	apihttp.WriteJSON(w, http.StatusOK, models.UserInfo{
-		ID:                     user.ID,
-		Username:               user.Username,
-		PasswordChangeRequired: user.PasswordChangeRequired,
-		CreatedAt:              user.CreatedAt,
-		UpdatedAt:              user.UpdatedAt,
-	})
+	apihttp.WriteJSON(w, http.StatusOK, models.FromUser(user))
 }

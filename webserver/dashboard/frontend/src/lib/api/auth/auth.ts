@@ -3,6 +3,7 @@ import { apiGet, apiPatch, apiPost, type FetchFn } from "../api-helpers";
 export type UserInfo = {
     id: number;
     username: string;
+    is_admin?: boolean;
     password_change_required: boolean;
     created_at: string;
     updated_at: string;

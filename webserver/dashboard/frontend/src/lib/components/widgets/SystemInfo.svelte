@@ -7,7 +7,7 @@
     import Poller from "./utils/Poller.svelte";
     import type { Metrics } from "$lib/api/objects/metrics/metrics";
     import { getMetricsProvider } from "$lib/context";
-    import { Clock, Cpu, MemoryStick, HardDrive, LayoutGrid } from "@lucide/svelte";
+    import { Clock, Cpu, MemoryStick, HardDrive } from "@lucide/svelte";
 
     const metrics = getMetricsProvider();
 
@@ -30,15 +30,11 @@
             <Poller pollFn={() => updateUptime(data)} pollInterval={1000}>
                 <div class="metrics">
                     <MetricCard label="Uptime" value={uptime} icon={Clock} />
-                    <MetricCard
-                        label="Goroutines"
-                        value={data.system.num_goroutines}
-                        icon={LayoutGrid}
-                    />
+                    <MetricCard label="Goroutines" value={data.system.num_goroutines} icon={Cpu} />
                     <MetricCard
                         label="Mem Allocated"
                         value={formatBytesToLargest(data.system.mem_alloc_bytes)}
-                        icon={Cpu}
+                        icon={MemoryStick}
                     />
                     <MetricCard
                         label="Total Allocated"

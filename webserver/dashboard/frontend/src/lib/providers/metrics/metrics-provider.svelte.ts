@@ -10,6 +10,7 @@ export class MetricsProvider {
     private settings: SettingsProvider;
     private readonly fetchFn: FetchFn;
     private refreshing = false;
+    private refreshPromise: Promise<void> | null = null;
     private abortController: AbortController | null = null;
 
     data = $state<Metrics | null>(null);
@@ -76,9 +77,15 @@ export class MetricsProvider {
         }
     };
 
-    refreshMetrics = async () => {
+    refreshMetrics = () => {
         if (!browser) return; // Do not run this in SSR
+        if (this.refreshPromise) return this.refreshPromise;
 
+        this.refreshPromise = this.runRefreshMetrics();
+        return this.refreshPromise;
+    };
+
+    private runRefreshMetrics = async () => {
         log.debug("Refreshing metrics...");
         this.loading = true;
 
@@ -105,6 +112,7 @@ export class MetricsProvider {
             this.error = err instanceof Error ? err.message : String(err);
         } finally {
             this.loading = false;
+            this.refreshPromise = null;
         }
 
         log.debug("Metrics refreshed");

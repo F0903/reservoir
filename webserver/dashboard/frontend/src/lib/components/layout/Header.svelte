@@ -2,7 +2,7 @@
     import { version } from "$lib/api/objects/version/version";
     import { onMount } from "svelte";
     import { getAuthProvider } from "$lib/context";
-    import { LogOut, User, Menu } from "@lucide/svelte";
+    import { LogOut, Menu, ShieldCheck, User } from "@lucide/svelte";
 
     let {
         onToggleMenu,
@@ -12,6 +12,7 @@
 
     let version_string = $state("");
     const session = getAuthProvider();
+    const isAdmin = $derived(!!session.user && session.user.is_admin !== false);
 
     onMount(async () => {
         let version_obj = await version();
@@ -32,6 +33,12 @@
             <div class="user-info">
                 <User size={18} />
                 <span class="username">{session.user.username}</span>
+                {#if isAdmin}
+                    <span class="admin-badge" aria-label="Administrator">
+                        <ShieldCheck size={13} />
+                        <span class="admin-badge-text">Admin</span>
+                    </span>
+                {/if}
             </div>
             <button class="logout-btn" onclick={session.logout} title="Logout">
                 <LogOut size={18} />
@@ -100,6 +107,22 @@
         font-weight: 600;
     }
 
+    .admin-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        min-height: 1.35rem;
+        padding: 0.15rem 0.45rem;
+        border: 1px solid color-mix(in srgb, var(--secondary-300) 26%, transparent);
+        border-radius: 999px;
+        background-color: color-mix(in srgb, var(--secondary-800) 24%, transparent);
+        color: var(--secondary-300);
+        font-size: 0.64rem;
+        font-weight: 800;
+        line-height: 1;
+        text-transform: uppercase;
+    }
+
     .logout-btn {
         display: flex;
         align-items: center;
@@ -127,7 +150,19 @@
             display: flex;
         }
 
+        .username {
+            display: none;
+        }
+
         .user-info {
+            gap: 0.35rem;
+        }
+
+        .admin-badge {
+            padding: 0.25rem;
+        }
+
+        .admin-badge-text {
             display: none;
         }
 

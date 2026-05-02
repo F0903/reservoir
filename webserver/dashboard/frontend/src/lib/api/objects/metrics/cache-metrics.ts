@@ -12,6 +12,10 @@ export type CacheMetrics = {
     cache_hits: number;
     cache_misses: number;
     cache_errors: number;
+    cache_request_hits: number;
+    cache_request_misses: number;
+    cache_request_revalidations: number;
+    cache_request_stales: number;
     cache_entries: number;
     bytes_cached: number;
     cleanup_runs: number;

@@ -419,6 +419,7 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 	if err != nil {
 		if errors.Is(err, ErrNotCacheable) {
 			slog.Debug("Request was not cacheable in singleflight, falling back to direct fetch", "url", req.URL)
+			metrics.Global.Requests.NonCoalescedRequests.Increment()
 			return f.fetchDirectlyFromUpstream(req)
 		}
 		return fetchResult{}, err
@@ -433,6 +434,8 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 
 		// Restore the original client headers for shared requests
 		clientHd = &originalClientHd
+	} else {
+		metrics.Global.Requests.NonCoalescedRequests.Increment()
 	}
 
 	switch fetched.Type {

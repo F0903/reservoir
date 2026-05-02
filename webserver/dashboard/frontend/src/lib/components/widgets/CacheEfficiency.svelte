@@ -12,25 +12,37 @@
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
             {@const totalCacheRequests =
-                data.cache.cache_hits + data.cache.cache_misses + data.cache.cache_errors}
+                data.cache.cache_request_hits +
+                data.cache.cache_request_revalidations +
+                data.cache.cache_request_stales +
+                data.cache.cache_request_misses}
             {@const hitRate =
-                totalCacheRequests > 0 ? (data.cache.cache_hits / totalCacheRequests) * 100 : 0}
+                totalCacheRequests > 0
+                    ? ((data.cache.cache_request_hits +
+                          data.cache.cache_request_revalidations +
+                          data.cache.cache_request_stales) /
+                          totalCacheRequests) *
+                      100
+                    : 0}
             {@const missRate =
-                totalCacheRequests > 0 ? (data.cache.cache_misses / totalCacheRequests) * 100 : 0}
-            {@const errorRate =
-                totalCacheRequests > 0 ? (data.cache.cache_errors / totalCacheRequests) * 100 : 0}
+                totalCacheRequests > 0
+                    ? (data.cache.cache_request_misses / totalCacheRequests) * 100
+                    : 0}
+            {@const revalidationRate =
+                totalCacheRequests > 0
+                    ? (data.cache.cache_request_revalidations / totalCacheRequests) * 100
+                    : 0}
             <div class="efficiency-display">
                 <div class="metric-cards-container">
                     <MetricCard
-                        label="Hit Rate"
+                        label="Served From Cache"
                         value={hitRate.toFixed(1) + "%"}
                         --metric-value-color="var(--success-color)"
                     />
                     <MetricCard label="Miss Rate" value={missRate.toFixed(1) + "%"} />
                     <MetricCard
-                        label="Error Rate"
-                        value={errorRate.toFixed(1) + "%"}
-                        --metric-value-color="var(--log-error-color)"
+                        label="Revalidation Rate"
+                        value={revalidationRate.toFixed(1) + "%"}
                     />
                 </div>
 
@@ -38,21 +50,26 @@
                     <Chart
                         type="bar"
                         data={{
-                            labels: ["Cache Operations"],
+                            labels: ["Proxy Cache Outcomes"],
                             datasets: [
                                 {
-                                    label: "Hits",
-                                    data: [data.cache.cache_hits],
+                                    label: "Fresh Hits",
+                                    data: [data.cache.cache_request_hits],
                                     backgroundColor: "var(--success-color)",
                                 },
                                 {
-                                    label: "Misses",
-                                    data: [data.cache.cache_misses],
+                                    label: "Revalidations",
+                                    data: [data.cache.cache_request_revalidations],
                                     backgroundColor: "var(--secondary-400)",
                                 },
                                 {
-                                    label: "Errors",
-                                    data: [data.cache.cache_errors],
+                                    label: "Stale",
+                                    data: [data.cache.cache_request_stales],
+                                    backgroundColor: "var(--tertiary-400)",
+                                },
+                                {
+                                    label: "Misses",
+                                    data: [data.cache.cache_request_misses],
                                     backgroundColor: "var(--error-color)",
                                 },
                             ],

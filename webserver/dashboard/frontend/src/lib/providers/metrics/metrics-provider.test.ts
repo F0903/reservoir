@@ -35,6 +35,10 @@ describe("MetricsProvider", () => {
                 cache_hits: 10,
                 cache_misses: 2,
                 cache_errors: 0,
+                cache_request_hits: 8,
+                cache_request_misses: 2,
+                cache_request_revalidations: 1,
+                cache_request_stales: 0,
                 cache_entries: 5,
                 bytes_cached: 1024,
                 cleanup_runs: 1,
@@ -136,6 +140,24 @@ describe("MetricsProvider", () => {
 
         resolveFetch(mockMetrics);
         await refreshPromise;
+
+        expect(provider.loading).toBe(false);
+    });
+
+    it("should reuse an in-flight refresh", async () => {
+        let resolveFetch: (_value: metricsApi.Metrics) => void = () => {};
+        const promise = new Promise<metricsApi.Metrics>((resolve) => (resolveFetch = resolve));
+        (metricsApi.getAllMetrics as Mock).mockReturnValue(promise);
+
+        const firstRefresh = provider.refreshMetrics();
+        const secondRefresh = provider.refreshMetrics();
+
+        expect(firstRefresh).toBe(secondRefresh);
+        expect(metricsApi.getAllMetrics).toHaveBeenCalledTimes(1);
+        expect(provider.loading).toBe(true);
+
+        resolveFetch(mockMetrics);
+        await firstRefresh;
 
         expect(provider.loading).toBe(false);
     });

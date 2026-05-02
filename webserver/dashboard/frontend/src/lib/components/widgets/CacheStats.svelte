@@ -11,35 +11,42 @@
 <Widget title="Cache Statistics">
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
-            {@const totalBytesObserved = data.cache.bytes_cached + data.cache.bytes_cleaned}
             {@const fillPercent =
-                totalBytesObserved > 0 ? (data.cache.bytes_cached / totalBytesObserved) * 100 : 0}
+                data.cache.storage.max_bytes > 0
+                    ? (data.cache.storage.bytes / data.cache.storage.max_bytes) * 100
+                    : 0}
             <div class="metrics-grid">
                 <MetricCard
                     label="Cache Entries"
                     value={data.cache.cache_entries.toLocaleString()}
                 />
                 <MetricCard
-                    label="Cache Hits"
-                    value={data.cache.cache_hits.toLocaleString()}
+                    label="Request Hits"
+                    value={(
+                        data.cache.cache_request_hits +
+                        data.cache.cache_request_revalidations +
+                        data.cache.cache_request_stales
+                    ).toLocaleString()}
                     --metric-value-color="var(--success-color)"
                 />
-                <MetricCard label="Cache Misses" value={data.cache.cache_misses.toLocaleString()} />
                 <MetricCard
-                    label="Cache Errors"
-                    value={data.cache.cache_errors.toLocaleString()}
-                    --metric-value-color="var(--log-error-color)"
+                    label="Request Misses"
+                    value={data.cache.cache_request_misses.toLocaleString()}
+                />
+                <MetricCard
+                    label="Revalidations"
+                    value={data.cache.cache_request_revalidations.toLocaleString()}
+                />
+                <MetricCard
+                    label="Stale Responses"
+                    value={data.cache.cache_request_stales.toLocaleString()}
                 />
                 <MetricCard
                     label="Bytes Cached"
                     value={formatBytesToLargest(data.cache.bytes_cached)}
                 />
-                <MetricCard label="Cache Fill Level" value={`${fillPercent.toFixed(1)}%`} />
+                <MetricCard label="Storage Used" value={`${fillPercent.toFixed(1)}%`} />
                 <MetricCard label="Cleanup Runs" value={data.cache.cleanup_runs.toLocaleString()} />
-                <MetricCard
-                    label="Bytes Cleaned"
-                    value={formatBytesToLargest(data.cache.bytes_cleaned)}
-                />
                 <MetricCard
                     label="Cache Evictions"
                     value={data.cache.cache_evictions.toLocaleString()}

@@ -11,15 +11,19 @@
     <Loadable state={metrics.data} error={metrics.error}>
         {#snippet children(data)}
             <!-- Convert nanoseconds to milliseconds -->
+            {@const cacheHitResponses =
+                data.cache.cache_request_hits +
+                data.cache.cache_request_revalidations +
+                data.cache.cache_request_stales}
             {@const cacheHitLatencyMs =
-                data.cache.cache_hit_latency / (data.cache.cache_hits || 1) / 1e6}
+                data.cache.cache_hit_latency / (cacheHitResponses || 1) / 1e6}
             {@const cacheMissLatencyMs =
-                data.cache.cache_miss_latency / (data.cache.cache_misses || 1) / 1e6}
+                data.cache.cache_miss_latency / (data.cache.cache_request_misses || 1) / 1e6}
 
             <Chart
                 type="bar"
                 data={{
-                    labels: ["Cache Hit", "Cache Miss"],
+                    labels: ["Cached Response", "Cache Miss"],
                     datasets: [
                         {
                             label: "Average Latency (ms)",
