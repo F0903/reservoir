@@ -29,6 +29,8 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [x] Add dashboard settings controls for cache backend, cache size, cleanup interval, and memory budget.
 - [x] Add restart-required and validation feedback in dashboard settings for changes that cannot be applied live.
 - [x] Add a layout editor for the dashboard.
+- [ ] Make layout grid a higher resolution.
+- [ ] Make widgets more responsive depending on their size.
 
 
 ## Project Wide
