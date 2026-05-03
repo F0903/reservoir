@@ -2,6 +2,7 @@
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import { version } from "$lib/api/objects/version/version";
+    import { userIsAdmin } from "$lib/auth/permissions";
     import { onMount } from "svelte";
     import { getAuthProvider } from "$lib/context";
     import { LogOut, Menu, ShieldCheck, User } from "@lucide/svelte";
@@ -14,7 +15,7 @@
 
     let version_string = $state("");
     const session = getAuthProvider();
-    const isAdmin = $derived(!!session.user && session.user.is_admin !== false);
+    const isAdmin = $derived(userIsAdmin(session.user));
 
     onMount(async () => {
         let version_obj = await version();
@@ -28,7 +29,7 @@
 
 <header>
     <div class="title-section">
-        {#if isAdmin}
+        {#if session.user && onToggleMenu}
             <button class="menu-toggle" onclick={onToggleMenu} aria-label="Toggle menu">
                 <Menu size={24} />
             </button>

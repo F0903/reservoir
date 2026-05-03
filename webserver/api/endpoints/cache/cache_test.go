@@ -17,6 +17,36 @@ type fakeCacheController struct {
 	clearCalled bool
 }
 
+func TestEndpointAdminRequirements(t *testing.T) {
+	tests := []struct {
+		name              string
+		method            apitypes.EndpointMethod
+		wantRequiresAdmin bool
+	}{
+		{
+			name:              "status read",
+			method:            (&StatusEndpoint{}).EndpointMethods()[0],
+			wantRequiresAdmin: false,
+		},
+		{
+			name:              "clear mutation",
+			method:            (&ClearEndpoint{}).EndpointMethods()[0],
+			wantRequiresAdmin: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.method.RequiresAuth {
+				t.Fatal("expected cache endpoint to require authentication")
+			}
+			if tt.method.RequiresAdmin != tt.wantRequiresAdmin {
+				t.Fatalf("expected RequiresAdmin=%t, got %t", tt.wantRequiresAdmin, tt.method.RequiresAdmin)
+			}
+		})
+	}
+}
+
 func (f *fakeCacheController) CacheStats() cachecore.Stats {
 	return f.stats
 }

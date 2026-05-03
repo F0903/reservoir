@@ -4,8 +4,10 @@
     import PanelHeading from "$lib/components/layout/PanelHeading.svelte";
     import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
     import PageTitle from "$lib/components/ui/PageTitle.svelte";
+    import Tooltip from "$lib/components/ui/Tooltip.svelte";
     import Button from "$lib/components/ui/input/Button.svelte";
     import Form from "$lib/components/ui/input/Form.svelte";
+    import PanelActionButton from "$lib/components/ui/input/PanelActionButton.svelte";
     import TextInput from "$lib/components/ui/input/TextInput.svelte";
     import Toggle from "$lib/components/ui/input/Toggle.svelte";
     import { getAuthProvider, getToastProvider } from "$lib/context";
@@ -36,6 +38,10 @@
     let resetError = $state<string | null>(null);
 
     const adminCount = $derived(users.filter((user) => user.is_admin).length);
+    const createFormReady = $derived(newUsername.trim() !== "" && newPassword !== "");
+    const createPasswordLabel = $derived(
+        newRequiresPasswordChange ? "Initial Password" : "Password",
+    );
 
     onMount(() => {
         loadUsers();
@@ -211,7 +217,7 @@
                         disabled={creating}
                     />
                     <TextInput
-                        label="Initial Password"
+                        label={createPasswordLabel}
                         bind:value={newPassword}
                         placeholder="Temporary password"
                         censor={true}
@@ -230,18 +236,21 @@
                     <ErrorBox>{createError}</ErrorBox>
                 {/if}
 
-                <div class="form-actions">
-                    <Button type="submit" disabled={creating}>
-                        <span class="button-inner">
+                <div class="form-actions create-actions">
+                    <PanelActionButton type="submit" disabled={creating || !createFormReady}>
+                        {#snippet icon()}
                             {#if creating}
-                                <RefreshCw size={16} class="spin" />
-                                Creating...
+                                <RefreshCw size={14} class="spin" />
                             {:else}
-                                <UserPlus size={16} />
-                                Create User
+                                <UserPlus size={14} />
                             {/if}
-                        </span>
-                    </Button>
+                        {/snippet}
+                        {#if creating}
+                            Creating...
+                        {:else}
+                            Create User
+                        {/if}
+                    </PanelActionButton>
                 </div>
             </Form>
         </PagePanel>
@@ -316,27 +325,29 @@
                                     <td>{formatUserDate(user.created_at)}</td>
                                     <td>
                                         <div class="row-actions">
-                                            <button
-                                                type="button"
-                                                class="icon-button"
-                                                disabled={userBusy(user)}
-                                                aria-label={`Reset password for ${user.username}`}
-                                                title="Reset password"
-                                                onclick={() => beginPasswordReset(user)}
-                                            >
-                                                <KeyRound size={15} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="icon-button danger"
-                                                disabled={userBusy(user) ||
-                                                    adminRemovalDisabled(user)}
-                                                aria-label={`Delete ${user.username}`}
-                                                title="Delete user"
-                                                onclick={() => deleteManagedUser(user)}
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
+                                            <Tooltip text="Reset password" align="end">
+                                                <button
+                                                    type="button"
+                                                    class="icon-button"
+                                                    disabled={userBusy(user)}
+                                                    aria-label={`Reset password for ${user.username}`}
+                                                    onclick={() => beginPasswordReset(user)}
+                                                >
+                                                    <KeyRound size={15} />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip text="Delete user" align="end">
+                                                <button
+                                                    type="button"
+                                                    class="icon-button danger"
+                                                    disabled={userBusy(user) ||
+                                                        adminRemovalDisabled(user)}
+                                                    aria-label={`Delete ${user.username}`}
+                                                    onclick={() => deleteManagedUser(user)}
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </Tooltip>
                                         </div>
                                     </td>
                                 </tr>
@@ -442,6 +453,12 @@
         justify-content: flex-end;
         gap: 0.6rem;
         margin-top: 1rem;
+    }
+
+    .create-actions {
+        margin-top: 0.9rem;
+        padding-top: 0.85rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .button-inner,
@@ -593,6 +610,10 @@
         }
 
         .form-actions :global(.btn) {
+            width: 100%;
+        }
+
+        .create-actions :global(.panel-action-button) {
             width: 100%;
         }
     }

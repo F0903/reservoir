@@ -90,6 +90,36 @@ describe("users page", () => {
         expect(screen.getByText("builder")).toBeInTheDocument();
     });
 
+    it("requires a username and password before creating a user", async () => {
+        render(UsersPage);
+        await waitFor(() => expect(screen.getByText("operator")).toBeInTheDocument());
+
+        const createButton = screen.getByRole("button", { name: /create user/i });
+        expect(createButton).toBeDisabled();
+
+        await fireEvent.input(screen.getByLabelText("Username"), {
+            target: { value: "builder" },
+        });
+        expect(createButton).toBeDisabled();
+
+        await fireEvent.input(screen.getByLabelText("Initial Password"), {
+            target: { value: "generated-password" },
+        });
+        expect(createButton).toBeEnabled();
+    });
+
+    it("renames the password field when no forced password change is required", async () => {
+        render(UsersPage);
+        await waitFor(() => expect(screen.getByText("operator")).toBeInTheDocument());
+
+        expect(screen.getByLabelText("Initial Password")).toBeInTheDocument();
+
+        await fireEvent.click(screen.getByLabelText("Require Password Change"));
+
+        expect(screen.getByLabelText("Password")).toBeInTheDocument();
+        expect(screen.queryByLabelText("Initial Password")).not.toBeInTheDocument();
+    });
+
     it("promotes a regular user to admin", async () => {
         contextMocks.auth.updateUser.mockResolvedValue({ ...regularUser, is_admin: true });
         render(UsersPage);

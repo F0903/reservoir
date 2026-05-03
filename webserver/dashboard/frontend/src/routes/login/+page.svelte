@@ -51,11 +51,6 @@
             }
 
             log.debug("Login successful, redirecting...");
-            if (!user.is_admin) {
-                await goto(resolve("/dashboard/user"), { replaceState: true, invalidateAll: true });
-                return;
-            }
-
             let returnToBase = resolve("/");
             returnToBase += returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
             await goto(returnToBase, { replaceState: true, invalidateAll: true });

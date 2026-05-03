@@ -16,10 +16,9 @@ func (m *RequestsMetricsEndpoint) Path() string {
 func (m *RequestsMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:        "GET",
-			Func:          m.Get,
-			RequiresAuth:  true,
-			RequiresAdmin: true,
+			Method:       "GET",
+			Func:         m.Get,
+			RequiresAuth: true,
 		},
 	}
 }

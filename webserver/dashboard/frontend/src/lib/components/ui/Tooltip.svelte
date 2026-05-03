@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
+    import { onMount, type Snippet } from "svelte";
 
     let {
         text,
@@ -10,51 +10,138 @@
         align?: "start" | "center" | "end";
         children: Snippet;
     } = $props();
+
+    let trigger: HTMLSpanElement;
+    let open = $state(false);
+
+    onMount(() => {
+        trigger.addEventListener("focusin", showTooltip);
+        trigger.addEventListener("focusout", handleFocusOut);
+        trigger.addEventListener("keydown", handleKeydown);
+        trigger.addEventListener("pointerenter", showTooltip);
+        trigger.addEventListener("pointerleave", hideTooltip);
+
+        return () => {
+            trigger.removeEventListener("focusin", showTooltip);
+            trigger.removeEventListener("focusout", handleFocusOut);
+            trigger.removeEventListener("keydown", handleKeydown);
+            trigger.removeEventListener("pointerenter", showTooltip);
+            trigger.removeEventListener("pointerleave", hideTooltip);
+        };
+    });
+
+    $effect(() => {
+        if (!open) return;
+
+        updatePosition();
+        window.addEventListener("resize", updatePosition);
+        window.addEventListener("scroll", updatePosition, true);
+
+        return () => {
+            window.removeEventListener("resize", updatePosition);
+            window.removeEventListener("scroll", updatePosition, true);
+        };
+    });
+
+    function showTooltip() {
+        open = true;
+        updatePosition();
+    }
+
+    function hideTooltip() {
+        open = false;
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+        const nextTarget = event.relatedTarget;
+        if (nextTarget instanceof Node && trigger.contains(nextTarget)) {
+            return;
+        }
+
+        hideTooltip();
+    }
+
+    function handleKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            hideTooltip();
+        }
+    }
+
+    function updatePosition() {
+        if (!trigger) return;
+
+        const rect = trigger.getBoundingClientRect();
+        const anchorOffset = 10;
+        const top = rect.bottom + 7;
+        const labelLeft =
+            align === "start"
+                ? rect.left
+                : align === "end"
+                  ? rect.right
+                  : rect.left + rect.width / 2;
+        const arrowLeft =
+            align === "start"
+                ? rect.left + anchorOffset
+                : align === "end"
+                  ? rect.right - anchorOffset
+                  : rect.left + rect.width / 2;
+
+        trigger.style.setProperty("--tooltip-top", `${top}px`);
+        trigger.style.setProperty("--tooltip-left", `${labelLeft}px`);
+        trigger.style.setProperty("--tooltip-arrow-left", `${arrowLeft}px`);
+    }
 </script>
 
 <span
+    bind:this={trigger}
     class="tooltip"
     class:align-start={align === "start"}
     class:align-end={align === "end"}
-    data-tooltip={text}
 >
     {@render children()}
+    {#if open}
+        <span class="tooltip-arrow" aria-hidden="true"></span>
+        <span class="tooltip-label" aria-hidden="true">{text}</span>
+    {/if}
 </span>
 
 <style>
     .tooltip {
-        position: relative;
+        --tooltip-label-x: -50%;
         display: inline-grid;
         place-items: center;
     }
 
-    .tooltip::before,
-    .tooltip::after {
-        position: absolute;
-        top: calc(100% + 0.45rem);
-        left: 50%;
-        z-index: 100;
-        pointer-events: none;
-        opacity: 0;
-        transition:
-            opacity 120ms ease,
-            transform 120ms ease;
+    .tooltip.align-start {
+        --tooltip-label-x: 0;
     }
 
-    .tooltip::before {
-        content: "";
+    .tooltip.align-end {
+        --tooltip-label-x: -100%;
+    }
+
+    .tooltip-arrow,
+    .tooltip-label {
+        position: fixed;
+        top: var(--tooltip-top);
+        z-index: 100;
+        pointer-events: none;
+    }
+
+    .tooltip-arrow {
+        left: var(--tooltip-arrow-left);
         width: 0.45rem;
         height: 0.45rem;
         background-color: var(--primary-700);
         border-left: 1px solid rgba(255, 255, 255, 0.08);
         border-top: 1px solid rgba(255, 255, 255, 0.08);
-        transform: translate(-50%, -0.15rem) rotate(45deg);
+        animation: tooltip-arrow-in 120ms ease both;
     }
 
-    .tooltip::after {
-        content: attr(data-tooltip);
-        min-width: max-content;
-        max-width: 13rem;
+    .tooltip-label {
+        left: var(--tooltip-left);
+        width: max-content;
+        max-width: min(13rem, calc(100vw - 1rem));
         padding: 0.35rem 0.5rem;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 6px;
@@ -66,59 +153,30 @@
         line-height: 1.2;
         text-align: center;
         white-space: nowrap;
-        transform: translate(-50%, -0.15rem);
+        animation: tooltip-label-in 120ms ease both;
     }
 
-    .tooltip.align-start::before {
-        left: 0.65rem;
-        transform: translateY(-0.15rem) rotate(45deg);
+    @keyframes tooltip-arrow-in {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -0.15rem) rotate(45deg);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(-50%, 0) rotate(45deg);
+        }
     }
 
-    .tooltip.align-start::after {
-        left: 0;
-        transform: translateY(-0.15rem);
-    }
+    @keyframes tooltip-label-in {
+        from {
+            opacity: 0;
+            transform: translate(var(--tooltip-label-x), -0.15rem);
+        }
 
-    .tooltip.align-end::before {
-        left: auto;
-        right: 0.65rem;
-        transform: translateY(-0.15rem) rotate(45deg);
-    }
-
-    .tooltip.align-end::after {
-        left: auto;
-        right: 0;
-        transform: translateY(-0.15rem);
-    }
-
-    .tooltip:hover::before,
-    .tooltip:hover::after,
-    .tooltip:focus-within::before,
-    .tooltip:focus-within::after {
-        opacity: 1;
-    }
-
-    .tooltip:hover::before,
-    .tooltip:focus-within::before {
-        transform: translate(-50%, 0) rotate(45deg);
-    }
-
-    .tooltip:hover::after,
-    .tooltip:focus-within::after {
-        transform: translate(-50%, 0);
-    }
-
-    .tooltip.align-start:hover::before,
-    .tooltip.align-start:focus-within::before,
-    .tooltip.align-end:hover::before,
-    .tooltip.align-end:focus-within::before {
-        transform: translateY(0) rotate(45deg);
-    }
-
-    .tooltip.align-start:hover::after,
-    .tooltip.align-start:focus-within::after,
-    .tooltip.align-end:hover::after,
-    .tooltip.align-end:focus-within::after {
-        transform: translateY(0);
+        to {
+            opacity: 1;
+            transform: translate(var(--tooltip-label-x), 0);
+        }
     }
 </style>

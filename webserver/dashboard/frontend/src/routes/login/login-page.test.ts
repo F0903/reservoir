@@ -66,7 +66,7 @@ describe("login page", () => {
         });
     });
 
-    it("redirects non-admin users to their account page", async () => {
+    it("redirects non-admin users to the dashboard", async () => {
         contextMocks.auth.login.mockResolvedValue({
             id: 2,
             username: "operator",
@@ -87,7 +87,7 @@ describe("login page", () => {
         await user.type(screen.getByLabelText("Password"), "secret{Enter}");
 
         await waitFor(() =>
-            expect(goto).toHaveBeenCalledWith("/dashboard/user", {
+            expect(goto).toHaveBeenCalledWith("/dashboard", {
                 replaceState: true,
                 invalidateAll: true,
             }),

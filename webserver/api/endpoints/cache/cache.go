@@ -17,10 +17,9 @@ func (e *StatusEndpoint) Path() string {
 func (e *StatusEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 	return []apitypes.EndpointMethod{
 		{
-			Method:        http.MethodGet,
-			Func:          e.Get,
-			RequiresAuth:  true,
-			RequiresAdmin: true,
+			Method:       http.MethodGet,
+			Func:         e.Get,
+			RequiresAuth: true,
 		},
 	}
 }

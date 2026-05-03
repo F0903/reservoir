@@ -5,15 +5,16 @@
     import { page } from "$app/state";
     import Header from "$lib/components/layout/Header.svelte";
     import SideNav from "$lib/components/layout/SideNav.svelte";
-    import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
     import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
+    import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
+    import { userIsAdmin } from "$lib/auth/permissions";
     import { getAuthProvider } from "$lib/context";
     import { LayoutDashboard, Logs, Settings, UsersRound } from "@lucide/svelte";
 
     let { children } = $props();
 
     const auth = getAuthProvider();
-    const isAdmin = $derived(!!auth.user && auth.user.is_admin !== false);
+    const isAdmin = $derived(userIsAdmin(auth.user));
     let isMenuOpen = $state(false);
 
     $effect(() => {
@@ -21,9 +22,9 @@
             return;
         }
 
-        const userPath = resolve("/dashboard/user");
-        if (page.url.pathname !== userPath) {
-            void goto(userPath, { replaceState: true });
+        const dashboardPath = resolve("/dashboard");
+        if (isAdminRoute(page.url.pathname)) {
+            void goto(dashboardPath, { replaceState: true });
         }
     });
 
@@ -34,24 +35,36 @@
     function closeMenu() {
         isMenuOpen = false;
     }
+
+    function isAdminRoute(pathname: string) {
+        return [resolve("/dashboard/settings"), resolve("/dashboard/users")].some((path) =>
+            isPathWithin(pathname, path),
+        );
+    }
+
+    function isPathWithin(pathname: string, root: string) {
+        return pathname === root || pathname.startsWith(`${root}/`);
+    }
 </script>
 
-<div class="layout-grid" class:no-sidenav={!isAdmin}>
+<div class="layout-grid" class:no-sidenav={!auth.user}>
     <div class="header-area">
         <Header onToggleMenu={toggleMenu} />
     </div>
-    {#if isAdmin}
+    {#if auth.user}
         <div class="sidenav-area" class:open={isMenuOpen}>
             <SideNav>
                 <SideNavButton url="/dashboard" onClick={closeMenu}>
                     <LayoutDashboard />Dashboard
                 </SideNavButton>
-                <SideNavButton url="/dashboard/settings" onClick={closeMenu}>
-                    <Settings />Settings
-                </SideNavButton>
-                <SideNavButton url="/dashboard/users" onClick={closeMenu}>
-                    <UsersRound />Users
-                </SideNavButton>
+                {#if isAdmin}
+                    <SideNavButton url="/dashboard/settings" onClick={closeMenu}>
+                        <Settings />Settings
+                    </SideNavButton>
+                    <SideNavButton url="/dashboard/users" onClick={closeMenu}>
+                        <UsersRound />Users
+                    </SideNavButton>
+                {/if}
                 <SideNavButton url="/dashboard/log" onClick={closeMenu}>
                     <Logs />Log
                 </SideNavButton>
@@ -59,7 +72,7 @@
         </div>
     {/if}
 
-    {#if isAdmin && isMenuOpen}
+    {#if auth.user && isMenuOpen}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="menu-backdrop" onclick={closeMenu}></div>

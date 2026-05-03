@@ -46,20 +46,20 @@ describe("Header", () => {
         expect(screen.getByLabelText("Administrator")).toBeInTheDocument();
     });
 
-    it("shows the admin badge when the backend has not sent role metadata yet", () => {
-        delete (contextMocks.auth.user as { is_admin?: boolean }).is_admin;
-
-        render(Header);
-
-        expect(screen.getByLabelText("Administrator")).toBeInTheDocument();
-    });
-
     it("hides the admin badge for non-admin users", () => {
         contextMocks.auth.user.is_admin = false;
 
         render(Header);
 
         expect(screen.queryByLabelText("Administrator")).not.toBeInTheDocument();
+    });
+
+    it("shows the menu toggle for non-admin users when navigation is available", () => {
+        contextMocks.auth.user.is_admin = false;
+
+        render(Header, { props: { onToggleMenu: vi.fn() } });
+
+        expect(screen.getByLabelText("Toggle menu")).toBeInTheDocument();
     });
 
     it("opens the user page from the header user button", async () => {

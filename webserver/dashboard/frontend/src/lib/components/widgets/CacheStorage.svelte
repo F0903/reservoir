@@ -1,8 +1,9 @@
 <script lang="ts">
     import { clearCache } from "$lib/api/objects/cache/cache";
+    import { userIsAdmin } from "$lib/auth/permissions";
     import Loadable from "$lib/components/ui/Loadable.svelte";
     import Tooltip from "$lib/components/ui/Tooltip.svelte";
-    import { getMetricsProvider, getToastProvider } from "$lib/context";
+    import { getAuthProvider, getMetricsProvider, getToastProvider } from "$lib/context";
     import { formatBytesToLargest } from "$lib/utils/bytestring";
     import { log } from "$lib/utils/logger";
     import { Database, HardDrive, MemoryStick, RefreshCw, Trash2 } from "@lucide/svelte";
@@ -10,6 +11,7 @@
     import CapacityMetricCard from "./utils/CapacityMetricCard.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
 
+    const auth = getAuthProvider();
     const metrics = getMetricsProvider();
     const toast = getToastProvider();
 
@@ -22,6 +24,15 @@
     );
     const error = $derived(metrics.error ?? missingStorageError);
     const loading = $derived(metrics.loading);
+    const isAdmin = $derived(userIsAdmin(auth.user));
+    const clearDisabled = $derived(!isAdmin || loading || clearing || (status?.entries ?? 0) === 0);
+    const clearTooltip = $derived(
+        !isAdmin
+            ? "Administrator access required"
+            : (status?.entries ?? 0) === 0
+              ? "Cache is empty"
+              : "Clear cache",
+    );
 
     const activeLimitBytes = $derived(
         status
@@ -35,6 +46,10 @@
     );
 
     async function clearCurrentCache() {
+        if (!isAdmin) {
+            toast.error("Administrator access required.");
+            return;
+        }
         if (!window.confirm("Clear cached package data?")) {
             return;
         }
@@ -56,14 +71,11 @@
 <Widget title="Cache Storage">
     {#snippet headerControls()}
         <div class="header-toolbar" aria-label="Cache storage actions">
-            <Tooltip
-                text={(status?.entries ?? 0) === 0 ? "Cache is empty" : "Clear cache"}
-                align="end"
-            >
+            <Tooltip text={clearTooltip} align="end">
                 <button
                     class="tool-button danger"
                     onclick={clearCurrentCache}
-                    disabled={loading || clearing || (status?.entries ?? 0) === 0}
+                    disabled={clearDisabled}
                     aria-label="Clear cache"
                 >
                     {#if clearing}
