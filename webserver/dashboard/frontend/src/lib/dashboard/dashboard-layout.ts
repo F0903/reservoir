@@ -81,6 +81,10 @@ export type DashboardWidgetLayout = {
     position?: DashboardGridPosition;
 };
 
+type PositionedDashboardWidgetLayout = DashboardWidgetLayout & {
+    position: DashboardGridPosition;
+};
+
 const minSpan = 1;
 const maxSpan = 8;
 
@@ -185,6 +189,10 @@ function occupiedCellKey(column: number, row: number) {
     return `${column}:${row}`;
 }
 
+function hasGridPosition(widget: DashboardWidgetLayout): widget is PositionedDashboardWidgetLayout {
+    return Boolean(widget.position);
+}
+
 function canPlaceWidget(
     occupiedCells: Set<string>,
     position: DashboardGridPosition,
@@ -221,12 +229,10 @@ function occupyWidgetCells(
 }
 
 function widgetContainsCell(
-    widget: DashboardWidgetLayout,
+    widget: PositionedDashboardWidgetLayout,
     cell: DashboardGridPosition,
     columns: number,
 ) {
-    if (!widget.position) return false;
-
     const width = effectiveSpanWidth(widget.span, columns);
 
     return (
@@ -325,19 +331,19 @@ function nonCascadingDashboardPlacement(
     position: DashboardGridPosition,
     columns: number,
 ) {
-    const stationaryWidgets = layout.filter((item) => item.id !== widget.id);
-    const widgetOverlaps = stationaryWidgets.filter(
-        (item) =>
-            item.position &&
-            widgetsOverlap(position, widget.span, item.position, item.span, columns),
+    const stationaryWidgets = layout
+        .filter((item) => item.id !== widget.id)
+        .filter(hasGridPosition);
+    const overlappingWidgets = stationaryWidgets.filter((item) =>
+        widgetsOverlap(position, widget.span, item.position, item.span, columns),
     );
     const hoveredWidget = stationaryWidgets.find((item) =>
         widgetContainsCell(item, position, columns),
     );
     const displacedWidget =
-        hoveredWidget ?? (widgetOverlaps.length === 1 ? widgetOverlaps[0] : undefined);
+        hoveredWidget ?? (overlappingWidgets.length === 1 ? overlappingWidgets[0] : undefined);
 
-    if (widgetOverlaps.some((item) => item.id !== displacedWidget?.id)) {
+    if (overlappingWidgets.some((item) => item.id !== displacedWidget?.id)) {
         return layout;
     }
 
@@ -347,7 +353,6 @@ function nonCascadingDashboardPlacement(
 
     for (const item of stationaryWidgets) {
         if (item.id === displacedWidget?.id) continue;
-        if (!item.position) continue;
 
         placed.push(item);
         occupyWidgetCells(occupiedCells, item.position, item.span, columns);

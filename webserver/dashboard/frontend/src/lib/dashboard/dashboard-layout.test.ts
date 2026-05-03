@@ -5,6 +5,7 @@ import {
     packDashboardLayout,
     placeDashboardWidget,
     setDashboardWidgetSpan,
+    type DashboardWidgetId,
     type DashboardWidgetLayout,
 } from "./dashboard-layout";
 
@@ -37,6 +38,14 @@ function smallPositionedLayout(): DashboardWidgetLayout[] {
         span: { width: 2, height: 2 },
         position: { column: 1, row: 20 + index * 3 },
     })) as DashboardWidgetLayout[];
+}
+
+function expectWidgetPosition(
+    layout: DashboardWidgetLayout[],
+    id: DashboardWidgetId,
+    position: { column: number; row: number },
+) {
+    expect(layout.find((widget) => widget.id === id)?.position).toEqual(position);
 }
 
 describe("dashboard layout", () => {
@@ -127,18 +136,9 @@ describe("dashboard layout", () => {
             8,
         );
 
-        expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
-            column: 3,
-            row: 1,
-        });
-        expect(layout.find((widget) => widget.id === "cache-latency")?.position).toEqual({
-            column: 1,
-            row: 1,
-        });
-        expect(layout.find((widget) => widget.id === "request-latency")?.position).toEqual({
-            column: 5,
-            row: 1,
-        });
+        expectWidgetPosition(layout, "cache-efficiency", { column: 3, row: 1 });
+        expectWidgetPosition(layout, "cache-latency", { column: 1, row: 1 });
+        expectWidgetPosition(layout, "request-latency", { column: 5, row: 1 });
         occupiedCells(layout, 8);
     });
 
@@ -160,18 +160,9 @@ describe("dashboard layout", () => {
             8,
         );
 
-        expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
-            column: 1,
-            row: 10,
-        });
-        expect(layout.find((widget) => widget.id === "cache-latency")?.position).toEqual({
-            column: 1,
-            row: 1,
-        });
-        expect(layout.find((widget) => widget.id === "request-latency")?.position).toEqual({
-            column: 3,
-            row: 1,
-        });
+        expectWidgetPosition(layout, "cache-efficiency", { column: 1, row: 10 });
+        expectWidgetPosition(layout, "cache-latency", { column: 1, row: 1 });
+        expectWidgetPosition(layout, "request-latency", { column: 3, row: 1 });
         occupiedCells(layout, 8);
     });
 
@@ -189,10 +180,7 @@ describe("dashboard layout", () => {
             8,
         );
 
-        expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
-            column: 3,
-            row: 2,
-        });
+        expectWidgetPosition(layout, "cache-efficiency", { column: 3, row: 2 });
         occupiedCells(layout, 8);
     });
 });
