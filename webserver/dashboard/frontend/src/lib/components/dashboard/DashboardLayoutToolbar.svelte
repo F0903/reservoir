@@ -17,15 +17,20 @@
         onReset: () => void;
         onSave: () => void;
     } = $props();
+
+    const refreshDisabled = $derived(refreshing || editing);
+    const refreshTooltip = $derived(
+        editing ? "Save layout before refreshing metrics" : "Refresh dashboard metrics",
+    );
 </script>
 
 <div class="dashboard-toolbar" aria-label="Dashboard layout controls">
     {#if onRefresh}
-        <Tooltip text="Refresh dashboard metrics" align="end">
+        <Tooltip text={refreshTooltip} align="end">
             <button
                 class="dashboard-action"
                 onclick={onRefresh}
-                disabled={refreshing}
+                disabled={refreshDisabled}
                 aria-label="Refresh dashboard metrics"
             >
                 <RefreshCw size={15} class={refreshing ? "spin" : ""} />

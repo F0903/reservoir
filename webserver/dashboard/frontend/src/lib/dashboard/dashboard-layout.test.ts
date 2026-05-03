@@ -31,6 +31,14 @@ function occupiedCells(layout: DashboardWidgetLayout[], columns: number) {
     return cells;
 }
 
+function smallPositionedLayout(): DashboardWidgetLayout[] {
+    return defaultDashboardLayout().map((item, index) => ({
+        ...item,
+        span: { width: 2, height: 2 },
+        position: { column: 1, row: 20 + index * 3 },
+    })) as DashboardWidgetLayout[];
+}
+
 describe("dashboard layout", () => {
     it("returns a complete default layout", () => {
         const layout = defaultDashboardLayout();
@@ -103,24 +111,79 @@ describe("dashboard layout", () => {
         occupiedCells(layout, 8);
     });
 
-    it("places a dragged widget at the requested grid cell and packs other widgets around it", () => {
+    it("moves only the widget occupying the requested grid cell", () => {
+        const initialLayout = smallPositionedLayout().map((item) => {
+            if (item.id === "cache-efficiency") return { ...item, position: { column: 1, row: 1 } };
+            if (item.id === "cache-latency") return { ...item, position: { column: 3, row: 1 } };
+            if (item.id === "request-latency") return { ...item, position: { column: 5, row: 1 } };
+
+            return item;
+        });
+
         const layout = placeDashboardWidget(
-            defaultDashboardLayout().slice(0, 5),
-            "response-status",
-            { column: 2, row: 2 },
+            initialLayout,
+            "cache-efficiency",
+            { column: 3, row: 1 },
             8,
         );
 
-        expect(layout.find((widget) => widget.id === "response-status")?.position).toEqual({
-            column: 2,
-            row: 2,
+        expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
+            column: 3,
+            row: 1,
+        });
+        expect(layout.find((widget) => widget.id === "cache-latency")?.position).toEqual({
+            column: 1,
+            row: 1,
+        });
+        expect(layout.find((widget) => widget.id === "request-latency")?.position).toEqual({
+            column: 5,
+            row: 1,
+        });
+        occupiedCells(layout, 8);
+    });
+
+    it("does not move widgets when a dragged widget would require cascading displacement", () => {
+        const initialLayout = smallPositionedLayout().map((item) => {
+            if (item.id === "cache-efficiency") {
+                return { ...item, span: { width: 4, height: 2 }, position: { column: 1, row: 10 } };
+            }
+            if (item.id === "cache-latency") return { ...item, position: { column: 1, row: 1 } };
+            if (item.id === "request-latency") return { ...item, position: { column: 3, row: 1 } };
+
+            return item;
+        }) as DashboardWidgetLayout[];
+
+        const layout = placeDashboardWidget(
+            initialLayout,
+            "cache-efficiency",
+            { column: 1, row: 1 },
+            8,
+        );
+
+        expect(layout.find((widget) => widget.id === "cache-efficiency")?.position).toEqual({
+            column: 1,
+            row: 10,
+        });
+        expect(layout.find((widget) => widget.id === "cache-latency")?.position).toEqual({
+            column: 1,
+            row: 1,
+        });
+        expect(layout.find((widget) => widget.id === "request-latency")?.position).toEqual({
+            column: 3,
+            row: 1,
         });
         occupiedCells(layout, 8);
     });
 
     it("clamps placed widgets to the available column range", () => {
+        const initialLayout = smallPositionedLayout().map((item) =>
+            item.id === "cache-efficiency"
+                ? { ...item, span: { width: 6, height: 2 }, position: { column: 1, row: 1 } }
+                : item,
+        ) as DashboardWidgetLayout[];
+
         const layout = placeDashboardWidget(
-            defaultDashboardLayout().slice(0, 3),
+            initialLayout,
             "cache-efficiency",
             { column: 16, row: 2 },
             8,

@@ -220,6 +220,41 @@ function occupyWidgetCells(
     }
 }
 
+function widgetContainsCell(
+    widget: DashboardWidgetLayout,
+    cell: DashboardGridPosition,
+    columns: number,
+) {
+    if (!widget.position) return false;
+
+    const width = effectiveSpanWidth(widget.span, columns);
+
+    return (
+        cell.column >= widget.position.column &&
+        cell.column < widget.position.column + width &&
+        cell.row >= widget.position.row &&
+        cell.row < widget.position.row + widget.span.height
+    );
+}
+
+function widgetsOverlap(
+    aPosition: DashboardGridPosition,
+    aSpan: DashboardSpan,
+    bPosition: DashboardGridPosition,
+    bSpan: DashboardSpan,
+    columns: number,
+) {
+    const aWidth = effectiveSpanWidth(aSpan, columns);
+    const bWidth = effectiveSpanWidth(bSpan, columns);
+
+    return (
+        aPosition.column < bPosition.column + bWidth &&
+        aPosition.column + aWidth > bPosition.column &&
+        aPosition.row < bPosition.row + bSpan.height &&
+        aPosition.row + aSpan.height > bPosition.row
+    );
+}
+
 function findFirstAvailablePosition(
     occupiedCells: Set<string>,
     span: DashboardSpan,
@@ -284,6 +319,55 @@ function packNormalizedDashboardLayout(
     return packed.sort(compareLayoutPosition);
 }
 
+function nonCascadingDashboardPlacement(
+    layout: DashboardWidgetLayout[],
+    widget: DashboardWidgetLayout,
+    position: DashboardGridPosition,
+    columns: number,
+) {
+    const stationaryWidgets = layout.filter((item) => item.id !== widget.id);
+    const widgetOverlaps = stationaryWidgets.filter(
+        (item) =>
+            item.position &&
+            widgetsOverlap(position, widget.span, item.position, item.span, columns),
+    );
+    const hoveredWidget = stationaryWidgets.find((item) =>
+        widgetContainsCell(item, position, columns),
+    );
+    const displacedWidget =
+        hoveredWidget ?? (widgetOverlaps.length === 1 ? widgetOverlaps[0] : undefined);
+
+    if (widgetOverlaps.some((item) => item.id !== displacedWidget?.id)) {
+        return layout;
+    }
+
+    const occupiedCells = new Set<string>();
+    const placed: DashboardWidgetLayout[] = [];
+    const placedWidget = { ...widget, position };
+
+    for (const item of stationaryWidgets) {
+        if (item.id === displacedWidget?.id) continue;
+        if (!item.position) continue;
+
+        placed.push(item);
+        occupyWidgetCells(occupiedCells, item.position, item.span, columns);
+    }
+
+    placed.push(placedWidget);
+    occupyWidgetCells(occupiedCells, position, widget.span, columns);
+
+    if (displacedWidget) {
+        const displacedPosition = findFirstAvailablePosition(
+            occupiedCells,
+            displacedWidget.span,
+            columns,
+        );
+        placed.push({ ...displacedWidget, position: displacedPosition });
+    }
+
+    return placed.sort(compareLayoutPosition);
+}
+
 export function defaultDashboardLayout(): DashboardWidgetLayout[] {
     return dashboardWidgetDefinitions.map(cloneLayoutItem);
 }
@@ -341,21 +425,17 @@ export function placeDashboardWidget(
     position: DashboardGridPosition,
     columns: number,
 ): DashboardWidgetLayout[] {
-    const normalized = normalizeDashboardLayout(layout);
+    const gridColumns = clampColumns(columns);
+    const normalized = packNormalizedDashboardLayout(normalizeDashboardLayout(layout), gridColumns);
     const widget = normalized.find((item) => item.id === id);
 
     if (!widget) {
-        return packNormalizedDashboardLayout(normalized, columns);
+        return normalized;
     }
 
-    const gridColumns = clampColumns(columns);
-    const positioned = normalized.map((item) =>
-        item.id === id
-            ? { ...item, position: clampWidgetPosition(position, item.span, gridColumns) }
-            : item,
-    );
+    const nextPosition = clampWidgetPosition(position, widget.span, gridColumns);
 
-    return packNormalizedDashboardLayout(positioned, gridColumns, id);
+    return nonCascadingDashboardPlacement(normalized, widget, nextPosition, gridColumns);
 }
 
 export function setDashboardWidgetSpan(

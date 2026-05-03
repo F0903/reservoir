@@ -36,4 +36,18 @@ describe("DashboardLayoutToolbar", () => {
 
         expect(screen.getByRole("button", { name: "Refresh dashboard metrics" })).toBeDisabled();
     });
+
+    it("disables dashboard refresh while editing the layout", () => {
+        render(DashboardLayoutToolbar, {
+            props: {
+                editing: true,
+                onEdit: noop,
+                onRefresh: noop,
+                onReset: noop,
+                onSave: noop,
+            },
+        });
+
+        expect(screen.getByRole("button", { name: "Refresh dashboard metrics" })).toBeDisabled();
+    });
 });

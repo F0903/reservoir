@@ -276,42 +276,48 @@
     }
 </script>
 
-<DashboardLayoutToolbar
-    {editing}
-    {refreshing}
-    onEdit={() => (editing = true)}
-    {onRefresh}
-    onReset={resetLayout}
-    onSave={() => (editing = false)}
-/>
+<div class="layout-editor">
+    <DashboardLayoutToolbar
+        {editing}
+        {refreshing}
+        onEdit={() => (editing = true)}
+        {onRefresh}
+        onReset={resetLayout}
+        onSave={() => (editing = false)}
+    />
 
-<SquaredGrid {elements} {gap}>
-    {#snippet children(element)}
-        {@const Comp = element.Comp}
-        <div
-            class="widget-shell"
-            class:editing
-            class:dragging={draggingWidgetId === element.id}
-            class:resizing={resizingWidgetId === element.id}
-            data-dashboard-widget-id={element.id}
-        >
-            <Comp />
-            {#if editing}
-                <DashboardWidgetEditorControls
-                    {element}
-                    onDragStart={startWidgetDrag}
-                    onResizeStart={startResize}
-                />
-            {/if}
-        </div>
-    {/snippet}
-</SquaredGrid>
+    <SquaredGrid {elements} {gap}>
+        {#snippet children(element)}
+            {@const Comp = element.Comp}
+            <div
+                class="widget-shell"
+                class:editing
+                class:dragging={draggingWidgetId === element.id}
+                class:resizing={resizingWidgetId === element.id}
+                data-dashboard-widget-id={element.id}
+            >
+                <Comp />
+                {#if editing}
+                    <DashboardWidgetEditorControls
+                        {element}
+                        onDragStart={startWidgetDrag}
+                        onResizeStart={startResize}
+                    />
+                {/if}
+            </div>
+        {/snippet}
+    </SquaredGrid>
+</div>
 
 {#if dragGhost}
     <DashboardDragGhost ghost={dragGhost} />
 {/if}
 
 <style>
+    .layout-editor {
+        overflow-anchor: none;
+    }
+
     .widget-shell {
         position: relative;
         width: 100%;
