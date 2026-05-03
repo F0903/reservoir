@@ -49,8 +49,8 @@ export const dashboardWidgetDefinitions = [
     {
         id: "data-transfer",
         label: "Data Transfer",
-        span: { width: 4, height: 6 },
-        mobileSpan: { height: 6 },
+        span: { width: 4, height: 5 },
+        mobileSpan: { height: 5 },
     },
     {
         id: "process-info",
@@ -67,7 +67,7 @@ export const dashboardWidgetDefinitions = [
     {
         id: "cache-storage",
         label: "Cache Storage",
-        span: { width: 4, height: 4 },
+        span: { width: 5, height: 4 },
         mobileSpan: { width: 4, height: 4 },
     },
 ] as const satisfies readonly DashboardWidgetDefinition[];
