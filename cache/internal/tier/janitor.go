@@ -1,10 +1,11 @@
-package cache
+package tier
 
 import (
 	"cmp"
 	"context"
 	"iter"
 	"log/slog"
+	"reservoir/cache"
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/bytesize"
@@ -14,32 +15,34 @@ import (
 	"time"
 )
 
-type cacheFunctions[MetadataT any] struct {
-	cacheIterator iter.Seq2[CacheKey, *EntryMetadata[MetadataT]]
-	removeEntry   func(key CacheKey) error
-	getCacheSize  func() int64
-	getCacheLen   func() int
-	getLock       func(key CacheKey) *sync.RWMutex
+type Functions[MetadataT any] struct {
+	Iterate iter.Seq2[cache.CacheKey, *cache.EntryMetadata[MetadataT]]
+	Remove  func(key cache.CacheKey) error
+	Size    func() int64
+	Len     func() int
+	Lock    func(key cache.CacheKey) *sync.RWMutex
 }
 
-type cacheJanitor[MetadataT any] struct {
+type Janitor[MetadataT any] struct {
 	stopChan        chan struct{}
 	intervalChanged chan time.Duration
 	interval        time.Duration
 	running         bool
 
-	cacheFns cacheFunctions[MetadataT]
-	subs     config.ConfigSubscriber
-	cfg      *config.Config
+	functions             Functions[MetadataT]
+	trackAggregateMetrics bool
+	subs                  config.ConfigSubscriber
+	cfg                   *config.Config
 }
 
-func newCacheJanitor[MetadataT any](cfg *config.Config, interval time.Duration, cacheFns cacheFunctions[MetadataT]) *cacheJanitor[MetadataT] {
-	j := &cacheJanitor[MetadataT]{
-		stopChan:        make(chan struct{}),
-		intervalChanged: make(chan time.Duration, 1),
-		interval:        interval,
-		cacheFns:        cacheFns,
-		cfg:             cfg,
+func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions Functions[MetadataT], trackAggregateMetrics bool) *Janitor[MetadataT] {
+	j := &Janitor[MetadataT]{
+		stopChan:              make(chan struct{}),
+		intervalChanged:       make(chan time.Duration, 1),
+		interval:              interval,
+		functions:             functions,
+		trackAggregateMetrics: trackAggregateMetrics,
+		cfg:                   cfg,
 	}
 
 	j.subs.Add(cfg.Cache.CleanupInterval.OnChange(func(newInterval duration.Duration) {
@@ -50,7 +53,7 @@ func newCacheJanitor[MetadataT any](cfg *config.Config, interval time.Duration, 
 	return j
 }
 
-func (j *cacheJanitor[MetadataT]) updateInterval(newInterval time.Duration) {
+func (j *Janitor[MetadataT]) updateInterval(newInterval time.Duration) {
 	select {
 	case j.intervalChanged <- newInterval:
 		return
@@ -68,7 +71,7 @@ func (j *cacheJanitor[MetadataT]) updateInterval(newInterval time.Duration) {
 	}
 }
 
-func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
+func (j *Janitor[MetadataT]) Start(ctx context.Context) {
 	if j.running {
 		return
 	}
@@ -85,7 +88,9 @@ func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
 				slog.Info("Running cache cleanup cycle...")
 				j.cleanExpiredEntries()
 				j.ensureCacheSize()
-				metrics.Global.Cache.CleanupRuns.Increment()
+				if j.trackAggregateMetrics {
+					metrics.Global.Cache.CleanupRuns.Increment()
+				}
 				slog.Info("Cache cleanup cycle complete")
 			case newInterval := <-j.intervalChanged:
 				j.interval = newInterval
@@ -102,7 +107,7 @@ func (j *cacheJanitor[MetadataT]) start(ctx context.Context) {
 	}()
 }
 
-func (j *cacheJanitor[MetadataT]) stop() {
+func (j *Janitor[MetadataT]) Stop() {
 	if !j.running {
 		return
 	}
@@ -113,14 +118,14 @@ func (j *cacheJanitor[MetadataT]) stop() {
 	close(j.stopChan)
 }
 
-func (j *cacheJanitor[MetadataT]) cleanExpiredEntries() {
+func (j *Janitor[MetadataT]) cleanExpiredEntries() {
 	slog.Info("Cleaning up expired cache entries")
 
-	startCacheSize := j.cacheFns.getCacheSize()
+	startCacheSize := j.functions.Size()
 
-	keysToRemove := make([]CacheKey, 0)
+	keysToRemove := make([]cache.CacheKey, 0)
 
-	for key, meta := range j.cacheFns.cacheIterator {
+	for key, meta := range j.functions.Iterate {
 		expired := meta.Expires.Before(time.Now())
 
 		if !expired {
@@ -134,14 +139,14 @@ func (j *cacheJanitor[MetadataT]) cleanExpiredEntries() {
 	for _, key := range keysToRemove {
 		slog.Info("Removing expired cache entry for key", "key", key.Hex)
 
-		lock := j.cacheFns.getLock(key)
+		lock := j.functions.Lock(key)
 		locked := lock.TryLock()
 		if !locked {
 			slog.Info("Failed to acquire lock for key", "key", key.Hex)
 			continue
 		}
 
-		if err := j.cacheFns.removeEntry(key); err != nil {
+		if err := j.functions.Remove(key); err != nil {
 			lock.Unlock()
 			slog.Info("Failed to remove expired cache entry for key", "key", key.Hex, "error", err)
 			continue
@@ -151,25 +156,27 @@ func (j *cacheJanitor[MetadataT]) cleanExpiredEntries() {
 		slog.Info("Removed expired cache entry for key", "key", key.Hex)
 	}
 
-	endCacheSize := j.cacheFns.getCacheSize()
-	metrics.Global.Cache.BytesCached.Set(endCacheSize)
-	metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+	endCacheSize := j.functions.Size()
+	if j.trackAggregateMetrics {
+		metrics.Global.Cache.BytesCached.Set(endCacheSize)
+		metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+	}
 
 	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
 }
 
 // Evict entries until 80% of maxCacheBytes is reached
-func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
+func (j *Janitor[MetadataT]) Evict(maxCacheBytes int64) {
 	type entryForEviction struct {
-		key      CacheKey
-		meta     *EntryMetadata[MetadataT]
-		priority int64 // Lower = evict first
+		key      cache.CacheKey
+		meta     *cache.EntryMetadata[MetadataT]
+		priority int64 // Higher = evict first
 	}
 
-	candidates := make([]entryForEviction, 0, j.cacheFns.getCacheLen())
+	candidates := make([]entryForEviction, 0, j.functions.Len())
 	now := time.Now()
 
-	for key, meta := range j.cacheFns.cacheIterator {
+	for key, meta := range j.functions.Iterate {
 		timeSinceAccess := now.Sub(meta.LastAccess).Milliseconds()
 		sizeWeight := meta.Size / bytesize.UnitM
 
@@ -192,20 +199,20 @@ func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
 	// Evict entries until we're under the limit
 	targetSize := int64(float64(maxCacheBytes) * 0.8) // Evict to 80% to avoid thrashing
 
-	startCacheSize := j.cacheFns.getCacheSize()
+	startCacheSize := j.functions.Size()
 
 	slog.Info("Target size for eviction", "target_size", bytesize.ByteSize(targetSize))
 	evictions := 0
 	for _, candidate := range candidates {
-		if j.cacheFns.getCacheSize() <= targetSize {
+		if j.functions.Size() <= targetSize {
 			break
 		}
 
-		lock := j.cacheFns.getLock(candidate.key)
+		lock := j.functions.Lock(candidate.key)
 		if lock.TryLock() {
 			slog.Info("Evicting cache entry", "key", candidate.key.Hex, "size", candidate.meta.Size, "last_access", candidate.meta.LastAccess)
 
-			if err := j.cacheFns.removeEntry(candidate.key); err != nil {
+			if err := j.functions.Remove(candidate.key); err != nil {
 				slog.Info("Failed to evict cache entry", "key", candidate.key.Hex, "error", err)
 			} else {
 				metrics.Global.Cache.CacheEvictions.Increment()
@@ -218,21 +225,23 @@ func (j *cacheJanitor[MetadataT]) evict(maxCacheBytes int64) {
 		}
 	}
 
-	endCacheSize := j.cacheFns.getCacheSize()
-	metrics.Global.Cache.BytesCached.Set(endCacheSize)
-	metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+	endCacheSize := j.functions.Size()
+	if j.trackAggregateMetrics {
+		metrics.Global.Cache.BytesCached.Set(endCacheSize)
+		metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+	}
 
 	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)
 }
 
-func (j *cacheJanitor[MetadataT]) ensureCacheSize() {
+func (j *Janitor[MetadataT]) ensureCacheSize() {
 	maxCacheSize := j.cfg.Cache.MaxCacheSize.Read().Bytes()
-	startCacheSize := j.cacheFns.getCacheSize()
+	startCacheSize := j.functions.Size()
 	if startCacheSize < maxCacheSize {
 		return
 	}
 
 	slog.Info("Cache size exceeds limit, starting eviction", "byte_size", startCacheSize, "max_cache_size", maxCacheSize)
 
-	j.evict(maxCacheSize)
+	j.Evict(maxCacheSize)
 }

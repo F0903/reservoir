@@ -152,8 +152,9 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 
 	var bytesRead int
 	reader := countingreader.New(resp.Body, &bytesRead)
+	cacheReader := cache.WithSizeHint(reader, resp.ContentLength)
 
-	cached, err = f.cache.Cache(storeKey, reader, decision.Expires, cachedRequestInfo{
+	cached, err = f.cache.Cache(storeKey, cacheReader, decision.Expires, cachedRequestInfo{
 		ETag:         etag,
 		LastModified: lastModified,
 		Header:       resp.Header,

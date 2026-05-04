@@ -94,10 +94,11 @@ These defaults are intentional for package-cache deployments. If you need strict
 
 ### Cache Backends
 
-Reservoir supports two cache backends:
+Reservoir supports three cache backends:
 
 - `cache.type = "memory"` keeps cached responses in process memory. This is the default and is best for short-lived burst caching where the proxy only needs to coalesce many package-manager requests that happen close together.
 - `cache.type = "file"` stores cached response bodies under `cache.file.dir`. This is useful when cached package responses may be larger than the memory budget or when short restart continuity is useful.
+- `cache.type = "hybrid"` keeps new and recently accessed responses in memory first, then demotes entries that have not been accessed for `cache.hybrid.demote_after` to the file cache. A later file-cache hit is promoted back into memory when it fits. This keeps bursty package-manager traffic fast while still giving colder entries short restart continuity.
 
 The file cache writes metadata sidecars next to cached response bodies. On startup, Reservoir loads sidecars only when the matching cached body still exists, the body is non-empty, and the cached response has not expired. Expired, corrupt, or orphaned cache files are discarded. This preserves useful restart continuity without turning the proxy into a long-lived package repository.
 
@@ -126,10 +127,11 @@ The command-line arguments currently available are the following:
 
 Other cache settings are currently configured through `var/config.json` or the dashboard rather than command-line flags. The most important ones are:
 
-- `cache.type` - `memory` or `file`.
+- `cache.type` - `memory`, `file`, or `hybrid`.
 - `cache.max_cache_size` - Maximum total cache size.
 - `cache.cleanup_interval` - How often expired entries and over-budget cache data are cleaned up.
 - `cache.memory.memory_budget_percent` - Memory-cache budget as a percentage of total system memory.
+- `cache.hybrid.demote_after` - How long an entry can sit in hybrid memory storage without access before being moved to file storage.
 - `proxy.cache_policy.ignore_cache_control` - Whether to ignore upstream cache-control directives.
 - `proxy.cache_policy.force_default_max_age` - Whether to always use Reservoir's configured default freshness lifetime.
 - `proxy.cache_policy.default_max_age` - The fallback/default freshness lifetime for cached responses.

@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrCacheEntryNotFound = errors.New("cache entry not found")
+	ErrCacheEntryNotFound  = errors.New("cache entry not found")
+	ErrCacheMemoryExceeded = errors.New("cache memory exceeded")
 )
 
 type Cache[MetadataT any] interface {

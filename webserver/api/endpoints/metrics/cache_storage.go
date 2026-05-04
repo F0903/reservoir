@@ -21,7 +21,7 @@ func collectCacheStorage(ctx apitypes.Context) {
 		MaxBytes: stats.MaxBytes,
 	}
 
-	if cacheType == config.CacheTypeMemory {
+	if cacheType == config.CacheTypeMemory || cacheType == config.CacheTypeHybrid {
 		memoryCapBytes := stats.MemoryCapBytes
 		storage.MemoryCapBytes = &memoryCapBytes
 	}

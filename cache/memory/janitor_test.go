@@ -1,7 +1,8 @@
-package cache
+package memory
 
 import (
 	"bytes"
+	"reservoir/cache"
 	"reservoir/config"
 	"reservoir/utils/bytesize"
 	"testing"
@@ -14,10 +15,10 @@ func TestCache_JanitorCleanup(t *testing.T) {
 
 	// Use very short cleanup interval for testing
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](cfg, 1, cfg.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
+	c := New[TestMeta](cfg, 1, cfg.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 	defer c.Destroy()
 
-	key := FromString("expired-key")
+	key := cache.FromString("expired-key")
 	data := []byte("expired data")
 	// Expired 1 second ago
 	expires := time.Now().Add(-time.Second)
@@ -42,8 +43,8 @@ func TestCache_JanitorCleanup(t *testing.T) {
 
 	// Verify it's gone
 	_, err = c.Get(key)
-	if err != ErrCacheEntryNotFound {
-		t.Errorf("Expected ErrCacheEntryNotFound after janitor cleanup, got %v", err)
+	if err != cache.ErrCacheEntryNotFound {
+		t.Errorf("Expected cache.ErrCacheEntryNotFound after janitor cleanup, got %v", err)
 	}
 }
 
@@ -55,13 +56,13 @@ func TestCache_JanitorEviction(t *testing.T) {
 	cfg.Cache.MaxCacheSize.Overwrite(bytesize.ParseUnchecked("1K"))
 
 	cleanupInterval := 100 * time.Millisecond
-	c := NewMemoryCache[TestMeta](cfg, 1, cfg.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
+	c := New[TestMeta](cfg, 1, cfg.Cache.MaxCacheSize.Read().Bytes(), cleanupInterval, 16, ctx)
 	defer c.Destroy()
 
 	// Add 2 entries of 600 bytes each (Total 1200 > 1024)
 	data := make([]byte, 600)
 
-	entry1, err := c.Cache(FromString("key-1"), bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{})
+	entry1, err := c.Cache(cache.FromString("key-1"), bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{})
 	if err != nil {
 		t.Fatalf("Cache 1 failed: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestCache_JanitorEviction(t *testing.T) {
 	// Small sleep to ensure different LastAccess times
 	time.Sleep(50 * time.Millisecond)
 
-	entry2, err := c.Cache(FromString("key-2"), bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{})
+	entry2, err := c.Cache(cache.FromString("key-2"), bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{})
 	if err != nil {
 		t.Fatalf("Cache 2 failed: %v", err)
 	}
@@ -80,11 +81,11 @@ func TestCache_JanitorEviction(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 
 	// One of them should have been evicted to get under 80% (819 bytes)
-	r1, err1 := c.Get(FromString("key-1"))
+	r1, err1 := c.Get(cache.FromString("key-1"))
 	if err1 == nil {
 		r1.Data.Close()
 	}
-	r2, err2 := c.Get(FromString("key-2"))
+	r2, err2 := c.Get(cache.FromString("key-2"))
 	if err2 == nil {
 		r2.Data.Close()
 	}

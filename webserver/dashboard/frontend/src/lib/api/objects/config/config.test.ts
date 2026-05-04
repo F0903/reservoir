@@ -66,6 +66,17 @@ describe("config api object", () => {
                 },
             ],
             [
+                "cache.hybrid.demote_after",
+                "10m",
+                {
+                    cache: {
+                        hybrid: {
+                            demote_after: "10m",
+                        },
+                    },
+                },
+            ],
+            [
                 "logging.level",
                 "DEBUG",
                 {

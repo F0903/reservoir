@@ -1,7 +1,7 @@
 import { apiGet, apiPost, type FetchFn } from "$lib/api/api-helpers";
 
 export type CacheStatus = {
-    type: "memory" | "file";
+    type: "memory" | "file" | "hybrid";
     entries: number;
     bytes: number;
     max_bytes: number;

@@ -249,6 +249,13 @@ func TestConfig_Verify(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid hybrid cache type",
+			modify: func(c *Config) {
+				c.Cache.Type.Overwrite(CacheTypeHybrid)
+			},
+			wantErr: false,
+		},
+		{
 			name: "empty proxy listen",
 			modify: func(c *Config) {
 				c.Proxy.Listen.Overwrite("")
@@ -287,6 +294,13 @@ func TestConfig_Verify(t *testing.T) {
 			name: "zero cleanup interval",
 			modify: func(c *Config) {
 				c.Cache.CleanupInterval.Overwrite(0)
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero hybrid demote age",
+			modify: func(c *Config) {
+				c.Cache.Hybrid.DemoteAfter.Overwrite(0)
 			},
 			wantErr: true,
 		},

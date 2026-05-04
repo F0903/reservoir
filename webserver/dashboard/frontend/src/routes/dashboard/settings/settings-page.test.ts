@@ -70,6 +70,9 @@ function baseConfig(): Config {
             memory: {
                 memory_budget_percent: 25,
             },
+            hybrid: {
+                demote_after: "10m",
+            },
         },
         logging: {
             level: "INFO",

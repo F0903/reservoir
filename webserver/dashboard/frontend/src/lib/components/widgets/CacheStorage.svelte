@@ -91,6 +91,7 @@
     <Loadable state={status} {error}>
         {#snippet children(data)}
             {@const isMemoryBackend = data.type === "memory"}
+            {@const hasMemoryLayer = data.type === "memory" || data.type === "hybrid"}
             {@const cardActiveLimitBytes = isMemoryBackend
                 ? Math.min(data.max_bytes, data.memory_cap_bytes ?? data.max_bytes)
                 : data.max_bytes}
@@ -104,7 +105,7 @@
                     label: isMemoryBackend ? "Cache Max" : "Storage Limit",
                     value: formatBytesToLargest(data.max_bytes),
                 },
-                ...(isMemoryBackend && data.memory_cap_bytes !== undefined
+                ...(hasMemoryLayer && data.memory_cap_bytes !== undefined
                     ? [
                           {
                               label: "Memory Budget",
@@ -131,7 +132,7 @@
                     label="Used"
                     value={formatBytesToLargest(data.bytes)}
                     percent={fillPercent}
-                    progressLabel={isMemoryBackend ? "Memory cache fill" : "File cache fill"}
+                    progressLabel={isMemoryBackend ? "Memory cache fill" : "Storage fill"}
                     {footerItems}
                 />
             </div>

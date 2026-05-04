@@ -112,6 +112,44 @@ func TestStatusEndpointReturnsCacheStats(t *testing.T) {
 	}
 }
 
+func TestStatusEndpointReturnsMemoryCapForHybridCache(t *testing.T) {
+	cfg := config.NewDefault()
+	cfg.Cache.Type.Overwrite(config.CacheTypeHybrid)
+
+	controller := &fakeCacheController{
+		stats: cachecore.Stats{
+			Entries:        3,
+			Bytes:          128,
+			MaxBytes:       1024,
+			MemoryCapBytes: 2048,
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/cache/status", nil)
+
+	(&StatusEndpoint{}).Get(rec, req, apitypes.Context{
+		Config: cfg,
+		Cache:  controller,
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var resp statusResponse
+	if !decodeJSONResponse(t, rec, &resp) {
+		return
+	}
+
+	if resp.Type != config.CacheTypeHybrid {
+		t.Fatalf("expected cache type %q, got %q", config.CacheTypeHybrid, resp.Type)
+	}
+	if resp.MemoryCapBytes == nil || *resp.MemoryCapBytes != 2048 {
+		t.Fatalf("expected memory cap 2048, got %v", resp.MemoryCapBytes)
+	}
+}
+
 func TestStatusEndpointOmitsMemoryCapForFileCache(t *testing.T) {
 	cfg := config.NewDefault()
 	cfg.Cache.Type.Overwrite(config.CacheTypeFile)

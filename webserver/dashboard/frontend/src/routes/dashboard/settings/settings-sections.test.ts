@@ -46,6 +46,9 @@ function testConfig(): Config {
             memory: {
                 memory_budget_percent: 25,
             },
+            hybrid: {
+                demote_after: "10m",
+            },
         },
         logging: {
             level: "INFO",
@@ -92,6 +95,7 @@ function findSetting(settings: ReturnType<typeof createSettingsSections>, label:
         get: () => unknown;
         commit: (_value: unknown) => Promise<unknown>;
         label: string;
+        options?: string[];
     };
 }
 
@@ -125,6 +129,7 @@ describe("settings sections", () => {
             "Max Cache Size",
             "Cleanup Interval",
             "Memory Budget (%)",
+            "Hybrid Demote After",
             "Log Level",
             "Log to Stdout",
             "Log File Path",
@@ -148,14 +153,22 @@ describe("settings sections", () => {
 
         await findSetting(sections, "Proxy Listen").commit(":7777");
         await findSetting(sections, "Max Cache Size").commit(4096);
+        await findSetting(sections, "Hybrid Demote After").commit("5m");
         await findSetting(sections, "Ignore Cache Control").commit(false);
 
         expect(patchConfigMock()).toHaveBeenCalledWith("proxy.listen", ":7777");
         expect(patchConfigMock()).toHaveBeenCalledWith("cache.max_cache_size", 4096);
+        expect(patchConfigMock()).toHaveBeenCalledWith("cache.hybrid.demote_after", "5m");
         expect(patchConfigMock()).toHaveBeenCalledWith(
             "proxy.cache_policy.ignore_cache_control",
             false,
         );
+    });
+
+    it("offers the hybrid cache backend in storage type options", () => {
+        const storageType = findSetting(createSettingsSections(testSettings()), "Storage Type");
+
+        expect(storageType.options).toEqual(["memory", "file", "hybrid"]);
     });
 
     it("marks proxy settings as requiring restart when config patch reports it", async () => {

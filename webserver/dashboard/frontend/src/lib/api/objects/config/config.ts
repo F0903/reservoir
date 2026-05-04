@@ -31,6 +31,10 @@ export type MemoryCacheConfig = {
     memory_budget_percent: number;
 };
 
+export type HybridCacheConfig = {
+    demote_after: string;
+};
+
 export type CacheConfig = {
     max_cache_size: number;
     type: string;
@@ -38,6 +42,7 @@ export type CacheConfig = {
     lock_shards: number;
     file: FileCacheConfig;
     memory: MemoryCacheConfig;
+    hybrid: HybridCacheConfig;
 };
 
 export type LogConfig = {

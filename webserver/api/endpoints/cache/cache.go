@@ -46,7 +46,7 @@ func (e *StatusEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitype
 		Bytes:    stats.Bytes,
 		MaxBytes: stats.MaxBytes,
 	}
-	if cacheType == config.CacheTypeMemory {
+	if cacheType == config.CacheTypeMemory || cacheType == config.CacheTypeHybrid {
 		resp.MemoryCapBytes = &stats.MemoryCapBytes
 	}
 

@@ -209,7 +209,7 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     get: () => cacheConfig().type,
                     commit: commit("cache.type"),
                     label: "Storage Type",
-                    options: ["memory", "file"],
+                    options: ["memory", "file", "hybrid"],
                     tooltip: "Cache backend to use. Changing this requires a restart.",
                 },
                 {
@@ -247,6 +247,15 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     commit: commit("cache.memory.memory_budget_percent"),
                     label: "Memory Budget (%)",
                     tooltip: "Maximum percentage of system memory the memory cache may use.",
+                },
+                {
+                    InputComponent: TextInput,
+                    get: () => cacheConfig().hybrid.demote_after,
+                    commit: commit("cache.hybrid.demote_after"),
+                    label: "Hybrid Demote After",
+                    pattern: durationPattern,
+                    tooltip:
+                        "How long a hybrid-cache entry can sit in memory without access before moving to file storage.",
                 },
             ],
         ],

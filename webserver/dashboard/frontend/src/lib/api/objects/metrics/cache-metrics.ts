@@ -1,7 +1,7 @@
 import { apiGet, type FetchFn } from "$lib/api/api-helpers";
 
 export type CacheStorageMetrics = {
-    type: "memory" | "file";
+    type: "memory" | "file" | "hybrid";
     entries: number;
     bytes: number;
     max_bytes: number;

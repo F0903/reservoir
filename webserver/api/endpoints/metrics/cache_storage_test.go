@@ -83,6 +83,47 @@ func TestCacheMetricsEndpointIncludesCacheStorage(t *testing.T) {
 	}
 }
 
+func TestCacheMetricsEndpointIncludesHybridCacheStorage(t *testing.T) {
+	useFreshMetrics(t)
+
+	cfg := config.NewDefault()
+	cfg.Cache.Type.Overwrite(config.CacheTypeHybrid)
+	controller := &fakeCacheController{
+		stats: cachecore.Stats{
+			Entries:        4,
+			Bytes:          2048,
+			MaxBytes:       4096,
+			MemoryCapBytes: 8192,
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/metrics/cache", nil)
+
+	(&CacheMetricsEndpoint{}).Get(rec, req, apitypes.Context{
+		Config: cfg,
+		Cache:  controller,
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var resp struct {
+		Storage runtimeMetrics.CacheStorageMetrics `json:"storage"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response body %q: %v", rec.Body.String(), err)
+	}
+
+	if resp.Storage.Type != string(config.CacheTypeHybrid) {
+		t.Fatalf("expected cache type %q, got %q", config.CacheTypeHybrid, resp.Storage.Type)
+	}
+	if resp.Storage.MemoryCapBytes == nil || *resp.Storage.MemoryCapBytes != 8192 {
+		t.Fatalf("expected memory cap 8192, got %v", resp.Storage.MemoryCapBytes)
+	}
+}
+
 func TestAllMetricsEndpointIncludesFileCacheStorage(t *testing.T) {
 	useFreshMetrics(t)
 

@@ -10,6 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
+	filecache "reservoir/cache/file"
+	"reservoir/cache/hybrid"
+	memorycache "reservoir/cache/memory"
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/proxy/certs"
@@ -86,10 +89,14 @@ func NewProxyWithUpstreamClient(cfg *config.Config, ca certs.CertAuthority, upst
 	switch cfg.Cache.Type.Read() {
 	case config.CacheTypeFile:
 		cacheDir := cfg.Cache.File.Dir.Read()
-		c = cache.NewFileCache[cachedRequestInfo](cfg, cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
+		c = filecache.New[cachedRequestInfo](cfg, cacheDir, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
+	case config.CacheTypeHybrid:
+		cacheDir := cfg.Cache.File.Dir.Read()
+		memoryBudget := cfg.Cache.Memory.MemoryBudgetPercent.Read()
+		c = hybrid.New[cachedRequestInfo](cfg, cacheDir, memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	case config.CacheTypeMemory:
 		memoryBudget := cfg.Cache.Memory.MemoryBudgetPercent.Read()
-		c = cache.NewMemoryCache[cachedRequestInfo](cfg, memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
+		c = memorycache.New[cachedRequestInfo](cfg, memoryBudget, maxCacheSize, cacheCleanupInterval, shardCount, ctx)
 	default:
 		return nil, fmt.Errorf("unsupported cache type: %v", cfg.Cache.Type.Read())
 	}
