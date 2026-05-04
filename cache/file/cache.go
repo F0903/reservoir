@@ -5,7 +5,6 @@ import (
 	"maps"
 	"path/filepath"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"reservoir/config"
 	"reservoir/utils/assertedpath"
 	"reservoir/utils/atomics"
@@ -21,7 +20,7 @@ type Cache[MetadataT any] struct {
 	locks           []sync.RWMutex
 	byteSize        atomics.Int64
 	maxCacheSize    atomics.Int64
-	janitor         *tier.Janitor[MetadataT]
+	janitor         *cache.Janitor[MetadataT]
 	subs            config.ConfigSubscriber
 }
 
@@ -48,7 +47,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, rootDir string, 
 
 	c.loadMetadataSidecars()
 
-	c.janitor = tier.NewJanitor(cfg, cleanupInterval, tier.Functions[MetadataT]{
+	c.janitor = cache.NewJanitor(cfg, cleanupInterval, cache.JanitorFunctions[MetadataT]{
 		Iterate: func(yield func(key cache.CacheKey, metadata *cache.EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
 			snapshot := maps.Clone(c.entriesMetadata)
@@ -72,7 +71,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, rootDir string, 
 			return c.ensureRemove(key)
 		},
 		Lock: func(key cache.CacheKey) *sync.RWMutex {
-			return tier.GetLock(c.locks, key)
+			return cache.GetLock(c.locks, key)
 		},
 	}, trackAggregateMetrics)
 	if c.byteSize.Get() >= c.maxCacheSize.Get() {

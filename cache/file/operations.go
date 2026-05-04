@@ -7,13 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"reservoir/metrics"
 	"time"
 )
 
 func (c *Cache[MetadataT]) get(key cache.CacheKey, recordMetrics bool) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 
@@ -68,7 +67,7 @@ func (c *Cache[MetadataT]) GetQuiet(key cache.CacheKey) (*cache.Entry[MetadataT]
 }
 
 func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -125,11 +124,11 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	c.mu.Unlock()
 
 	if replaced {
-		tier.DecrementCacheSize(&c.byteSize, previousMeta.Size)
+		cache.DecrementCacheSize(&c.byteSize, previousMeta.Size)
 	} else {
-		tier.IncrementCacheEntries()
+		cache.IncrementCacheEntries()
 	}
-	tier.AddCacheSize(&c.byteSize, fileSize)
+	cache.AddCacheSize(&c.byteSize, fileSize)
 	c.writeMetadataSidecar(key, meta)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
@@ -149,7 +148,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 }
 
 func (c *Cache[MetadataT]) Delete(key cache.CacheKey) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -192,8 +191,8 @@ func (c *Cache[MetadataT]) ensureRemove(key cache.CacheKey) error {
 	delete(c.entriesMetadata, key)
 	c.mu.Unlock()
 
-	tier.DecrementCacheEntries()
-	tier.DecrementCacheSize(&c.byteSize, meta.Size)
+	cache.DecrementCacheEntries()
+	cache.DecrementCacheSize(&c.byteSize, meta.Size)
 
 	return nil
 }
@@ -224,7 +223,7 @@ func (c *Cache[MetadataT]) Clear() error {
 
 	var errs []error
 	for _, key := range keys {
-		lock := tier.GetLock(c.locks, key)
+		lock := cache.GetLock(c.locks, key)
 		lock.Lock()
 		err := c.ensureRemove(key)
 		lock.Unlock()

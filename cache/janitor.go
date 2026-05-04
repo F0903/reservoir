@@ -1,11 +1,10 @@
-package tier
+package cache
 
 import (
 	"cmp"
 	"context"
 	"iter"
 	"log/slog"
-	"reservoir/cache"
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/bytesize"
@@ -15,12 +14,12 @@ import (
 	"time"
 )
 
-type Functions[MetadataT any] struct {
-	Iterate iter.Seq2[cache.CacheKey, *cache.EntryMetadata[MetadataT]]
-	Remove  func(key cache.CacheKey) error
+type JanitorFunctions[MetadataT any] struct {
+	Iterate iter.Seq2[CacheKey, *EntryMetadata[MetadataT]]
+	Remove  func(key CacheKey) error
 	Size    func() int64
 	Len     func() int
-	Lock    func(key cache.CacheKey) *sync.RWMutex
+	Lock    func(key CacheKey) *sync.RWMutex
 }
 
 type Janitor[MetadataT any] struct {
@@ -29,13 +28,13 @@ type Janitor[MetadataT any] struct {
 	interval        time.Duration
 	running         bool
 
-	functions             Functions[MetadataT]
+	functions             JanitorFunctions[MetadataT]
 	trackAggregateMetrics bool
 	subs                  config.ConfigSubscriber
 	cfg                   *config.Config
 }
 
-func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions Functions[MetadataT], trackAggregateMetrics bool) *Janitor[MetadataT] {
+func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions JanitorFunctions[MetadataT], trackAggregateMetrics bool) *Janitor[MetadataT] {
 	j := &Janitor[MetadataT]{
 		stopChan:              make(chan struct{}),
 		intervalChanged:       make(chan time.Duration, 1),
@@ -123,7 +122,7 @@ func (j *Janitor[MetadataT]) cleanExpiredEntries() {
 
 	startCacheSize := j.functions.Size()
 
-	keysToRemove := make([]cache.CacheKey, 0)
+	keysToRemove := make([]CacheKey, 0)
 
 	for key, meta := range j.functions.Iterate {
 		expired := meta.Expires.Before(time.Now())
@@ -168,8 +167,8 @@ func (j *Janitor[MetadataT]) cleanExpiredEntries() {
 // Evict entries until 80% of maxCacheBytes is reached
 func (j *Janitor[MetadataT]) Evict(maxCacheBytes int64) {
 	type entryForEviction struct {
-		key      cache.CacheKey
-		meta     *cache.EntryMetadata[MetadataT]
+		key      CacheKey
+		meta     *EntryMetadata[MetadataT]
 		priority int64 // Higher = evict first
 	}
 

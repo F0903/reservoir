@@ -5,12 +5,11 @@ import (
 	"errors"
 	"io"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"time"
 )
 
 func (c *Cache[MetadataT]) get(key cache.CacheKey, recordMetrics bool) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.RLock()
 	defer lock.RUnlock()
 
@@ -104,11 +103,11 @@ func (c *Cache[MetadataT]) cacheBytesInternal(key cache.CacheKey, dataBytes []by
 	c.mu.Unlock()
 
 	if replaced {
-		tier.DecrementCacheSize(&c.byteSize, previousEntry.meta.Size)
+		cache.DecrementCacheSize(&c.byteSize, previousEntry.meta.Size)
 	} else {
-		tier.IncrementCacheEntries()
+		cache.IncrementCacheEntries()
 	}
-	tier.AddCacheSize(&c.byteSize, int64(count))
+	cache.AddCacheSize(&c.byteSize, int64(count))
 
 	return &cache.Entry[MetadataT]{
 		Data:     &memoryReadSeekCloser{bytes.NewReader(dataBytes)},
@@ -129,7 +128,7 @@ func (c *Cache[MetadataT]) cacheInternal(key cache.CacheKey, data io.Reader, exp
 }
 
 func (c *Cache[MetadataT]) cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -137,7 +136,7 @@ func (c *Cache[MetadataT]) cache(key cache.CacheKey, data io.Reader, expires tim
 }
 
 func (c *Cache[MetadataT]) cacheStrict(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -145,7 +144,7 @@ func (c *Cache[MetadataT]) cacheStrict(key cache.CacheKey, data io.Reader, expir
 }
 
 func (c *Cache[MetadataT]) cacheBytesStrict(key cache.CacheKey, data []byte, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -161,7 +160,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 }
 
 func (c *Cache[MetadataT]) Delete(key cache.CacheKey) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -178,7 +177,7 @@ func (c *Cache[MetadataT]) Clear() error {
 
 	var errs []error
 	for _, key := range keys {
-		lock := tier.GetLock(c.locks, key)
+		lock := cache.GetLock(c.locks, key)
 		lock.Lock()
 		err := c.deleteInternal(key)
 		lock.Unlock()
@@ -201,8 +200,8 @@ func (c *Cache[MetadataT]) deleteInternal(key cache.CacheKey) error {
 	delete(c.entries, key)
 	c.mu.Unlock()
 
-	tier.DecrementCacheEntries()
-	tier.DecrementCacheSize(&c.byteSize, entry.meta.Size)
+	cache.DecrementCacheEntries()
+	cache.DecrementCacheSize(&c.byteSize, entry.meta.Size)
 
 	return nil
 }

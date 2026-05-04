@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"time"
 )
 
@@ -59,7 +58,7 @@ func (c *Cache[MetadataT]) OverrideMemoryCapForTesting(memoryCap int64) {
 }
 
 func (c *Cache[MetadataT]) OverrideEntryLastAccessForTesting(key cache.CacheKey, lastAccess time.Time) bool {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -75,7 +74,7 @@ func (c *Cache[MetadataT]) OverrideEntryLastAccessForTesting(key cache.CacheKey,
 }
 
 func (c *Cache[MetadataT]) DeleteAfter(key cache.CacheKey, fn func() error) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -99,7 +98,7 @@ func (c *Cache[MetadataT]) DemotionCandidates(cutoff time.Time) []cache.CacheKey
 }
 
 func (c *Cache[MetadataT]) DemoteEntry(key cache.CacheKey, cutoff time.Time, write func(data io.Reader, expires time.Time, metadata MetadataT) error) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 

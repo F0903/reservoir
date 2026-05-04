@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"reservoir/metrics"
 	"strings"
 	"time"
@@ -91,8 +90,8 @@ func (c *Cache[MetadataT]) loadMetadataSidecar(key cache.CacheKey, now time.Time
 
 	meta.Size = dataStat.Size()
 	c.entriesMetadata[key] = &meta
-	tier.AddCacheSize(&c.byteSize, meta.Size)
-	tier.IncrementCacheEntries()
+	cache.AddCacheSize(&c.byteSize, meta.Size)
+	cache.IncrementCacheEntries()
 	return true
 }
 
@@ -129,7 +128,7 @@ func isCacheDataFileName(name string) bool {
 }
 
 func (c *Cache[MetadataT]) updateMetadata(key cache.CacheKey, modifier func(*cache.EntryMetadata[MetadataT]), recordMetrics bool) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -166,7 +165,7 @@ func (c *Cache[MetadataT]) UpdateMetadataQuiet(key cache.CacheKey, modifier func
 }
 
 func (c *Cache[MetadataT]) getMetadata(key cache.CacheKey, recordMetrics bool) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock() // Upgraded from RLock to Lock to prevent data race on LastAccess
 	defer lock.Unlock()
 

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"maps"
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/utils/atomics"
@@ -25,7 +24,7 @@ type Cache[MetadataT any] struct {
 	maxCacheSize atomics.Int64
 	byteSize     atomics.Int64
 
-	janitor *tier.Janitor[MetadataT]
+	janitor *cache.Janitor[MetadataT]
 	subs    config.ConfigSubscriber
 }
 
@@ -61,14 +60,14 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, memoryBudgetPerc
 		slog.Info("Memory budget changed", "new_percent", newPercent, "new_cap", bytesize.ByteSize(newCap))
 	}))
 
-	c.janitor = tier.NewJanitor(cfg, cleanupInterval, tier.Functions[MetadataT]{
+	c.janitor = cache.NewJanitor(cfg, cleanupInterval, cache.JanitorFunctions[MetadataT]{
 		Iterate: func(yield func(key cache.CacheKey, metadata *cache.EntryMetadata[MetadataT]) bool) {
 			c.mu.RLock()
 			snapshot := maps.Clone(c.entries)
 			c.mu.RUnlock()
 
 			for key := range snapshot {
-				lock := tier.GetLock(c.locks, key)
+				lock := cache.GetLock(c.locks, key)
 				lock.RLock()
 				c.mu.RLock()
 				entry, ok := c.entries[key]
@@ -100,7 +99,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, memoryBudgetPerc
 			return len(c.entries)
 		},
 		Lock: func(key cache.CacheKey) *sync.RWMutex {
-			return tier.GetLock(c.locks, key)
+			return cache.GetLock(c.locks, key)
 		},
 	}, trackAggregateMetrics)
 	c.janitor.Start(ctx)

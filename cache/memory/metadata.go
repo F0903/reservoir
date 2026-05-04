@@ -2,12 +2,11 @@ package memory
 
 import (
 	"reservoir/cache"
-	"reservoir/cache/internal/tier"
 	"time"
 )
 
 func (c *Cache[MetadataT]) updateMetadata(key cache.CacheKey, modifier func(*cache.EntryMetadata[MetadataT]), recordMetrics bool) error {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
@@ -40,7 +39,7 @@ func (c *Cache[MetadataT]) UpdateMetadataQuiet(key cache.CacheKey, modifier func
 }
 
 func (c *Cache[MetadataT]) getMetadata(key cache.CacheKey, recordMetrics bool) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
-	lock := tier.GetLock(c.locks, key)
+	lock := cache.GetLock(c.locks, key)
 	lock.RLock()
 	defer lock.RUnlock()
 

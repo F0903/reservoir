@@ -1,7 +1,6 @@
-package tier
+package cache
 
 import (
-	"reservoir/cache"
 	"reservoir/metrics"
 	"reservoir/utils"
 	"reservoir/utils/atomics"
@@ -9,7 +8,7 @@ import (
 )
 
 // Gets or creates a lock for the given key.
-func GetLock(locks []sync.RWMutex, key cache.CacheKey) *sync.RWMutex {
+func GetLock(locks []sync.RWMutex, key CacheKey) *sync.RWMutex {
 	val := utils.Hex8ToIndex(key.Hex)
 	return &locks[val%uint32(len(locks))]
 }
