@@ -25,8 +25,8 @@ function testConfig(): Config {
             retry_on_range_416: true,
             retry_on_invalid_range: true,
             cache_policy: {
-                default_max_age: "1h",
-                force_default_max_age: false,
+                default_max_age: "15m",
+                force_default_max_age: true,
                 ignore_cache_control: true,
             },
         },
@@ -36,9 +36,9 @@ function testConfig(): Config {
             api_disabled: false,
         },
         cache: {
-            type: "memory",
+            type: "hybrid",
             max_cache_size: 1024,
-            cleanup_interval: "10m",
+            cleanup_interval: "5m",
             lock_shards: 64,
             file: {
                 dir: "var/cache",
@@ -47,7 +47,7 @@ function testConfig(): Config {
                 memory_budget_percent: 25,
             },
             hybrid: {
-                demote_after: "10m",
+                demote_after: "5m",
             },
         },
         logging: {
@@ -96,6 +96,8 @@ function findSetting(settings: ReturnType<typeof createSettingsSections>, label:
         commit: (_value: unknown) => Promise<unknown>;
         label: string;
         options?: string[];
+        visibleForBackends?: string[];
+        onValueChange?: (_value: string) => void;
     };
 }
 
@@ -121,15 +123,15 @@ describe("settings sections", () => {
             "CA Key Path",
             "Upstream Default HTTPS",
             "Retry on Range 416",
-            "Default Max Age",
-            "Force Default Max Age",
+            "Package Freshness Window",
+            "Force Freshness Window",
             "Ignore Cache Control",
-            "Storage Type",
+            "Cache Backend",
             "Cache Directory",
-            "Max Cache Size",
-            "Cleanup Interval",
+            "Total Cache Limit",
+            "Expired Cleanup Interval",
             "Memory Budget (%)",
-            "Hybrid Demote After",
+            "Demote Idle Memory After",
             "Log Level",
             "Log to Stdout",
             "Log File Path",
@@ -152,8 +154,8 @@ describe("settings sections", () => {
         const sections = createSettingsSections(testSettings());
 
         await findSetting(sections, "Proxy Listen").commit(":7777");
-        await findSetting(sections, "Max Cache Size").commit(4096);
-        await findSetting(sections, "Hybrid Demote After").commit("5m");
+        await findSetting(sections, "Total Cache Limit").commit(4096);
+        await findSetting(sections, "Demote Idle Memory After").commit("5m");
         await findSetting(sections, "Ignore Cache Control").commit(false);
 
         expect(patchConfigMock()).toHaveBeenCalledWith("proxy.listen", ":7777");
@@ -166,16 +168,47 @@ describe("settings sections", () => {
     });
 
     it("offers the hybrid cache backend in storage type options", () => {
-        const storageType = findSetting(createSettingsSections(testSettings()), "Storage Type");
+        const storageType = findSetting(createSettingsSections(testSettings()), "Cache Backend");
 
         expect(storageType.options).toEqual(["memory", "file", "hybrid"]);
+    });
+
+    it("marks backend-specific cache controls with their applicable backends", () => {
+        const sections = createSettingsSections(testSettings());
+
+        expect(findSetting(sections, "Cache Directory").visibleForBackends).toEqual([
+            "file",
+            "hybrid",
+        ]);
+        expect(findSetting(sections, "Memory Budget (%)").visibleForBackends).toEqual([
+            "memory",
+            "hybrid",
+        ]);
+        expect(findSetting(sections, "Demote Idle Memory After").visibleForBackends).toEqual([
+            "hybrid",
+        ]);
+        expect(findSetting(sections, "Total Cache Limit").visibleForBackends).toBeUndefined();
+    });
+
+    it("notifies callers when the staged cache backend changes", () => {
+        const onCacheBackendChange = vi.fn();
+        const storageType = findSetting(
+            createSettingsSections(testSettings(), { onCacheBackendChange }),
+            "Cache Backend",
+        );
+
+        storageType.onValueChange?.("file");
+        storageType.onValueChange?.("invalid");
+
+        expect(onCacheBackendChange).toHaveBeenCalledTimes(1);
+        expect(onCacheBackendChange).toHaveBeenCalledWith("file");
     });
 
     it("marks proxy settings as requiring restart when config patch reports it", async () => {
         const settings = testSettings();
         patchConfigMock().mockResolvedValueOnce("restart required");
 
-        await findSetting(createSettingsSections(settings), "Storage Type").commit("file");
+        await findSetting(createSettingsSections(settings), "Cache Backend").commit("file");
 
         expect(settings.proxySettings.needsRestart).toBe(true);
     });

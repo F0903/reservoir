@@ -49,8 +49,8 @@ function baseConfig(): Config {
             retry_on_range_416: true,
             retry_on_invalid_range: true,
             cache_policy: {
-                default_max_age: "1h",
-                force_default_max_age: false,
+                default_max_age: "15m",
+                force_default_max_age: true,
                 ignore_cache_control: true,
             },
         },
@@ -60,9 +60,9 @@ function baseConfig(): Config {
             api_disabled: false,
         },
         cache: {
-            type: "memory",
+            type: "hybrid",
             max_cache_size: 1024,
-            cleanup_interval: "10m",
+            cleanup_interval: "5m",
             lock_shards: 64,
             file: {
                 dir: "var/cache",
@@ -71,7 +71,7 @@ function baseConfig(): Config {
                 memory_budget_percent: 25,
             },
             hybrid: {
-                demote_after: "10m",
+                demote_after: "5m",
             },
         },
         logging: {
@@ -158,12 +158,58 @@ describe("settings page", () => {
         await renderSettingsPage();
 
         await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
-        await fireEvent.change(screen.getByLabelText("Storage Type"), {
+        await fireEvent.change(screen.getByLabelText("Cache Backend"), {
             target: { value: "file" },
         });
         await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
 
         await waitFor(() => expect(screen.getByText("Restart Required")).toBeInTheDocument());
         expect(contextMocks.settings?.proxySettings.needsRestart).toBe(true);
+    });
+
+    it("shows only cache settings relevant to the staged backend", async () => {
+        await renderSettingsPage();
+        await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
+
+        expect(screen.getByLabelText("Cache Directory")).toBeInTheDocument();
+        expect(screen.getByLabelText("Memory Budget (%)")).toBeInTheDocument();
+        expect(screen.getByLabelText("Demote Idle Memory After")).toBeInTheDocument();
+
+        await fireEvent.change(screen.getByLabelText("Cache Backend"), {
+            target: { value: "memory" },
+        });
+
+        await waitFor(() =>
+            expect(screen.queryByLabelText("Cache Directory")).not.toBeInTheDocument(),
+        );
+        expect(screen.getByLabelText("Memory Budget (%)")).toBeInTheDocument();
+        expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument();
+
+        await fireEvent.change(screen.getByLabelText("Cache Backend"), {
+            target: { value: "file" },
+        });
+
+        await waitFor(() => expect(screen.getByLabelText("Cache Directory")).toBeInTheDocument());
+        expect(screen.queryByLabelText("Memory Budget (%)")).not.toBeInTheDocument();
+        expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument();
+    });
+
+    it("does not save hidden backend-specific cache settings", async () => {
+        await renderSettingsPage();
+        await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
+
+        await fireEvent.input(screen.getByLabelText("Demote Idle Memory After"), {
+            target: { value: "1m" },
+        });
+        await fireEvent.change(screen.getByLabelText("Cache Backend"), {
+            target: { value: "file" },
+        });
+        await waitFor(() =>
+            expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument(),
+        );
+        await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+        await waitFor(() => expect(patchConfigMock()).toHaveBeenCalledWith("cache.type", "file"));
+        expect(patchConfigMock()).not.toHaveBeenCalledWith("cache.hybrid.demote_after", "1m");
     });
 });

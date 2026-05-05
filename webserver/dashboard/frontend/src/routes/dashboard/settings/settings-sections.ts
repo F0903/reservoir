@@ -29,6 +29,7 @@ export const tabs = [
 ] as const;
 
 export type TabId = (typeof tabs)[number]["id"];
+export type CacheBackend = "memory" | "file" | "hybrid";
 
 export type SettingInputInstance = {
     commit: () => Promise<void>;
@@ -49,6 +50,8 @@ type InputSection<
     label: string;
     pattern?: string;
     tooltip?: string;
+    visibleForBackends?: CacheBackend[];
+    onValueChange?: (_val: ComponentProps<C>["value"]) => void;
 } & Omit<ComponentProps<C>, "value" | "label">;
 
 type RegularInputProps<V> = {
@@ -69,6 +72,14 @@ export type SettingsInput =
     | InputSection<typeof Dropdown, RegularInputProps<string> & { options: string[] }>;
 
 export type SettingsSections = { [_K in TabId]: SettingsInput[][] };
+
+type CreateSettingsSectionsOptions = {
+    onCacheBackendChange?: (_backend: CacheBackend) => void;
+};
+
+function isCacheBackend(value: string): value is CacheBackend {
+    return value === "memory" || value === "file" || value === "hybrid";
+}
 
 async function sendConfigPatch<P extends ConfigPropPath>(
     settings: SettingsProvider,
@@ -102,7 +113,10 @@ export function createInputInstances(
     };
 }
 
-export function createSettingsSections(settings: SettingsProvider): SettingsSections {
+export function createSettingsSections(
+    settings: SettingsProvider,
+    options: CreateSettingsSectionsOptions = {},
+): SettingsSections {
     const commit = createConfigCommit(settings);
     const proxyConfig = () => settings.proxySettings.fields.proxy;
     const webserverConfig = () => settings.proxySettings.fields.webserver;
@@ -181,18 +195,18 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     InputComponent: TextInput,
                     get: () => proxyConfig().cache_policy.default_max_age,
                     commit: commit("proxy.cache_policy.default_max_age"),
-                    label: "Default Max Age",
+                    label: "Package Freshness Window",
                     pattern: durationPattern,
                     tooltip:
-                        "Freshness lifetime Reservoir applies to cached package responses when using the default policy.",
+                        "How long Reservoir treats cached package responses as fresh when using the default policy.",
                 },
                 {
                     InputComponent: Toggle,
                     get: () => proxyConfig().cache_policy.force_default_max_age,
                     commit: commit("proxy.cache_policy.force_default_max_age"),
-                    label: "Force Default Max Age",
+                    label: "Force Freshness Window",
                     tooltip:
-                        "Always use Reservoir's default max age instead of upstream freshness metadata.",
+                        "Always use Reservoir's package freshness window instead of upstream freshness metadata.",
                 },
                 {
                     InputComponent: Toggle,
@@ -208,9 +222,15 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     InputComponent: Dropdown,
                     get: () => cacheConfig().type,
                     commit: commit("cache.type"),
-                    label: "Storage Type",
+                    label: "Cache Backend",
                     options: ["memory", "file", "hybrid"],
-                    tooltip: "Cache backend to use. Changing this requires a restart.",
+                    onValueChange: (value: string) => {
+                        if (isCacheBackend(value)) {
+                            options.onCacheBackendChange?.(value);
+                        }
+                    },
+                    tooltip:
+                        "Cache backend to use. Hybrid keeps hot package data in memory and spills colder data to disk. Changing this requires a restart.",
                 },
                 {
                     InputComponent: TextInput,
@@ -218,7 +238,9 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     commit: commit("cache.file.dir"),
                     label: "Cache Directory",
                     pattern: stringPattern,
-                    tooltip: "Directory for file-cache storage. Changing this requires a restart.",
+                    visibleForBackends: ["file", "hybrid"],
+                    tooltip:
+                        "Directory used by the file backend and the hybrid file tier. Changing this requires a restart.",
                 },
             ],
             [
@@ -227,16 +249,16 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     get: () => String(cacheConfig().max_cache_size),
                     valueTransform: (val: string) => parseByteString(val),
                     commit: commit("cache.max_cache_size"),
-                    label: "Max Cache Size",
+                    label: "Total Cache Limit",
                     pattern: bytesizePattern,
                     tooltip:
-                        "Maximum bytes Reservoir may keep in cache. This applies without a restart.",
+                        "Maximum bytes Reservoir may keep across all cache tiers. This applies without a restart.",
                 },
                 {
                     InputComponent: TextInput,
                     get: () => cacheConfig().cleanup_interval,
                     commit: commit("cache.cleanup_interval"),
-                    label: "Cleanup Interval",
+                    label: "Expired Cleanup Interval",
                     pattern: durationPattern,
                     tooltip:
                         "How often Reservoir removes expired entries and trims oversized cache data.",
@@ -246,14 +268,17 @@ export function createSettingsSections(settings: SettingsProvider): SettingsSect
                     get: () => cacheConfig().memory.memory_budget_percent,
                     commit: commit("cache.memory.memory_budget_percent"),
                     label: "Memory Budget (%)",
-                    tooltip: "Maximum percentage of system memory the memory cache may use.",
+                    visibleForBackends: ["memory", "hybrid"],
+                    tooltip:
+                        "Maximum percentage of system memory used by the memory backend and the hybrid memory tier. In hybrid mode, entries spill to file storage when this budget is full.",
                 },
                 {
                     InputComponent: TextInput,
                     get: () => cacheConfig().hybrid.demote_after,
                     commit: commit("cache.hybrid.demote_after"),
-                    label: "Hybrid Demote After",
+                    label: "Demote Idle Memory After",
                     pattern: durationPattern,
+                    visibleForBackends: ["hybrid"],
                     tooltip:
                         "How long a hybrid-cache entry can sit in memory without access before moving to file storage.",
                 },

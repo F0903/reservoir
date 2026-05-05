@@ -8,6 +8,7 @@ import (
 	"reservoir/utils/bytesize"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type subConfig struct {
@@ -234,6 +235,32 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 	// Verify it was reset to defaults (checking a field that was definitely missing)
 	if cfg.Proxy.Listen.Read() != ":9999" {
 		t.Errorf("Expected reset to default proxy listen, got %s", cfg.Proxy.Listen.Read())
+	}
+}
+
+func TestDefaultConfig_HybridPackageCacheTuning(t *testing.T) {
+	cfg := NewDefault()
+
+	if got := cfg.Cache.Type.Read(); got != CacheTypeHybrid {
+		t.Fatalf("expected default cache type %q, got %q", CacheTypeHybrid, got)
+	}
+	if got := cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast(); got != 15*time.Minute {
+		t.Fatalf("expected default cache max age 15m, got %s", got)
+	}
+	if got := cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Read(); !got {
+		t.Fatal("expected default cache policy to force the package freshness window")
+	}
+	if got := cfg.Proxy.CachePolicy.IgnoreCacheControl.Read(); !got {
+		t.Fatal("expected default cache policy to ignore upstream cache-control")
+	}
+	if got := cfg.Cache.CleanupInterval.Read().Cast(); got != 5*time.Minute {
+		t.Fatalf("expected default cleanup interval 5m, got %s", got)
+	}
+	if got := cfg.Cache.Memory.MemoryBudgetPercent.Read(); got != 25 {
+		t.Fatalf("expected default memory tier limit 25%%, got %d%%", got)
+	}
+	if got := cfg.Cache.Hybrid.DemoteAfter.Read().Cast(); got != 5*time.Minute {
+		t.Fatalf("expected default hybrid demotion after 5m, got %s", got)
 	}
 }
 

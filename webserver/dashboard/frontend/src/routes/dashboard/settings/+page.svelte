@@ -13,13 +13,20 @@
         createInputInstances,
         createSettingsSections,
         tabs,
+        type CacheBackend,
         type SettingInputInstance,
+        type SettingsInput,
         type TabId,
     } from "./settings-sections";
 
     const settings = getSettingsProvider();
     const toast = getToastProvider();
-    const sections = createSettingsSections(settings);
+    let selectedCacheBackend = $state<CacheBackend>("hybrid");
+    const sections = createSettingsSections(settings, {
+        onCacheBackendChange: (backend) => {
+            selectedCacheBackend = backend;
+        },
+    });
     let activeTab = $state<TabId>("dashboard");
 
     const inputInstances = $state(createInputInstances(sections));
@@ -30,24 +37,95 @@
 
     onMount(async () => {
         await Promise.all([settings.proxySettings.reload(), settings.dashboardSettings.reload()]);
+        syncSelectedCacheBackend();
         await resetInputs();
         inputsDisabled = false;
     });
 
+    function isCacheBackend(value: unknown): value is CacheBackend {
+        return value === "memory" || value === "file" || value === "hybrid";
+    }
+
+    function syncSelectedCacheBackend() {
+        const backend = settings.proxySettings.fields.cache?.type;
+        if (isCacheBackend(backend)) {
+            selectedCacheBackend = backend;
+        }
+    }
+
+    function isInputVisible(input: SettingsInput) {
+        return (
+            input.visibleForBackends === undefined ||
+            input.visibleForBackends.includes(selectedCacheBackend)
+        );
+    }
+
+    function visibleSections(tabId: TabId) {
+        return sections[tabId]
+            .map((section, sectionIndex) => ({
+                sectionIndex,
+                inputs: section
+                    .map((input, inputIndex) => ({ input, inputIndex }))
+                    .filter(({ input }) => isInputVisible(input)),
+            }))
+            .filter((section) => section.inputs.length > 0);
+    }
+
+    function visibleInputEntries() {
+        const entries: { input: SettingsInput; instance: SettingInputInstance }[] = [];
+        for (const tab of tabs) {
+            for (const { sectionIndex, inputs } of visibleSections(tab.id)) {
+                for (const { input, inputIndex } of inputs) {
+                    const instance = inputInstances[tab.id][sectionIndex][inputIndex];
+                    if (instance != null) {
+                        entries.push({ input, instance });
+                    }
+                }
+            }
+        }
+        return entries;
+    }
+
     function allInputInstances() {
-        return Object.values(inputInstances)
-            .flat(2)
-            .filter((input): input is SettingInputInstance => input != null);
+        return visibleInputEntries().map(({ instance }) => instance);
+    }
+
+    function cacheBackendHasDiverged() {
+        return selectedCacheBackend !== settings.proxySettings.fields.cache?.type;
+    }
+
+    function cacheBackendSetting() {
+        return sections.cache.flat().find((input) => input.label === "Cache Backend") as
+            | { commit: (_backend: CacheBackend) => Promise<unknown> }
+            | undefined;
+    }
+
+    function updateHasChanges() {
+        hasChanges =
+            cacheBackendHasDiverged() ||
+            visibleInputEntries()
+                .filter(({ input }) => input.label !== "Cache Backend")
+                .some(({ instance }) => instance.hasDiverged());
     }
 
     function onChange(_different: boolean) {
-        hasChanges = allInputInstances().some((i) => i.hasDiverged());
+        updateHasChanges();
     }
 
     async function commitChanges() {
         saving = true;
         try {
-            await Promise.all(allInputInstances().map((i) => i.commit()));
+            const commits: Promise<unknown>[] = visibleInputEntries()
+                .filter(({ input }) => input.label !== "Cache Backend")
+                .map(({ instance }) => instance.commit());
+
+            if (cacheBackendHasDiverged()) {
+                commits.push(
+                    cacheBackendSetting()?.commit(selectedCacheBackend) ?? Promise.resolve(),
+                );
+            }
+
+            await Promise.all(commits);
 
             toast.success("Settings saved successfully.");
             await settings.proxySettings.reload();
@@ -62,6 +140,7 @@
 
     async function resetInputs() {
         await Promise.all(allInputInstances().map((i) => i.reset()));
+        syncSelectedCacheBackend();
         hasChanges = false;
     }
 </script>
@@ -96,12 +175,13 @@
     </div>
 
     {#snippet pane(tabId: TabId)}
-        {#each sections[tabId] as section, i (i)}
+        {@const tabSections = visibleSections(tabId)}
+        {#each tabSections as section, i (section.sectionIndex)}
             <div class="settings-group">
                 <div class="group-grid">
-                    {#each section as input, j (input.label)}
+                    {#each section.inputs as { input, inputIndex } (input.label)}
                         <SettingInput
-                            bind:this={inputInstances[tabId][i][j]}
+                            bind:this={inputInstances[tabId][section.sectionIndex][inputIndex]}
                             {...input as Record<string, unknown>}
                             InputComponent={input.InputComponent as Component<
                                 Record<string, unknown>,
@@ -116,7 +196,7 @@
                     {/each}
                 </div>
             </div>
-            {#if i < sections[tabId].length - 1}
+            {#if i < tabSections.length - 1}
                 <VerticalSpacer
                     --spacer-color="rgba(255,255,255,0.05)"
                     --spacer-margin="1.5rem -2.5rem"

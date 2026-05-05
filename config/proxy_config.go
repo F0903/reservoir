@@ -51,7 +51,7 @@ func defaultProxyConfig() ProxyConfig {
 		RetryOnInvalidRange:  NewConfigProp(false),
 		CachePolicy: CachePolicyConfig{
 			IgnoreCacheControl: NewConfigProp(true),
-			DefaultMaxAge:      NewConfigProp(duration.Duration(1 * time.Hour)),
+			DefaultMaxAge:      NewConfigProp(duration.Duration(15 * time.Minute)),
 			ForceDefaultMaxAge: NewConfigProp(true),
 		},
 	}

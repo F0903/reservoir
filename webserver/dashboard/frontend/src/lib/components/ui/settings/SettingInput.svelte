@@ -11,6 +11,8 @@
         commit: commitValue,
         valueTransform,
         onChange,
+        onValueChange,
+        visibleForBackends: _visibleForBackends,
         ...restProps
     }: {
         InputComponent: C;
@@ -18,6 +20,8 @@
         commit: (_val: O) => Promise<unknown>;
         valueTransform?: (_val: V) => O;
         onChange?: (_different: boolean) => void;
+        onValueChange?: (_value: V) => void;
+        visibleForBackends?: unknown;
         [key: string]: unknown;
     } = $props();
 
@@ -64,6 +68,7 @@
 
     function setValue(newValue: V) {
         inputValue = newValue;
+        onValueChange?.(newValue);
         onChange?.(hasDiverged());
     }
 </script>

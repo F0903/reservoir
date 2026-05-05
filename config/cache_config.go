@@ -16,21 +16,21 @@ var (
 )
 
 type FileCacheConfig struct {
-	Dir ConfigProp[string] `json:"dir"` // The directory where cached files will be stored.
+	Dir ConfigProp[string] `json:"dir"` // The directory used by the file backend and hybrid file tier.
 }
 
 type MemoryCacheConfig struct {
-	MemoryBudgetPercent ConfigProp[int] `json:"memory_budget_percent"` // The percentage of total memory to use for the cache.
+	MemoryBudgetPercent ConfigProp[int] `json:"memory_budget_percent"` // The percentage of total memory used by the memory backend and hybrid memory tier.
 }
 
 type HybridCacheConfig struct {
-	DemoteAfter ConfigProp[duration.Duration] `json:"demote_after"` // How long a memory entry can sit without access before it is demoted to the file cache.
+	DemoteAfter ConfigProp[duration.Duration] `json:"demote_after"` // How long a hybrid memory-tier entry can sit without access before it is demoted to the file tier.
 }
 
 type CacheConfig struct {
-	MaxCacheSize    ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`   // The maximum size of the cache in bytes.
+	MaxCacheSize    ConfigProp[bytesize.ByteSize] `json:"max_cache_size"`   // The maximum size of the cache across all tiers.
 	Type            ConfigProp[CacheType]         `json:"type"`             // The type of cache to use. Supported values are "memory", "file", and "hybrid".
-	CleanupInterval ConfigProp[duration.Duration] `json:"cleanup_interval"` // The interval at which the cache will be cleaned up.
+	CleanupInterval ConfigProp[duration.Duration] `json:"cleanup_interval"` // The interval at which expired cache entries are removed.
 	LockShards      ConfigProp[int]               `json:"lock_shards"`      // The number of shards to use for per-key locking.
 	File            FileCacheConfig               `json:"file"`
 	Memory          MemoryCacheConfig             `json:"memory"`
@@ -59,7 +59,8 @@ func (c *CacheConfig) verify() error {
 	if c.File.Dir.Read() == "" {
 		return fmt.Errorf("cache.file.dir cannot be empty")
 	}
-	if c.Type.Read() != CacheTypeFile && c.Type.Read() != CacheTypeMemory && c.Type.Read() != CacheTypeHybrid {
+	cType := c.Type.Read()
+	if cType != CacheTypeFile && cType != CacheTypeMemory && cType != CacheTypeHybrid {
 		return fmt.Errorf("cache.type must be one of 'file', 'memory', or 'hybrid'")
 	}
 	return nil
@@ -68,17 +69,17 @@ func (c *CacheConfig) verify() error {
 func defaultCacheConfig() CacheConfig {
 	return CacheConfig{
 		MaxCacheSize:    NewConfigProp(bytesize.ParseUnchecked("10G")),
-		Type:            NewConfigProp(CacheTypeMemory),
-		CleanupInterval: NewConfigProp(duration.Duration(90 * time.Minute)),
+		Type:            NewConfigProp(CacheTypeHybrid),
+		CleanupInterval: NewConfigProp(duration.Duration(5 * time.Minute)),
 		LockShards:      NewConfigProp(1024),
 		File: FileCacheConfig{
 			Dir: NewConfigProp("var/cache/"),
 		},
 		Memory: MemoryCacheConfig{
-			MemoryBudgetPercent: NewConfigProp(75),
+			MemoryBudgetPercent: NewConfigProp(25),
 		},
 		Hybrid: HybridCacheConfig{
-			DemoteAfter: NewConfigProp(duration.Duration(10 * time.Minute)),
+			DemoteAfter: NewConfigProp(duration.Duration(5 * time.Minute)),
 		},
 	}
 }
