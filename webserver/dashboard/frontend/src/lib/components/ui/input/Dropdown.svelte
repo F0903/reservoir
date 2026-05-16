@@ -1,4 +1,6 @@
 <script lang="ts">
+    import InputLabel from "./InputLabel.svelte";
+
     let {
         label,
         options,
@@ -14,12 +16,14 @@
         tooltip?: string;
         disabled?: boolean;
     } = $props();
+
+    const inputId = $derived(`${label}-dropdown`);
 </script>
 
 <div class="input-label-container">
-    <label class="label" for="{label}-dropdown" title={tooltip}>{label}</label>
+    <InputLabel {label} {tooltip} {inputId} />
     <div class="input-container">
-        <select class="input" name="{label}-dropdown" id="{label}-dropdown" bind:value {disabled}>
+        <select class="input" name={inputId} id={inputId} bind:value {disabled}>
             {#if !required}
                 <option value="" selected={value === ""}>Select an option</option>
             {/if}
@@ -61,16 +65,6 @@
     .input-container:has(.input:focus) {
         border-color: var(--secondary-400);
         background-color: var(--primary-700);
-    }
-
-    .label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--secondary-300);
-        opacity: 0.8;
-        padding-left: 0.2rem;
     }
 
     .input:disabled {

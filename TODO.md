@@ -10,6 +10,6 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 ## Dashboard 
 - [ ] Make widgets more responsive depending on their size. 
-- [ ] Use custom tooltip component more places instead of browser tooltips.
+- [x] Use custom tooltip component more places instead of browser tooltips.
 
 ## Project Wide

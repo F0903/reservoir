@@ -3,6 +3,7 @@
     import { resolve } from "$app/paths";
     import { version } from "$lib/api/objects/version/version";
     import { userIsAdmin } from "$lib/auth/permissions";
+    import Tooltip from "$lib/components/ui/Tooltip.svelte";
     import { onMount } from "svelte";
     import { getAuthProvider } from "$lib/context";
     import { LogOut, Menu, ShieldCheck, User } from "@lucide/svelte";
@@ -49,10 +50,12 @@
                     </span>
                 {/if}
             </button>
-            <button class="logout-btn" onclick={session.logout} title="Logout">
-                <LogOut size={18} />
-                <span class="logout-text">Logout</span>
-            </button>
+            <Tooltip text="Logout" align="end">
+                <button class="logout-btn" onclick={session.logout} aria-label="Logout">
+                    <LogOut size={18} />
+                    <span class="logout-text">Logout</span>
+                </button>
+            </Tooltip>
         </div>
     {/if}
 </header>

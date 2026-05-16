@@ -1,4 +1,6 @@
 <script lang="ts">
+    import InputLabel from "./InputLabel.svelte";
+
     let {
         label,
         value = $bindable(),
@@ -11,20 +13,21 @@
         disabled?: boolean;
     } = $props();
 
+    const inputId = $derived(`${label}-toggle`);
+
     function onToggleClick() {
         value = !value;
     }
 </script>
 
 <div class="toggle-wrapper">
-    <label class="label" for="{label}-toggle" title={tooltip}>{label}</label>
+    <InputLabel {label} {tooltip} {inputId} />
     <div class="input-container">
         <input
             type="checkbox"
             class="input"
-            id="{label}-toggle"
+            id={inputId}
             bind:checked={value}
-            title={tooltip}
             aria-checked={value}
             role="switch"
             {disabled}
@@ -57,16 +60,6 @@
         align-items: center;
         gap: 1rem;
         height: 42px;
-    }
-
-    .label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--secondary-300);
-        opacity: 0.8;
-        padding-left: 0.2rem;
     }
 
     .status-text {

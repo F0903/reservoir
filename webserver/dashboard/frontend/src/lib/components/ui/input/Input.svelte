@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { Snippet } from "svelte";
+    import InputLabel from "./InputLabel.svelte";
 
     let {
         type = "text",
@@ -35,6 +36,7 @@
     } = $props();
 
     let input: HTMLInputElement;
+    const inputId = $derived(`${label}-${type}-input`);
 
     let hasCustomError = false;
 
@@ -53,17 +55,16 @@
 </script>
 
 <div class="input-label-container">
-    <label class="label" for="{label}-{type}-input" title={tooltip}>{label}</label>
+    <InputLabel {label} {tooltip} {inputId} />
     <div class="input-container">
         <input
             bind:this={input}
             {type}
             class="input"
-            id="{label}-{type}-input"
+            id={inputId}
             {pattern}
             bind:value
             {placeholder}
-            title={tooltip}
             onsubmit={onSubmit}
             maxlength={maxCharacters}
             {min}
@@ -115,16 +116,6 @@
         gap: 0.4rem;
         width: var(--input-width, 100%);
         margin: 0.75rem 0;
-    }
-
-    .label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--secondary-300);
-        opacity: 0.8;
-        padding-left: 0.2rem;
     }
 
     .suffix {
