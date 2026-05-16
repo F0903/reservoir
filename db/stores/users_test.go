@@ -6,6 +6,7 @@ import (
 	"reservoir/db"
 	"reservoir/db/models"
 	"reservoir/utils/phc"
+	"sync"
 	"testing"
 )
 
@@ -149,6 +150,32 @@ func TestUpdateAdminRejectsDemotingLastAdmin(t *testing.T) {
 	}
 }
 
+func TestUpdateAdminConcurrentDemotionsKeepOneAdmin(t *testing.T) {
+	store := newTestUserStore(t)
+	first, err := store.Create(testUser("first"))
+	if err != nil {
+		t.Fatalf("failed to create first admin: %v", err)
+	}
+	second, err := store.Create(testUser("second"))
+	if err != nil {
+		t.Fatalf("failed to create second admin: %v", err)
+	}
+
+	errs := runConcurrently(
+		func() error {
+			_, err := store.UpdateAdmin(first.ID, false)
+			return err
+		},
+		func() error {
+			_, err := store.UpdateAdmin(second.ID, false)
+			return err
+		},
+	)
+
+	assertOneSuccessOneLastAdmin(t, errs)
+	assertAdminCount(t, store, 1)
+}
+
 func TestUpdateAdminAllowsMultipleAdmins(t *testing.T) {
 	store := newTestUserStore(t)
 	admin, err := store.Create(testUser("admin"))
@@ -180,6 +207,21 @@ func TestUpdateAdminAllowsMultipleAdmins(t *testing.T) {
 	}
 }
 
+func TestSaveRejectsDemotingLastAdmin(t *testing.T) {
+	store := newTestUserStore(t)
+	admin, err := store.Create(testUser("admin"))
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+
+	admin.IsAdmin = false
+	err = store.Save(admin)
+	if !errors.Is(err, ErrLastAdmin) {
+		t.Fatalf("expected ErrLastAdmin, got %v", err)
+	}
+	assertAdminCount(t, store, 1)
+}
+
 func TestDeleteRejectsDeletingLastAdmin(t *testing.T) {
 	store := newTestUserStore(t)
 	admin, err := store.Create(testUser("admin"))
@@ -190,6 +232,37 @@ func TestDeleteRejectsDeletingLastAdmin(t *testing.T) {
 	err = store.Delete(admin.ID)
 	if !errors.Is(err, ErrLastAdmin) {
 		t.Fatalf("expected ErrLastAdmin, got %v", err)
+	}
+}
+
+func TestDeleteConcurrentAdminsKeepsOneAdmin(t *testing.T) {
+	store := newTestUserStore(t)
+	first, err := store.Create(testUser("first"))
+	if err != nil {
+		t.Fatalf("failed to create first admin: %v", err)
+	}
+	second, err := store.Create(testUser("second"))
+	if err != nil {
+		t.Fatalf("failed to create second admin: %v", err)
+	}
+
+	errs := runConcurrently(
+		func() error { return store.Delete(first.ID) },
+		func() error { return store.Delete(second.ID) },
+	)
+
+	assertOneSuccessOneLastAdmin(t, errs)
+	assertAdminCount(t, store, 1)
+
+	users, err := store.List()
+	if err != nil {
+		t.Fatalf("failed to list users: %v", err)
+	}
+	if len(users) != 1 {
+		t.Fatalf("expected one remaining user, got %d", len(users))
+	}
+	if !users[0].IsAdmin {
+		t.Fatal("expected the remaining user to still be an admin")
 	}
 }
 
@@ -210,5 +283,60 @@ func TestUpdatePasswordSetsPasswordAndRequirement(t *testing.T) {
 	}
 	if !updated.PasswordHash.VerifyArgon2id("new-password") {
 		t.Fatal("expected updated password hash to verify")
+	}
+}
+
+func runConcurrently(first func() error, second func() error) [2]error {
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var errs [2]error
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		errs[0] = first()
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		errs[1] = second()
+	}()
+
+	close(start)
+	wg.Wait()
+	return errs
+}
+
+func assertOneSuccessOneLastAdmin(t *testing.T, errs [2]error) {
+	t.Helper()
+
+	successes := 0
+	lastAdminErrors := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrLastAdmin):
+			lastAdminErrors++
+		default:
+			t.Fatalf("expected nil or ErrLastAdmin, got %v", err)
+		}
+	}
+
+	if successes != 1 || lastAdminErrors != 1 {
+		t.Fatalf("expected one success and one ErrLastAdmin, got errors: %v", errs)
+	}
+}
+
+func assertAdminCount(t *testing.T, store *UserStore, want int) {
+	t.Helper()
+
+	admins, err := store.CountAdmins()
+	if err != nil {
+		t.Fatalf("failed to count admins: %v", err)
+	}
+	if admins != want {
+		t.Fatalf("expected %d admin(s), got %d", want, admins)
 	}
 }

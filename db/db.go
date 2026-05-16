@@ -24,9 +24,13 @@ type Database struct {
 	raw *sqlx.DB
 }
 
+type Tx struct {
+	raw *sqlx.Tx
+}
+
 func Open(path string, busyTimeout int) (Database, error) {
 	// Windows-friendly file URI. Relative path is fine too.
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(%d)&_pragma=foreign_keys(1)", path, busyTimeout)
+	dsn := fmt.Sprintf("file:%s?_txlock=immediate&_pragma=busy_timeout(%d)&_pragma=foreign_keys(1)", path, busyTimeout)
 	db, err := sqlx.Open("sqlite", dsn)
 	if err != nil {
 		return Database{}, err
@@ -72,6 +76,39 @@ func (db *Database) Exec(query string, args ...any) error {
 
 func (db *Database) ExecResult(query string, args ...any) (sql.Result, error) {
 	return db.raw.Exec(query, args...)
+}
+
+func (db *Database) WithTransaction(fn func(*Tx) error) error {
+	tx, err := db.raw.Beginx()
+	if err != nil {
+		return err
+	}
+
+	if err := fn(&Tx{raw: tx}); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return errors.Join(err, rollbackErr)
+		}
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (tx *Tx) Get(dest any, query string, args ...any) error {
+	return tx.raw.Get(dest, query, args...)
+}
+
+func (tx *Tx) Select(dest any, query string, args ...any) error {
+	return tx.raw.Select(dest, query, args...)
+}
+
+func (tx *Tx) Exec(query string, args ...any) error {
+	_, err := tx.raw.Exec(query, args...)
+	return err
+}
+
+func (tx *Tx) ExecResult(query string, args ...any) (sql.Result, error) {
+	return tx.raw.Exec(query, args...)
 }
 
 func (db *Database) Migrate() error {

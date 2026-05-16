@@ -32,21 +32,33 @@ func OpenUserStore() (*UserStore, error) {
 
 // Saves the given user to the database. If a user with the same username already exists, it is updated.
 func (s *UserStore) Save(user *models.User) error {
-	return s.db.Exec(
-		`
-		INSERT INTO users (username, password_hash, is_admin, password_change_required)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(username) DO UPDATE SET
-			username = excluded.username,
-			password_hash = excluded.password_hash,
-			is_admin = excluded.is_admin,
-			password_change_required = excluded.password_change_required;
-		`,
-		user.Username,
-		user.PasswordHash,
-		user.IsAdmin,
-		user.PasswordChangeRequired,
-	)
+	return s.db.WithTransaction(func(tx *db.Tx) error {
+		existing, err := getUserByUsername(tx, user.Username)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			if err := ensureCanRemoveAdmin(tx, existing.IsAdmin && !user.IsAdmin); err != nil {
+				return err
+			}
+		}
+
+		return tx.Exec(
+			`
+			INSERT INTO users (username, password_hash, is_admin, password_change_required)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(username) DO UPDATE SET
+				username = excluded.username,
+				password_hash = excluded.password_hash,
+				is_admin = excluded.is_admin,
+				password_change_required = excluded.password_change_required;
+			`,
+			user.Username,
+			user.PasswordHash,
+			user.IsAdmin,
+			user.PasswordChangeRequired,
+		)
+	})
 }
 
 func (s *UserStore) Create(user *models.User) (*models.User, error) {
@@ -135,8 +147,21 @@ func (s *UserStore) List() ([]models.User, error) {
 
 // Returns the user with the given username, or nil if no such user exists.
 func (s *UserStore) GetByUsername(username string) (*models.User, error) {
+	return getUserByUsername(&s.db, username)
+}
+
+// Returns the user with the given ID, or nil if no such user exists.
+func (s *UserStore) GetByID(id int64) (*models.User, error) {
+	return getUserByID(&s.db, id)
+}
+
+type userGetter interface {
+	Get(dest any, query string, args ...any) error
+}
+
+func getUserByUsername(q userGetter, username string) (*models.User, error) {
 	var user models.User
-	err := s.db.Get(&user, "SELECT * FROM users WHERE username = ?", username)
+	err := q.Get(&user, "SELECT * FROM users WHERE username = ?", username)
 	if err != nil {
 		if db.IsResponseEmpty(err) {
 			return nil, nil
@@ -146,10 +171,9 @@ func (s *UserStore) GetByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-// Returns the user with the given ID, or nil if no such user exists.
-func (s *UserStore) GetByID(id int64) (*models.User, error) {
+func getUserByID(q userGetter, id int64) (*models.User, error) {
 	var user models.User
-	err := s.db.Get(&user, "SELECT * FROM users WHERE id = ?", id)
+	err := q.Get(&user, "SELECT * FROM users WHERE id = ?", id)
 	if err != nil {
 		if db.IsResponseEmpty(err) {
 			return nil, nil
@@ -181,27 +205,36 @@ func (s *UserStore) UpdateUsername(id int64, username string) (*models.User, err
 }
 
 func (s *UserStore) UpdateAdmin(id int64, isAdmin bool) (*models.User, error) {
-	user, err := s.GetByID(id)
+	var updated *models.User
+
+	err := s.db.WithTransaction(func(tx *db.Tx) error {
+		user, err := getUserByID(tx, id)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return ErrUserNotFound
+		}
+
+		if err := ensureCanRemoveAdmin(tx, user.IsAdmin && !isAdmin); err != nil {
+			return err
+		}
+
+		result, err := tx.ExecResult("UPDATE users SET is_admin = ? WHERE id = ?", isAdmin, id)
+		if err != nil {
+			return err
+		}
+		if err := ensureRowsAffected(result); err != nil {
+			return err
+		}
+
+		updated, err = getUserByID(tx, id)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-
-	if err := s.ensureCanRemoveAdmin(user.IsAdmin && !isAdmin); err != nil {
-		return nil, err
-	}
-
-	result, err := s.db.ExecResult("UPDATE users SET is_admin = ? WHERE id = ?", isAdmin, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := ensureRowsAffected(result); err != nil {
-		return nil, err
-	}
-
-	return s.GetByID(id)
+	return updated, nil
 }
 
 func (s *UserStore) UpdatePassword(id int64, passwordHash phc.PHC, passwordChangeRequired bool) (*models.User, error) {
@@ -222,22 +255,24 @@ func (s *UserStore) UpdatePassword(id int64, passwordHash phc.PHC, passwordChang
 }
 
 func (s *UserStore) Delete(id int64) error {
-	user, err := s.GetByID(id)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return ErrUserNotFound
-	}
-	if err := s.ensureCanRemoveAdmin(user.IsAdmin); err != nil {
-		return err
-	}
+	return s.db.WithTransaction(func(tx *db.Tx) error {
+		user, err := getUserByID(tx, id)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return ErrUserNotFound
+		}
+		if err := ensureCanRemoveAdmin(tx, user.IsAdmin); err != nil {
+			return err
+		}
 
-	result, err := s.db.ExecResult("DELETE FROM users WHERE id = ?", id)
-	if err != nil {
-		return err
-	}
-	return ensureRowsAffected(result)
+		result, err := tx.ExecResult("DELETE FROM users WHERE id = ?", id)
+		if err != nil {
+			return err
+		}
+		return ensureRowsAffected(result)
+	})
 }
 
 func ensureRowsAffected(result interface{ RowsAffected() (int64, error) }) error {
@@ -251,12 +286,12 @@ func ensureRowsAffected(result interface{ RowsAffected() (int64, error) }) error
 	return nil
 }
 
-func (s *UserStore) ensureCanRemoveAdmin(removingAdmin bool) error {
+func ensureCanRemoveAdmin(q userGetter, removingAdmin bool) error {
 	if !removingAdmin {
 		return nil
 	}
 
-	admins, err := s.CountAdmins()
+	admins, err := countAdmins(q)
 	if err != nil {
 		return err
 	}
@@ -273,8 +308,12 @@ func (s *UserStore) Count() (int, error) {
 }
 
 func (s *UserStore) CountAdmins() (int, error) {
+	return countAdmins(&s.db)
+}
+
+func countAdmins(q userGetter) (int, error) {
 	var count int
-	err := s.db.Get(&count, "SELECT COUNT(*) FROM users WHERE is_admin")
+	err := q.Get(&count, "SELECT COUNT(*) FROM users WHERE is_admin")
 	return count, err
 }
 
