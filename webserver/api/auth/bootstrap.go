@@ -41,7 +41,7 @@ func (e *BootstrapEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *BootstrapEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	required, err := coreauth.BootstrapRequired()
+	required, err := coreauth.BootstrapRequired(ctx.UserStore)
 	if err != nil {
 		slog.Error("Error checking bootstrap status", "error", err)
 		apihttp.InternalServerError(w)
@@ -61,7 +61,7 @@ func (e *BootstrapEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx api
 		return
 	}
 
-	user, err := coreauth.CreateBootstrapAdmin(req.Username, req.Password)
+	user, err := coreauth.CreateBootstrapAdmin(ctx.UserStore, req.Username, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, coreauth.ErrBootstrapNotRequired):

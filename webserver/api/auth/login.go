@@ -41,7 +41,7 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	user, err := creds.Authenticate()
+	user, err := creds.Authenticate(ctx.UserStore)
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			apihttp.Error(w, "Invalid Credentials", http.StatusUnauthorized)

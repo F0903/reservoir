@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reservoir/config"
 	dbmodels "reservoir/db/models"
+	"reservoir/db/stores"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	authEndpoints "reservoir/webserver/api/auth"
@@ -30,11 +31,12 @@ type API struct {
 	basePath  string
 	cfg       *config.Config
 	sessions  *coreauth.SessionManager
+	users     *stores.UserStore
 	cache     apitypes.CacheController
 	endpoints []apitypes.Endpoint
 }
 
-func New(cfg *config.Config, sessions *coreauth.SessionManager, cacheController apitypes.CacheController) *API {
+func New(cfg *config.Config, sessions *coreauth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController) *API {
 	if sessions == nil {
 		sessions = coreauth.DefaultSessionManager()
 	}
@@ -43,6 +45,7 @@ func New(cfg *config.Config, sessions *coreauth.SessionManager, cacheController 
 		basePath: "/api",
 		cfg:      cfg,
 		sessions: sessions,
+		users:    users,
 		cache:    cacheController,
 		endpoints: []apitypes.Endpoint{
 			// Register all our current API endpoints here.
@@ -102,15 +105,14 @@ func adminAllowed(user *dbmodels.User, method apitypes.EndpointMethod) bool {
 	return !method.RequiresAdmin || user.IsAdmin
 }
 
-func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, cacheController apitypes.CacheController, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
+func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := apitypes.CreateContext(r, cfg, sessions, cacheController)
+		ctx, err := apitypes.CreateContext(r, cfg, sessions, users, cacheController)
 		if err != nil {
 			slog.Error("Error creating request context", "error", err)
 			apihttp.InternalServerError(w)
 			return
 		}
-		defer ctx.Close()
 
 		if preRunHook != nil {
 			if status, err := preRunHook(ctx); err != nil {
@@ -151,7 +153,7 @@ func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
-			mux.HandleFunc(pattern, WrapHandler(api.cfg, api.sessions, api.cache, method.Func, func(ctx apitypes.Context) (int, error) {
+			mux.HandleFunc(pattern, WrapHandler(api.cfg, api.sessions, api.users, api.cache, method.Func, func(ctx apitypes.Context) (int, error) {
 				return EnsureAllowed(ctx, method)
 			}))
 			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())

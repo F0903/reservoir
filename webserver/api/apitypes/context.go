@@ -7,7 +7,6 @@ import (
 	"reservoir/config"
 	"reservoir/db/models"
 	"reservoir/db/stores"
-	"reservoir/utils/phc"
 	"reservoir/webserver/auth"
 )
 
@@ -16,41 +15,20 @@ type CacheController interface {
 	ClearCache() error
 }
 
-type UserStore interface {
-	Create(user *models.User) (*models.User, error)
-	List() ([]models.User, error)
-	GetByID(id int64) (*models.User, error)
-	GetByUsername(username string) (*models.User, error)
-	UpdateUsername(id int64, username string) (*models.User, error)
-	UpdateAdmin(id int64, isAdmin bool) (*models.User, error)
-	UpdatePassword(id int64, passwordHash phc.PHC, passwordChangeRequired bool) (*models.User, error)
-	Delete(id int64) error
-	Save(user *models.User) error
-	Close() error
-}
-
 type Context struct {
 	Session        *auth.Session
 	SessionManager *auth.SessionManager
-	UserStore      UserStore
+	UserStore      *stores.UserStore
 	Config         *config.Config
 	Cache          CacheController
 }
 
-func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager, cacheController CacheController) (Context, error) {
+func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager, users *stores.UserStore, cacheController CacheController) (Context, error) {
 	if sessions == nil {
 		sessions = auth.DefaultSessionManager()
 	}
 
-	sess, authorized := sessions.SessionFromRequest(r)
-	var users UserStore
-	if authorized {
-		var err error
-		users, err = stores.OpenUserStore()
-		if err != nil {
-			return Context{}, err
-		}
-	}
+	sess, _ := sessions.SessionFromRequest(r)
 
 	return Context{
 		Session:        sess,
@@ -73,10 +51,4 @@ func (c *Context) GetCurrentUser() (*models.User, error) {
 		return nil, auth.ErrNoSession
 	}
 	return c.UserStore.GetByID(c.Session.UserID)
-}
-
-func (c *Context) Close() {
-	if c.UserStore != nil {
-		c.UserStore.Close()
-	}
 }

@@ -15,12 +15,13 @@ const (
 )
 
 var (
-	ErrBootstrapNotRequired       = errors.New("bootstrap is not required")
-	ErrBootstrapUsernameEmpty     = errors.New("bootstrap username must not be empty")
-	ErrBootstrapPasswordEmpty     = errors.New("bootstrap password must not be empty")
-	ErrBootstrapPasswordTooShort  = errors.New("bootstrap password must be at least 12 characters")
-	ErrBootstrapUserCreateFailed  = errors.New("bootstrap user create failed")
-	ErrBootstrapCreatedUserLookup = errors.New("bootstrap user lookup failed after create")
+	ErrBootstrapNotRequired          = errors.New("bootstrap is not required")
+	ErrBootstrapUsernameEmpty        = errors.New("bootstrap username must not be empty")
+	ErrBootstrapPasswordEmpty        = errors.New("bootstrap password must not be empty")
+	ErrBootstrapPasswordTooShort     = errors.New("bootstrap password must be at least 12 characters")
+	ErrBootstrapUserCreateFailed     = errors.New("bootstrap user create failed")
+	ErrBootstrapCreatedUserLookup    = errors.New("bootstrap user lookup failed after create")
+	ErrBootstrapUserStoreUnavailable = errors.New("bootstrap user store unavailable")
 )
 
 type BootstrapResult struct {
@@ -28,27 +29,14 @@ type BootstrapResult struct {
 	Required bool
 }
 
-type bootstrapUserStore interface {
-	Count() (int, error)
-}
-
-type bootstrapCreateUserStore interface {
-	GetByUsername(username string) (*models.User, error)
-	Count() (int, error)
-	CreateFirst(user *models.User) error
-}
-
-func EnsureBootstrapAdmin() (*BootstrapResult, error) {
-	users, err := stores.OpenUserStore()
-	if err != nil {
-		return nil, err
-	}
-	defer users.Close()
-
+func EnsureBootstrapAdmin(users *stores.UserStore) (*BootstrapResult, error) {
 	return ensureBootstrapAdmin(users)
 }
 
-func ensureBootstrapAdmin(users bootstrapUserStore) (*BootstrapResult, error) {
+func ensureBootstrapAdmin(users *stores.UserStore) (*BootstrapResult, error) {
+	if users == nil {
+		return nil, ErrBootstrapUserStoreUnavailable
+	}
 	required, err := bootstrapRequired(users)
 	if err != nil {
 		return nil, err
@@ -64,17 +52,14 @@ func ensureBootstrapAdmin(users bootstrapUserStore) (*BootstrapResult, error) {
 	}, nil
 }
 
-func BootstrapRequired() (bool, error) {
-	users, err := stores.OpenUserStore()
-	if err != nil {
-		return false, err
-	}
-	defer users.Close()
-
+func BootstrapRequired(users *stores.UserStore) (bool, error) {
 	return bootstrapRequired(users)
 }
 
-func bootstrapRequired(users interface{ Count() (int, error) }) (bool, error) {
+func bootstrapRequired(users *stores.UserStore) (bool, error) {
+	if users == nil {
+		return false, ErrBootstrapUserStoreUnavailable
+	}
 	count, err := users.Count()
 	if err != nil {
 		return false, err
@@ -82,17 +67,14 @@ func bootstrapRequired(users interface{ Count() (int, error) }) (bool, error) {
 	return count == 0, nil
 }
 
-func CreateBootstrapAdmin(username string, password string) (*models.User, error) {
-	users, err := stores.OpenUserStore()
-	if err != nil {
-		return nil, err
-	}
-	defer users.Close()
-
+func CreateBootstrapAdmin(users *stores.UserStore, username string, password string) (*models.User, error) {
 	return createBootstrapAdmin(users, username, password)
 }
 
-func createBootstrapAdmin(users bootstrapCreateUserStore, username string, password string) (*models.User, error) {
+func createBootstrapAdmin(users *stores.UserStore, username string, password string) (*models.User, error) {
+	if users == nil {
+		return nil, ErrBootstrapUserStoreUnavailable
+	}
 	username = strings.TrimSpace(username)
 	if username == "" {
 		return nil, ErrBootstrapUsernameEmpty

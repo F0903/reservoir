@@ -2,56 +2,44 @@ package auth
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
+	"reservoir/db"
 	"reservoir/db/models"
 	"reservoir/db/stores"
+	"reservoir/utils/phc"
 )
 
-type fakeBootstrapUserStore struct {
-	users     map[string]*models.User
-	saveCount int
-}
+func newTestBootstrapUserStore(t *testing.T, users ...*models.User) *stores.UserStore {
+	t.Helper()
 
-func newFakeBootstrapUserStore(users ...*models.User) *fakeBootstrapUserStore {
-	store := &fakeBootstrapUserStore{users: map[string]*models.User{}}
+	databasePath := filepath.ToSlash(filepath.Join(t.TempDir(), "database.db"))
+	database, err := db.Open(databasePath, 5000)
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
+	}
+	if err := database.Migrate(); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
+	}
+
+	store := stores.NewUserStore(database)
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Fatalf("failed to close test user store: %v", err)
+		}
+	})
+
 	for _, user := range users {
-		userCopy := *user
-		store.users[user.Username] = &userCopy
+		if err := store.Save(user); err != nil {
+			t.Fatalf("failed to seed test user %q: %v", user.Username, err)
+		}
 	}
 	return store
 }
 
-func (s *fakeBootstrapUserStore) GetByUsername(username string) (*models.User, error) {
-	user, ok := s.users[username]
-	if !ok {
-		return nil, nil
-	}
-	userCopy := *user
-	return &userCopy, nil
-}
-
-func (s *fakeBootstrapUserStore) Count() (int, error) {
-	return len(s.users), nil
-}
-
-func (s *fakeBootstrapUserStore) Save(user *models.User) error {
-	userCopy := *user
-	s.users[user.Username] = &userCopy
-	s.saveCount++
-	return nil
-}
-
-func (s *fakeBootstrapUserStore) CreateFirst(user *models.User) error {
-	if len(s.users) > 0 {
-		return stores.ErrUserStoreNotEmpty
-	}
-
-	return s.Save(user)
-}
-
 func TestEnsureBootstrapAdminReportsRequiredForEmptyStore(t *testing.T) {
-	store := newFakeBootstrapUserStore()
+	store := newTestBootstrapUserStore(t)
 
 	result, err := ensureBootstrapAdmin(store)
 	if err != nil {
@@ -61,15 +49,20 @@ func TestEnsureBootstrapAdminReportsRequiredForEmptyStore(t *testing.T) {
 	if result == nil || !result.Required {
 		t.Fatalf("expected bootstrap required result, got %#v", result)
 	}
-	if store.saveCount != 0 {
-		t.Fatalf("expected empty store bootstrap check not to save users, saved %d times", store.saveCount)
+	count, err := store.Count()
+	if err != nil {
+		t.Fatalf("failed to count users: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected empty store bootstrap check not to create users, found %d", count)
 	}
 }
 
 func TestEnsureBootstrapAdminDoesNothingWhenUsersExist(t *testing.T) {
-	store := newFakeBootstrapUserStore(&models.User{
-		Username: DefaultAdminUsername,
-		IsAdmin:  true,
+	store := newTestBootstrapUserStore(t, &models.User{
+		Username:     DefaultAdminUsername,
+		PasswordHash: *phc.GenerateArgon2id("existing-password"),
+		IsAdmin:      true,
 	})
 
 	result, err := ensureBootstrapAdmin(store)
@@ -80,13 +73,17 @@ func TestEnsureBootstrapAdminDoesNothingWhenUsersExist(t *testing.T) {
 	if result != nil {
 		t.Fatalf("expected no bootstrap result, got %#v", result)
 	}
-	if store.saveCount != 0 {
-		t.Fatalf("expected configured admin to remain unchanged, saved %d times", store.saveCount)
+	count, err := store.Count()
+	if err != nil {
+		t.Fatalf("failed to count users: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected configured admin to remain unchanged, found %d users", count)
 	}
 }
 
 func TestCreateBootstrapAdminCreatesFirstAdmin(t *testing.T) {
-	store := newFakeBootstrapUserStore()
+	store := newTestBootstrapUserStore(t)
 
 	user, err := createBootstrapAdmin(store, " admin ", "generated-password")
 	if err != nil {
@@ -111,9 +108,10 @@ func TestCreateBootstrapAdminCreatesFirstAdmin(t *testing.T) {
 }
 
 func TestCreateBootstrapAdminRejectsExistingUsers(t *testing.T) {
-	store := newFakeBootstrapUserStore(&models.User{
-		Username: "existing",
-		IsAdmin:  true,
+	store := newTestBootstrapUserStore(t, &models.User{
+		Username:     "existing",
+		PasswordHash: *phc.GenerateArgon2id("existing-password"),
+		IsAdmin:      true,
 	})
 
 	_, err := createBootstrapAdmin(store, DefaultAdminUsername, "generated-password")
@@ -136,7 +134,7 @@ func TestCreateBootstrapAdminValidatesInput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := newFakeBootstrapUserStore()
+			store := newTestBootstrapUserStore(t)
 
 			_, err := createBootstrapAdmin(store, tt.username, tt.password)
 			if !errors.Is(err, tt.wantErr) {

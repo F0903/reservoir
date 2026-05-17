@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidCredentials   = errors.New("invalid credentials")
+	ErrUserStoreUnavailable = errors.New("user store unavailable")
 )
 
 type Credentials struct {
@@ -15,13 +16,10 @@ type Credentials struct {
 	Password string `json:"password"`
 }
 
-func (c *Credentials) Authenticate() (*models.User, error) {
-	users, err := stores.OpenUserStore()
-	if err != nil {
-		return nil, err
+func (c *Credentials) Authenticate(users *stores.UserStore) (*models.User, error) {
+	if users == nil {
+		return nil, ErrUserStoreUnavailable
 	}
-	defer users.Close()
-
 	user, err := users.GetByUsername(c.Username)
 	if err != nil {
 		return nil, err

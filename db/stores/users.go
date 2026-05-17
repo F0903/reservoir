@@ -20,14 +20,8 @@ type UserStore struct {
 	db db.Database
 }
 
-// Opens a connection to the user store on the main database.
-func OpenUserStore() (*UserStore, error) {
-	db, err := db.OpenMainDatabase()
-	if err != nil {
-		return nil, err
-	}
-
-	return &UserStore{db: db}, nil
+func NewUserStore(database db.Database) *UserStore {
+	return &UserStore{db: database}
 }
 
 // Saves the given user to the database. If a user with the same username already exists, it is updated.

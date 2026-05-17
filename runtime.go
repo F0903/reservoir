@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"reservoir/config"
 	"reservoir/db"
+	"reservoir/db/stores"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
@@ -22,6 +23,7 @@ type Runtime struct {
 	proxy            *proxy.Proxy
 	webserver        *webserver.WebServer
 	sessions         *auth.SessionManager
+	userStore        *stores.UserStore
 	webserverEnabled bool
 	sessionGCEnabled bool
 }
@@ -31,9 +33,19 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to migrate databases: %w", err)
 	}
 
-	if !cfg.Webserver.ApiDisabled.Read() {
-		bootstrap, err := auth.EnsureBootstrapAdmin()
+	apiDisabled := cfg.Webserver.ApiDisabled.Read()
+
+	var users *stores.UserStore
+	if !apiDisabled {
+		database, err := db.OpenMainDatabase()
 		if err != nil {
+			return nil, fmt.Errorf("failed to open main database: %w", err)
+		}
+		users = stores.NewUserStore(database)
+
+		bootstrap, err := auth.EnsureBootstrapAdmin(users)
+		if err != nil {
+			_ = users.Close()
 			return nil, fmt.Errorf("failed to ensure bootstrap admin: %w", err)
 		}
 		if bootstrap != nil {
@@ -47,18 +59,27 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	caKey := cfg.Proxy.CaKey.Read()
 	ca, err := certs.NewPrivateCA(caCert, caKey)
 	if err != nil {
+		if users != nil {
+			_ = users.Close()
+		}
 		return nil, fmt.Errorf("failed to create CA: %w", err)
 	}
 
 	p, err := proxy.NewProxy(cfg, ca, ctx)
 	if err != nil {
+		if users != nil {
+			_ = users.Close()
+		}
 		return nil, fmt.Errorf("failed to create proxy: %w", err)
 	}
 
 	sessions := auth.NewSessionManager()
-	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions, p)
+	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions, users, p)
 	if err != nil {
 		p.Destroy()
+		if users != nil {
+			_ = users.Close()
+		}
 		return nil, err
 	}
 
@@ -67,12 +88,13 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		proxy:            p,
 		webserver:        ws,
 		sessions:         sessions,
+		userStore:        users,
 		webserverEnabled: webserverEnabled,
 		sessionGCEnabled: sessionGCEnabled,
 	}, nil
 }
 
-func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, cacheController apitypes.CacheController) (*webserver.WebServer, bool, bool, error) {
+func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController) (*webserver.WebServer, bool, bool, error) {
 	dashboardDisabled := cfg.Webserver.DashboardDisabled.Read()
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 
@@ -98,7 +120,10 @@ func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, cacheCont
 	if apiDisabled {
 		slog.Info("API is disabled by configuration, skipping registration")
 	} else {
-		a := api.New(cfg, sessions, cacheController)
+		if users == nil {
+			return nil, false, false, fmt.Errorf("API requires an initialized user store")
+		}
+		a := api.New(cfg, sessions, users, cacheController)
 		if err := ws.Register(a); err != nil {
 			return nil, false, false, fmt.Errorf("failed to register API: %w", err)
 		}
@@ -140,5 +165,10 @@ func (r *Runtime) Run(ctx context.Context) error {
 func (r *Runtime) Close() {
 	if r.proxy != nil {
 		r.proxy.Destroy()
+	}
+	if r.userStore != nil {
+		if err := r.userStore.Close(); err != nil {
+			slog.Error("Failed to close user store", "error", err)
+		}
 	}
 }

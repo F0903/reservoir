@@ -2,134 +2,43 @@ package auth
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strconv"
+	"testing"
+
+	"reservoir/db"
 	"reservoir/db/models"
 	"reservoir/db/stores"
 	"reservoir/utils/phc"
 	"reservoir/webserver/api/apitypes"
 	coreauth "reservoir/webserver/auth"
-	"testing"
-	"time"
 )
 
-type fakeManagedUserStore struct {
-	users     map[int64]*models.User
-	nextID    int64
-	deleteErr error
-}
+func newTestManagedUserStore(t *testing.T) *stores.UserStore {
+	t.Helper()
 
-func newFakeManagedUserStore(users ...*models.User) *fakeManagedUserStore {
-	store := &fakeManagedUserStore{
-		users:  make(map[int64]*models.User),
-		nextID: 1,
+	databasePath := filepath.ToSlash(filepath.Join(t.TempDir(), "database.db"))
+	database, err := db.Open(databasePath, 5000)
+	if err != nil {
+		t.Fatalf("failed to open test database: %v", err)
 	}
-	for _, user := range users {
-		userCopy := *user
-		if userCopy.ID == 0 {
-			userCopy.ID = store.nextID
-			store.nextID++
-		}
-		store.users[userCopy.ID] = &userCopy
-		if userCopy.ID >= store.nextID {
-			store.nextID = userCopy.ID + 1
-		}
+	if err := database.Migrate(); err != nil {
+		t.Fatalf("failed to migrate test database: %v", err)
 	}
+
+	store := stores.NewUserStore(database)
+	t.Cleanup(func() {
+		if err := store.Close(); err != nil {
+			t.Fatalf("failed to close test user store: %v", err)
+		}
+	})
 	return store
 }
 
-func (s *fakeManagedUserStore) Create(user *models.User) (*models.User, error) {
-	userCopy := *user
-	userCopy.ID = s.nextID
-	s.nextID++
-	userCopy.CreatedAt = time.Now()
-	userCopy.UpdatedAt = userCopy.CreatedAt
-	s.users[userCopy.ID] = &userCopy
-	return &userCopy, nil
-}
-
-func (s *fakeManagedUserStore) List() ([]models.User, error) {
-	users := make([]models.User, 0, len(s.users))
-	for _, user := range s.users {
-		users = append(users, *user)
-	}
-	return users, nil
-}
-
-func (s *fakeManagedUserStore) GetByID(id int64) (*models.User, error) {
-	user, ok := s.users[id]
-	if !ok {
-		return nil, nil
-	}
-	userCopy := *user
-	return &userCopy, nil
-}
-
-func (s *fakeManagedUserStore) GetByUsername(username string) (*models.User, error) {
-	for _, user := range s.users {
-		if user.Username == username {
-			userCopy := *user
-			return &userCopy, nil
-		}
-	}
-	return nil, nil
-}
-
-func (s *fakeManagedUserStore) UpdateUsername(id int64, username string) (*models.User, error) {
-	user, ok := s.users[id]
-	if !ok {
-		return nil, stores.ErrUserNotFound
-	}
-	user.Username = username
-	userCopy := *user
-	return &userCopy, nil
-}
-
-func (s *fakeManagedUserStore) UpdateAdmin(id int64, isAdmin bool) (*models.User, error) {
-	user, ok := s.users[id]
-	if !ok {
-		return nil, stores.ErrUserNotFound
-	}
-	user.IsAdmin = isAdmin
-	userCopy := *user
-	return &userCopy, nil
-}
-
-func (s *fakeManagedUserStore) UpdatePassword(id int64, passwordHash phc.PHC, passwordChangeRequired bool) (*models.User, error) {
-	user, ok := s.users[id]
-	if !ok {
-		return nil, stores.ErrUserNotFound
-	}
-	user.PasswordHash = passwordHash
-	user.PasswordChangeRequired = passwordChangeRequired
-	userCopy := *user
-	return &userCopy, nil
-}
-
-func (s *fakeManagedUserStore) Delete(id int64) error {
-	if s.deleteErr != nil {
-		return s.deleteErr
-	}
-	if _, ok := s.users[id]; !ok {
-		return stores.ErrUserNotFound
-	}
-	delete(s.users, id)
-	return nil
-}
-
-func (s *fakeManagedUserStore) Save(user *models.User) error {
-	userCopy := *user
-	s.users[user.ID] = &userCopy
-	return nil
-}
-
-func (s *fakeManagedUserStore) Close() error {
-	return nil
-}
-
 func TestUsersEndpointCreatesUserWithPasswordChangeRequiredByDefault(t *testing.T) {
-	store := newFakeManagedUserStore()
+	store := newTestManagedUserStore(t)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", bytes.NewBufferString(`{
 		"username": "operator",
@@ -144,7 +53,10 @@ func TestUsersEndpointCreatesUserWithPasswordChangeRequiredByDefault(t *testing.
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
 	}
 
-	created := store.users[1]
+	created, err := store.GetByUsername("operator")
+	if err != nil {
+		t.Fatalf("failed to fetch created user: %v", err)
+	}
 	if created == nil {
 		t.Fatal("expected created user")
 	}
@@ -163,21 +75,25 @@ func TestUsersEndpointCreatesUserWithPasswordChangeRequiredByDefault(t *testing.
 }
 
 func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
-	store := newFakeManagedUserStore(&models.User{
-		ID:           7,
+	store := newTestManagedUserStore(t)
+	user, err := store.Create(&models.User{
 		Username:     "operator",
 		PasswordHash: *phc.GenerateArgon2id("old-password"),
 		IsAdmin:      false,
 	})
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
 	sessions := coreauth.NewSessionManager()
-	current := sessions.Create(7)
-	other := sessions.Create(7)
-	req := httptest.NewRequest(http.MethodPatch, "/api/auth/users/7", bytes.NewBufferString(`{
+	current := sessions.Create(user.ID)
+	other := sessions.Create(user.ID)
+	req := httptest.NewRequest(http.MethodPatch, "/api/auth/users/"+strconv.FormatInt(user.ID, 10), bytes.NewBufferString(`{
 		"password": "generated-password",
 		"password_change_required": false
 	}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.SetPathValue("id", "7")
+	req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 	rec := httptest.NewRecorder()
 
 	(&UserEndpoint{}).Patch(rec, req, apitypes.Context{
@@ -195,23 +111,35 @@ func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
 	if _, ok := sessions.Get(other.ID); ok {
 		t.Fatal("expected other session to be destroyed")
 	}
-	if !store.users[7].PasswordHash.VerifyArgon2id("generated-password") {
+
+	updated, err := store.GetByID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch updated user: %v", err)
+	}
+	if updated == nil {
+		t.Fatal("expected updated user")
+	}
+	if !updated.PasswordHash.VerifyArgon2id("generated-password") {
 		t.Fatal("expected password hash to be updated")
 	}
-	if store.users[7].PasswordChangeRequired {
+	if updated.PasswordChangeRequired {
 		t.Fatal("expected password change requirement to be cleared")
 	}
 }
 
 func TestUserEndpointDeleteMapsLastAdminError(t *testing.T) {
-	store := newFakeManagedUserStore(&models.User{
-		ID:       1,
-		Username: "admin",
-		IsAdmin:  true,
+	store := newTestManagedUserStore(t)
+	user, err := store.Create(&models.User{
+		Username:     "admin",
+		PasswordHash: *phc.GenerateArgon2id("admin-password"),
+		IsAdmin:      true,
 	})
-	store.deleteErr = stores.ErrLastAdmin
-	req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/1", nil)
-	req.SetPathValue("id", "1")
+	if err != nil {
+		t.Fatalf("failed to create test admin: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/auth/users/"+strconv.FormatInt(user.ID, 10), nil)
+	req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 	rec := httptest.NewRecorder()
 
 	(&UserEndpoint{}).Delete(rec, req, apitypes.Context{
@@ -222,7 +150,12 @@ func TestUserEndpointDeleteMapsLastAdminError(t *testing.T) {
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusConflict, rec.Code, rec.Body.String())
 	}
-	if !errors.Is(store.deleteErr, stores.ErrLastAdmin) {
-		t.Fatal("expected test store to preserve last-admin error")
+
+	remaining, err := store.GetByID(user.ID)
+	if err != nil {
+		t.Fatalf("failed to fetch admin after failed delete: %v", err)
+	}
+	if remaining == nil {
+		t.Fatal("expected last admin to remain after failed delete")
 	}
 }
