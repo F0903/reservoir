@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"reservoir/config"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -36,7 +36,14 @@ func (e *ConfigEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *ConfigEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	apihttp.WriteJSON(w, http.StatusOK, ctx.Config)
+	cfg, err := ctx.Services.Config.Snapshot()
+	if err != nil {
+		slog.Error("Failed to get config", "error", err)
+		apihttp.InternalServerError(w)
+		return
+	}
+
+	apihttp.WriteJSON(w, http.StatusOK, cfg)
 }
 
 func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
@@ -49,9 +56,9 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apity
 		return
 	}
 
-	status, err := config.UpdatePartialFromConfig(ctx.Config, updates)
+	status, err := ctx.Services.Config.UpdatePartial(updates)
 	if err != nil {
-		if errors.Is(err, config.ErrValidationFailed) {
+		if errors.Is(err, appservices.ErrConfigValidationFailed) {
 			apihttp.BadRequest(w, err.Error())
 			return
 		}
@@ -62,9 +69,9 @@ func (e *ConfigEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apity
 	}
 
 	switch status {
-	case config.UpdateStatusSuccess:
+	case appservices.ConfigUpdateSuccess:
 		apihttp.WriteText(w, http.StatusAccepted, successResponse)
-	case config.UpdateStatusRestartRequired:
+	case appservices.ConfigUpdateRestartRequired:
 		apihttp.WriteText(w, http.StatusAccepted, restartRequiredResponse)
 	}
 }

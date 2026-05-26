@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	appservices "reservoir/application/services"
 	cachecore "reservoir/cache"
 	"reservoir/config"
 	"reservoir/webserver/api/apitypes"
@@ -82,8 +83,7 @@ func TestStatusEndpointReturnsCacheStats(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/cache/status", nil)
 
 	(&StatusEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {
@@ -95,7 +95,7 @@ func TestStatusEndpointReturnsCacheStats(t *testing.T) {
 		return
 	}
 
-	if resp.Type != config.CacheTypeMemory {
+	if resp.Type != string(config.CacheTypeMemory) {
 		t.Fatalf("expected cache type %q, got %q", config.CacheTypeMemory, resp.Type)
 	}
 	if resp.Entries != 3 {
@@ -129,8 +129,7 @@ func TestStatusEndpointReturnsMemoryCapForHybridCache(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/cache/status", nil)
 
 	(&StatusEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {
@@ -142,7 +141,7 @@ func TestStatusEndpointReturnsMemoryCapForHybridCache(t *testing.T) {
 		return
 	}
 
-	if resp.Type != config.CacheTypeHybrid {
+	if resp.Type != string(config.CacheTypeHybrid) {
 		t.Fatalf("expected cache type %q, got %q", config.CacheTypeHybrid, resp.Type)
 	}
 	if resp.MemoryCapBytes == nil || *resp.MemoryCapBytes != 2048 {
@@ -167,8 +166,7 @@ func TestStatusEndpointOmitsMemoryCapForFileCache(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/cache/status", nil)
 
 	(&StatusEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {
@@ -191,7 +189,9 @@ func TestClearEndpointClearsCache(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/cache/clear", nil)
 
-	(&ClearEndpoint{}).Post(rec, req, apitypes.Context{Cache: controller})
+	(&ClearEndpoint{}).Post(rec, req, apitypes.Context{
+		Services: appservices.NewContainer(config.NewDefault(), nil, nil, controller),
+	})
 
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, rec.Code)
@@ -207,7 +207,9 @@ func TestClearEndpointReturnsErrorWhenClearFails(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/cache/clear", nil)
 
-	(&ClearEndpoint{}).Post(rec, req, apitypes.Context{Cache: controller})
+	(&ClearEndpoint{}).Post(rec, req, apitypes.Context{
+		Services: appservices.NewContainer(config.NewDefault(), nil, nil, controller),
+	})
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)

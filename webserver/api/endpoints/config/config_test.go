@@ -3,6 +3,7 @@ package config
 import (
 	"net/http"
 	"net/http/httptest"
+	appservices "reservoir/application/services"
 	coreconfig "reservoir/config"
 	"reservoir/webserver/api/apitypes"
 	"strings"
@@ -23,7 +24,7 @@ func TestPatchReturnsBadRequestForValidationError(t *testing.T) {
 	(&ConfigEndpoint{}).Patch(
 		rec,
 		newPatchRequest(`{"cache":{"max_cache_size":"0B"}}`),
-		apitypes.Context{Config: cfg},
+		apitypes.Context{Services: appservices.NewContainer(cfg, nil, nil, nil)},
 	)
 
 	if rec.Code != http.StatusBadRequest {
@@ -43,7 +44,7 @@ func TestPatchReturnsBadRequestForNullBody(t *testing.T) {
 	(&ConfigEndpoint{}).Patch(
 		rec,
 		newPatchRequest(`null`),
-		apitypes.Context{Config: coreconfig.NewDefault()},
+		apitypes.Context{Services: appservices.NewContainer(coreconfig.NewDefault(), nil, nil, nil)},
 	)
 
 	if rec.Code != http.StatusBadRequest {

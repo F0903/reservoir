@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	appservices "reservoir/application/services"
 	cachecore "reservoir/cache"
 	"reservoir/config"
 	runtimeMetrics "reservoir/metrics"
@@ -51,8 +52,7 @@ func TestCacheMetricsEndpointIncludesCacheStorage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/metrics/cache", nil)
 
 	(&CacheMetricsEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {
@@ -101,8 +101,7 @@ func TestCacheMetricsEndpointIncludesHybridCacheStorage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/metrics/cache", nil)
 
 	(&CacheMetricsEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {
@@ -142,8 +141,7 @@ func TestAllMetricsEndpointIncludesFileCacheStorage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/metrics", nil)
 
 	(&AllMetricsEndpoint{}).Get(rec, req, apitypes.Context{
-		Config: cfg,
-		Cache:  controller,
+		Services: appservices.NewContainer(cfg, nil, nil, controller),
 	})
 
 	if rec.Code != http.StatusOK {

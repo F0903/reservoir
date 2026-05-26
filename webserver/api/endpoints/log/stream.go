@@ -39,7 +39,7 @@ func (m *LogStreamEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apit
 		return
 	}
 
-	logFilePath := ctx.Config.Logging.File.Read()
+	logFilePath := ctx.Services.Config.LogFilePath()
 	if logFilePath == "" {
 		apihttp.Error(w, "No Log File Configured", http.StatusNotFound)
 		return

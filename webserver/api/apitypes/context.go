@@ -3,52 +3,37 @@ package apitypes
 
 import (
 	"net/http"
-	"reservoir/cache"
-	"reservoir/config"
+	appservices "reservoir/application/services"
 	"reservoir/db/models"
-	"reservoir/db/stores"
-	"reservoir/webserver/auth"
 )
 
-type CacheController interface {
-	CacheStats() cache.Stats
-	ClearCache() error
-}
-
 type Context struct {
-	Session        *auth.Session
-	SessionManager *auth.SessionManager
-	UserStore      *stores.UserStore
-	Config         *config.Config
-	Cache          CacheController
+	Request       appservices.RequestContext
+	Services      *appservices.Container
+	authenticated bool
 }
 
-func CreateContext(r *http.Request, cfg *config.Config, sessions *auth.SessionManager, users *stores.UserStore, cacheController CacheController) (Context, error) {
-	if sessions == nil {
-		sessions = auth.DefaultSessionManager()
+func CreateContext(r *http.Request, services *appservices.Container) (Context, error) {
+	if services == nil || services.Auth == nil {
+		return Context{}, appservices.ErrServicesUnavailable
 	}
 
-	sess, _ := sessions.SessionFromRequest(r)
+	request, authenticated := services.Auth.RequestFromHTTP(r)
 
 	return Context{
-		Session:        sess,
-		SessionManager: sessions,
-		UserStore:      users,
-		Config:         cfg,
-		Cache:          cacheController,
+		Request:       request,
+		Services:      services,
+		authenticated: authenticated,
 	}, nil
 }
 
 func (c *Context) IsAuthenticated() bool {
-	return c.Session != nil
+	return c.authenticated
 }
 
 func (c *Context) GetCurrentUser() (*models.User, error) {
-	if !c.IsAuthenticated() {
-		return nil, auth.ErrNoSession
+	if c.Services == nil || c.Services.Auth == nil {
+		return nil, appservices.ErrServicesUnavailable
 	}
-	if c.UserStore == nil {
-		return nil, auth.ErrNoSession
-	}
-	return c.UserStore.GetByID(c.Session.UserID)
+	return c.Services.Auth.CurrentUser(c.Request)
 }

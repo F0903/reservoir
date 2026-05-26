@@ -2,7 +2,6 @@ package config
 
 import (
 	"net/http"
-	"reservoir/config"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -25,6 +24,6 @@ func (e *RestartRequiredEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *RestartRequiredEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	restart := config.IsRestartNeeded()
+	restart := ctx.Services.Config.RestartRequired()
 	apihttp.WriteJSON(w, http.StatusOK, map[string]bool{"restart_required": restart})
 }

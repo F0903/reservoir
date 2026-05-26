@@ -3,7 +3,6 @@ package cache
 import (
 	"log/slog"
 	"net/http"
-	"reservoir/config"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -25,11 +24,11 @@ func (e *StatusEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 type statusResponse struct {
-	Type           config.CacheType `json:"type"`
-	Entries        int              `json:"entries"`
-	Bytes          int64            `json:"bytes"`
-	MaxBytes       int64            `json:"max_bytes"`
-	MemoryCapBytes *int64           `json:"memory_cap_bytes,omitempty"`
+	Type           string `json:"type"`
+	Entries        int    `json:"entries"`
+	Bytes          int64  `json:"bytes"`
+	MaxBytes       int64  `json:"max_bytes"`
+	MemoryCapBytes *int64 `json:"memory_cap_bytes,omitempty"`
 }
 
 func (e *StatusEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
@@ -37,17 +36,19 @@ func (e *StatusEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	stats := ctx.Cache.CacheStats()
-	cacheType := ctx.Config.Cache.Type.Read()
+	status, err := ctx.Services.Cache.Status()
+	if err != nil {
+		slog.Error("Failed to get cache status", "error", err)
+		apihttp.InternalServerError(w)
+		return
+	}
 
 	resp := statusResponse{
-		Type:     cacheType,
-		Entries:  stats.Entries,
-		Bytes:    stats.Bytes,
-		MaxBytes: stats.MaxBytes,
-	}
-	if cacheType == config.CacheTypeMemory || cacheType == config.CacheTypeHybrid {
-		resp.MemoryCapBytes = &stats.MemoryCapBytes
+		Type:           string(status.Type),
+		Entries:        status.Entries,
+		Bytes:          status.Bytes,
+		MaxBytes:       status.MaxBytes,
+		MemoryCapBytes: status.MemoryCapBytes,
 	}
 
 	apihttp.WriteJSON(w, http.StatusOK, resp)
@@ -75,7 +76,7 @@ func (e *ClearEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	if err := ctx.Cache.ClearCache(); err != nil {
+	if err := ctx.Services.Cache.Clear(); err != nil {
 		slog.Error("Failed to clear cache", "error", err)
 		apihttp.InternalServerError(w)
 		return
@@ -85,7 +86,7 @@ func (e *ClearEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 }
 
 func requireCacheController(w http.ResponseWriter, ctx apitypes.Context) bool {
-	if ctx.Cache != nil {
+	if ctx.Services != nil && ctx.Services.Cache != nil && ctx.Services.Cache.Available() {
 		return true
 	}
 

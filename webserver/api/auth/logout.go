@@ -1,10 +1,11 @@
 package auth
 
 import (
+	"log/slog"
 	"net/http"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
-	"time"
 )
 
 type LogoutEndpoint struct{}
@@ -25,12 +26,16 @@ func (e *LogoutEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *LogoutEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	ctx.SessionManager.Destroy(ctx.Session)
-
-	cookie := ctx.Session.BuildSessionCookie()
-	cookie.Value = ""
-	cookie.Expires = time.Unix(0, 0).UTC()
-	cookie.MaxAge = -1
+	cookie, err := ctx.Services.Auth.Logout(ctx.Request)
+	if err != nil {
+		if err == appservices.ErrNoSession {
+			apihttp.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		slog.Error("Error during logout", "error", err)
+		apihttp.InternalServerError(w)
+		return
+	}
 
 	http.SetCookie(w, cookie)
 	apihttp.NoContent(w)

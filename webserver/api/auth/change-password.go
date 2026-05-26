@@ -1,9 +1,10 @@
 package auth
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
-	"reservoir/utils/phc"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -60,28 +61,16 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 		return
 	}
 
-	user, err := ctx.GetCurrentUser()
-	if err != nil {
-		slog.Error("Error retrieving current user", "error", err)
-		apihttp.InternalServerError(w)
-		return
-	}
-
-	passwordMatch := user.PasswordHash.VerifyArgon2id(req.CurrentPassword)
-	if !passwordMatch {
-		slog.Warn("Failed password change attempt", "user_id", user.ID)
-		apihttp.BadRequest(w, "Current password is incorrect")
-		return
-	}
-
-	user.PasswordHash = *phc.GenerateArgon2id(req.NewPassword)
-	user.PasswordChangeRequired = false
-	if err := ctx.UserStore.Save(user); err != nil {
+	if err := ctx.Services.Auth.ChangePassword(ctx.Request, req.CurrentPassword, req.NewPassword); err != nil {
+		if errors.Is(err, appservices.ErrCurrentPasswordIncorrect) {
+			slog.Warn("Failed password change attempt")
+			apihttp.BadRequest(w, "Current password is incorrect")
+			return
+		}
 		slog.Error("Error updating user password", "error", err)
 		apihttp.InternalServerError(w)
 		return
 	}
-	ctx.SessionManager.DestroySessionsForUserExcept(user.ID, ctx.Session.ID)
 
 	apihttp.NoContent(w)
 }

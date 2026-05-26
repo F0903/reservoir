@@ -4,13 +4,18 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth/models"
-	"reservoir/webserver/auth"
 )
 
 type LoginEndpoint struct{}
+
+type loginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 
 func (e *LoginEndpoint) Path() string {
 	return "/auth/login"
@@ -31,19 +36,18 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	var creds auth.Credentials
-	if !apihttp.DecodeJSON(w, r, &creds) {
+	var req loginRequest
+	if !apihttp.DecodeJSON(w, r, &req) {
 		return
 	}
 
-	if ctx.IsAuthenticated() {
-		apihttp.WriteText(w, http.StatusOK, "Already Authenticated")
-		return
-	}
-
-	user, err := creds.Authenticate(ctx.UserStore)
+	user, cookie, err := ctx.Services.Auth.Login(ctx.Request, req.Username, req.Password)
 	if err != nil {
-		if errors.Is(err, auth.ErrInvalidCredentials) {
+		if errors.Is(err, appservices.ErrAlreadyAuthenticated) {
+			apihttp.WriteText(w, http.StatusOK, "Already Authenticated")
+			return
+		}
+		if errors.Is(err, appservices.ErrInvalidCredentials) {
 			apihttp.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 			return
 		}
@@ -52,8 +56,7 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 		return
 	}
 
-	sess := ctx.SessionManager.Create(user.ID)
-	http.SetCookie(w, sess.BuildSessionCookie())
+	http.SetCookie(w, cookie)
 
 	apihttp.WriteJSON(w, http.StatusOK, models.FromUser(user))
 }

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"reservoir/config"
+	appservices "reservoir/application/services"
 	dbmodels "reservoir/db/models"
-	"reservoir/db/stores"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	authEndpoints "reservoir/webserver/api/auth"
@@ -16,7 +15,6 @@ import (
 	"reservoir/webserver/api/endpoints/log"
 	"reservoir/webserver/api/endpoints/metrics"
 	"reservoir/webserver/api/endpoints/version"
-	coreauth "reservoir/webserver/auth"
 )
 
 var (
@@ -29,24 +27,14 @@ var (
 
 type API struct {
 	basePath  string
-	cfg       *config.Config
-	sessions  *coreauth.SessionManager
-	users     *stores.UserStore
-	cache     apitypes.CacheController
+	services  *appservices.Container
 	endpoints []apitypes.Endpoint
 }
 
-func New(cfg *config.Config, sessions *coreauth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController) *API {
-	if sessions == nil {
-		sessions = coreauth.DefaultSessionManager()
-	}
-
+func New(services *appservices.Container) *API {
 	return &API{
 		basePath: "/api",
-		cfg:      cfg,
-		sessions: sessions,
-		users:    users,
-		cache:    cacheController,
+		services: services,
 		endpoints: []apitypes.Endpoint{
 			// Register all our current API endpoints here.
 			&version.VersionEndpoint{},
@@ -82,6 +70,9 @@ func EnsureAllowed(ctx apitypes.Context, method apitypes.EndpointMethod) (status
 
 	user, err := ctx.GetCurrentUser()
 	if err != nil {
+		if errors.Is(err, appservices.ErrUserNotFound) {
+			return http.StatusUnauthorized, ErrEndpointUnauthorized
+		}
 		return http.StatusInternalServerError, err
 	}
 	if user == nil {
@@ -105,9 +96,9 @@ func adminAllowed(user *dbmodels.User, method apitypes.EndpointMethod) bool {
 	return !method.RequiresAdmin || user.IsAdmin
 }
 
-func WrapHandler(cfg *config.Config, sessions *coreauth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
+func WrapHandler(services *appservices.Container, methodFunc apitypes.MethodFunc, preRunHook func(apitypes.Context) (statusCode int, err error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, err := apitypes.CreateContext(r, cfg, sessions, users, cacheController)
+		ctx, err := apitypes.CreateContext(r, services)
 		if err != nil {
 			slog.Error("Error creating request context", "error", err)
 			apihttp.InternalServerError(w)
@@ -153,7 +144,7 @@ func (api *API) RegisterHandlers(mux *http.ServeMux) error {
 			}
 
 			pattern := fmt.Sprintf("%s %s%s", method.Method, api.basePath, endpoint.Path())
-			mux.HandleFunc(pattern, WrapHandler(api.cfg, api.sessions, api.users, api.cache, method.Func, func(ctx apitypes.Context) (int, error) {
+			mux.HandleFunc(pattern, WrapHandler(api.services, method.Func, func(ctx apitypes.Context) (int, error) {
 				return EnsureAllowed(ctx, method)
 			}))
 			slog.Debug("Registered API handler", "pattern", pattern, "endpoint", endpoint.Path())

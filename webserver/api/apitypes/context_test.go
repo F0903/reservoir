@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	appservices "reservoir/application/services"
 	"reservoir/config"
 	"reservoir/db"
 	"reservoir/db/stores"
@@ -34,9 +35,10 @@ func newTestContextUserStore(t *testing.T) *stores.UserStore {
 
 func TestCreateContextCarriesInjectedUserStoreForUnauthenticatedRequests(t *testing.T) {
 	users := newTestContextUserStore(t)
+	services := appservices.NewContainer(config.NewDefault(), auth.NewSessionManager(), users, nil)
 	req := httptest.NewRequest("POST", "/api/auth/login", nil)
 
-	ctx, err := CreateContext(req, config.NewDefault(), auth.NewSessionManager(), users, nil)
+	ctx, err := CreateContext(req, services)
 	if err != nil {
 		t.Fatalf("CreateContext returned error: %v", err)
 	}
@@ -44,7 +46,7 @@ func TestCreateContextCarriesInjectedUserStoreForUnauthenticatedRequests(t *test
 	if ctx.IsAuthenticated() {
 		t.Fatal("expected request without session cookie to be unauthenticated")
 	}
-	if ctx.UserStore != users {
-		t.Fatal("expected context to use injected user store")
+	if ctx.Services != services {
+		t.Fatal("expected context to use injected application services")
 	}
 }

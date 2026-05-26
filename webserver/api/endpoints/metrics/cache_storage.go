@@ -1,29 +1,20 @@
 package metrics
 
 import (
-	"reservoir/config"
 	runtimeMetrics "reservoir/metrics"
 	"reservoir/webserver/api/apitypes"
 )
 
 func collectCacheStorage(ctx apitypes.Context) {
-	if ctx.Cache == nil || ctx.Config == nil {
+	if ctx.Services == nil || ctx.Services.Cache == nil {
 		runtimeMetrics.Global.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
 		return
 	}
 
-	stats := ctx.Cache.CacheStats()
-	cacheType := ctx.Config.Cache.Type.Read()
-	storage := runtimeMetrics.CacheStorageMetrics{
-		Type:     string(cacheType),
-		Entries:  stats.Entries,
-		Bytes:    stats.Bytes,
-		MaxBytes: stats.MaxBytes,
-	}
-
-	if cacheType == config.CacheTypeMemory || cacheType == config.CacheTypeHybrid {
-		memoryCapBytes := stats.MemoryCapBytes
-		storage.MemoryCapBytes = &memoryCapBytes
+	storage, ok := ctx.Services.Cache.StorageMetrics()
+	if !ok {
+		runtimeMetrics.Global.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
+		return
 	}
 
 	runtimeMetrics.Global.Cache.SetStorage(storage)

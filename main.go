@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os/signal"
+	"reservoir/application"
 	"reservoir/config"
 	"reservoir/logging"
 	"syscall"
@@ -22,7 +23,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	rt, err := NewRuntime(cfg, ctx)
+	rt, err := application.NewRuntime(cfg, ctx)
 	if err != nil {
 		slog.Error("Failed to initialize runtime", "error", err)
 		panic(err)

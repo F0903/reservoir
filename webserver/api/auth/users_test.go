@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"testing"
 
+	appservices "reservoir/application/services"
 	"reservoir/db"
 	"reservoir/db/models"
 	"reservoir/db/stores"
@@ -39,6 +40,7 @@ func newTestManagedUserStore(t *testing.T) *stores.UserStore {
 
 func TestUsersEndpointCreatesUserWithPasswordChangeRequiredByDefault(t *testing.T) {
 	store := newTestManagedUserStore(t)
+	services := appservices.NewContainer(nil, coreauth.NewSessionManager(), store, nil)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/users", bytes.NewBufferString(`{
 		"username": "operator",
@@ -47,7 +49,7 @@ func TestUsersEndpointCreatesUserWithPasswordChangeRequiredByDefault(t *testing.
 	}`))
 	req.Header.Set("Content-Type", "application/json")
 
-	(&UsersEndpoint{}).Post(rec, req, apitypes.Context{UserStore: store})
+	(&UsersEndpoint{}).Post(rec, req, apitypes.Context{Services: services})
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rec.Code, rec.Body.String())
@@ -86,6 +88,7 @@ func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
 	}
 
 	sessions := coreauth.NewSessionManager()
+	services := appservices.NewContainer(nil, sessions, store, nil)
 	current := sessions.Create(user.ID)
 	other := sessions.Create(user.ID)
 	req := httptest.NewRequest(http.MethodPatch, "/api/auth/users/"+strconv.FormatInt(user.ID, 10), bytes.NewBufferString(`{
@@ -93,14 +96,15 @@ func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
 		"password_change_required": false
 	}`))
 	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(current.BuildSessionCookie())
 	req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 	rec := httptest.NewRecorder()
+	ctx, err := apitypes.CreateContext(req, services)
+	if err != nil {
+		t.Fatalf("failed to create API context: %v", err)
+	}
 
-	(&UserEndpoint{}).Patch(rec, req, apitypes.Context{
-		Session:        current,
-		SessionManager: sessions,
-		UserStore:      store,
-	})
+	(&UserEndpoint{}).Patch(rec, req, ctx)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
@@ -129,6 +133,7 @@ func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
 
 func TestUserEndpointDeleteMapsLastAdminError(t *testing.T) {
 	store := newTestManagedUserStore(t)
+	services := appservices.NewContainer(nil, coreauth.NewSessionManager(), store, nil)
 	user, err := store.Create(&models.User{
 		Username:     "admin",
 		PasswordHash: *phc.GenerateArgon2id("admin-password"),
@@ -142,10 +147,7 @@ func TestUserEndpointDeleteMapsLastAdminError(t *testing.T) {
 	req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 	rec := httptest.NewRecorder()
 
-	(&UserEndpoint{}).Delete(rec, req, apitypes.Context{
-		SessionManager: coreauth.NewSessionManager(),
-		UserStore:      store,
-	})
+	(&UserEndpoint{}).Delete(rec, req, apitypes.Context{Services: services})
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusConflict, rec.Code, rec.Body.String())

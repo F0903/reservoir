@@ -1,9 +1,10 @@
-package main
+package application
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	appservices "reservoir/application/services"
 	"reservoir/config"
 	"reservoir/db"
 	"reservoir/db/stores"
@@ -11,7 +12,6 @@ import (
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
 	"reservoir/webserver/api"
-	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/auth"
 	"reservoir/webserver/dashboard"
 
@@ -24,6 +24,7 @@ type Runtime struct {
 	webserver        *webserver.WebServer
 	sessions         *auth.SessionManager
 	userStore        *stores.UserStore
+	services         *appservices.Container
 	webserverEnabled bool
 	sessionGCEnabled bool
 }
@@ -74,7 +75,8 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	}
 
 	sessions := auth.NewSessionManager()
-	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, sessions, users, p)
+	svc := appservices.NewContainer(cfg, sessions, users, p)
+	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, svc)
 	if err != nil {
 		p.Destroy()
 		if users != nil {
@@ -89,12 +91,13 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		webserver:        ws,
 		sessions:         sessions,
 		userStore:        users,
+		services:         svc,
 		webserverEnabled: webserverEnabled,
 		sessionGCEnabled: sessionGCEnabled,
 	}, nil
 }
 
-func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, users *stores.UserStore, cacheController apitypes.CacheController) (*webserver.WebServer, bool, bool, error) {
+func buildWebServer(cfg *config.Config, services *appservices.Container) (*webserver.WebServer, bool, bool, error) {
 	dashboardDisabled := cfg.Webserver.DashboardDisabled.Read()
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 
@@ -120,10 +123,10 @@ func buildWebServer(cfg *config.Config, sessions *auth.SessionManager, users *st
 	if apiDisabled {
 		slog.Info("API is disabled by configuration, skipping registration")
 	} else {
-		if users == nil {
-			return nil, false, false, fmt.Errorf("API requires an initialized user store")
+		if services == nil || services.Auth == nil || services.Users == nil {
+			return nil, false, false, fmt.Errorf("API requires initialized application services")
 		}
-		a := api.New(cfg, sessions, users, cacheController)
+		a := api.New(services)
 		if err := ws.Register(a); err != nil {
 			return nil, false, false, fmt.Errorf("failed to register API: %w", err)
 		}

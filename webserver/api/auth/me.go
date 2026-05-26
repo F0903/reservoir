@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"reservoir/db/stores"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth/models"
@@ -57,21 +57,14 @@ func (e *MeEndpoint) Patch(w http.ResponseWriter, r *http.Request, ctx apitypes.
 		return
 	}
 
-	user, err := ctx.GetCurrentUser()
-	if err != nil {
-		slog.Error("Error retrieving current user", "error", err)
-		apihttp.InternalServerError(w)
-		return
-	}
-
-	updated, err := ctx.UserStore.UpdateUsername(user.ID, req.Username)
+	updated, err := ctx.Services.Auth.UpdateCurrentUsername(ctx.Request, req.Username)
 	if err != nil {
 		switch {
-		case errors.Is(err, stores.ErrUsernameEmpty):
+		case errors.Is(err, appservices.ErrUsernameEmpty):
 			apihttp.BadRequest(w, "Username must not be empty")
-		case errors.Is(err, stores.ErrUsernameTaken):
+		case errors.Is(err, appservices.ErrUsernameTaken):
 			apihttp.Error(w, "Username is already taken", http.StatusConflict)
-		case errors.Is(err, stores.ErrUserNotFound):
+		case errors.Is(err, appservices.ErrUserNotFound):
 			apihttp.Error(w, "User not found", http.StatusNotFound)
 		default:
 			slog.Error("Error updating current user", "error", err)

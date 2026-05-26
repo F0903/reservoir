@@ -4,10 +4,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 	"reservoir/webserver/api/auth/models"
-	coreauth "reservoir/webserver/auth"
 )
 
 type BootstrapEndpoint struct{}
@@ -41,7 +41,7 @@ func (e *BootstrapEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (e *BootstrapEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	required, err := coreauth.BootstrapRequired(ctx.UserStore)
+	required, err := ctx.Services.Auth.BootstrapRequired()
 	if err != nil {
 		slog.Error("Error checking bootstrap status", "error", err)
 		apihttp.InternalServerError(w)
@@ -61,16 +61,16 @@ func (e *BootstrapEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx api
 		return
 	}
 
-	user, err := coreauth.CreateBootstrapAdmin(ctx.UserStore, req.Username, req.Password)
+	user, cookie, err := ctx.Services.Auth.CreateBootstrapAdmin(req.Username, req.Password)
 	if err != nil {
 		switch {
-		case errors.Is(err, coreauth.ErrBootstrapNotRequired):
+		case errors.Is(err, appservices.ErrBootstrapNotRequired):
 			apihttp.Error(w, "Bootstrap is not required", http.StatusConflict)
-		case errors.Is(err, coreauth.ErrBootstrapUsernameEmpty):
+		case errors.Is(err, appservices.ErrUsernameEmpty):
 			apihttp.BadRequest(w, "Username must not be empty")
-		case errors.Is(err, coreauth.ErrBootstrapPasswordEmpty):
+		case errors.Is(err, appservices.ErrPasswordEmpty):
 			apihttp.BadRequest(w, "Password must not be empty")
-		case errors.Is(err, coreauth.ErrBootstrapPasswordTooShort):
+		case errors.Is(err, appservices.ErrPasswordTooShort):
 			apihttp.BadRequest(w, "Password must be at least 12 characters")
 		default:
 			slog.Error("Error creating bootstrap admin", "error", err)
@@ -79,8 +79,7 @@ func (e *BootstrapEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx api
 		return
 	}
 
-	sess := ctx.SessionManager.Create(user.ID)
-	http.SetCookie(w, sess.BuildSessionCookie())
+	http.SetCookie(w, cookie)
 
 	apihttp.WriteJSON(w, http.StatusCreated, models.FromUser(user))
 }
