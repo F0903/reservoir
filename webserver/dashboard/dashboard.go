@@ -57,7 +57,7 @@ func (d *Dashboard) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dashboard) RegisterHandlers(mux *http.ServeMux) error {
-	mux.HandleFunc("/", d.ServeDashboard)
+	mux.Handle("/", secure(http.HandlerFunc(d.ServeDashboard)))
 
 	return nil
 }
