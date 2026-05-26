@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"reservoir/cache"
-	"reservoir/metrics"
 	"time"
 )
 
@@ -22,7 +21,7 @@ func (c *Cache[MetadataT]) get(key cache.CacheKey, recordMetrics bool) (*cache.E
 
 	if !exists {
 		if recordMetrics {
-			metrics.Global.Cache.CacheMisses.Increment()
+			c.metrics.Cache.CacheMisses.Increment()
 		}
 		slog.Debug("Cache miss", "key", key.Hex)
 		return nil, cache.ErrCacheEntryNotFound
@@ -32,7 +31,7 @@ func (c *Cache[MetadataT]) get(key cache.CacheKey, recordMetrics bool) (*cache.E
 	dataFile, err := os.Open(fileName)
 	if err != nil {
 		if recordMetrics {
-			metrics.Global.Cache.CacheErrors.Increment()
+			c.metrics.Cache.CacheErrors.Increment()
 		}
 		slog.Error("Failed to open cached data file", "key", key.Hex, "error", err)
 		return nil, fmt.Errorf("%w: failed to open cached data file '%s'", ErrRead, fileName)
@@ -48,7 +47,7 @@ func (c *Cache[MetadataT]) get(key cache.CacheKey, recordMetrics bool) (*cache.E
 	metaSnapshot := metadataSnapshot(entryMeta)
 
 	if recordMetrics {
-		metrics.Global.Cache.CacheHits.Increment()
+		c.metrics.Cache.CacheHits.Increment()
 	}
 	slog.Debug("Successful cache hit", "key", key.Hex)
 	return &cache.Entry[MetadataT]{
@@ -82,7 +81,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	fileName := c.dataPath(key)
 	file, err := os.Create(fileName)
 	if err != nil {
-		metrics.Global.Cache.CacheErrors.Increment()
+		c.metrics.Cache.CacheErrors.Increment()
 		slog.Error("Failed to create cache file", "key", key.Hex, "error", err)
 		return nil, fmt.Errorf("%w: failed to create cache file '%s'", ErrCreate, fileName)
 	}
@@ -91,7 +90,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	if err != nil {
 		file.Close()
 		os.Remove(fileName)
-		metrics.Global.Cache.CacheErrors.Increment()
+		c.metrics.Cache.CacheErrors.Increment()
 		slog.Error("Failed to write cache file", "key", key.Hex, "error", err)
 		return nil, fmt.Errorf("%w: failed to write cache file '%s'", ErrWrite, fileName)
 	}
@@ -99,7 +98,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	if fileSize == 0 {
 		file.Close()
 		os.Remove(fileName)
-		metrics.Global.Cache.CacheErrors.Increment()
+		c.metrics.Cache.CacheErrors.Increment()
 		slog.Error("Cache file is empty", "key", key.Hex, "file_size", fileSize)
 		return nil, fmt.Errorf("%w: wrote 0 bytes to cache file '%s'", ErrEmpty, fileName)
 	}
@@ -124,11 +123,11 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	c.mu.Unlock()
 
 	if replaced {
-		cache.DecrementCacheSize(&c.byteSize, previousMeta.Size)
+		cache.DecrementCacheSize(c.metrics, &c.byteSize, previousMeta.Size)
 	} else {
-		cache.IncrementCacheEntries()
+		cache.IncrementCacheEntries(c.metrics)
 	}
-	cache.AddCacheSize(&c.byteSize, fileSize)
+	cache.AddCacheSize(c.metrics, &c.byteSize, fileSize)
 	c.writeMetadataSidecar(key, meta)
 
 	slog.Debug("Successfully cached data", "key", key.Hex, "size", fileSize)
@@ -136,7 +135,7 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	slog.Debug("Seeking to the beginning of written cache file...", "key", key.Hex)
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
-		metrics.Global.Cache.CacheErrors.Increment()
+		c.metrics.Cache.CacheErrors.Increment()
 		slog.Error("Failed to seek to start of cache file", "key", key.Hex, "error", err)
 		return nil, fmt.Errorf("%w: failed to seek to start of cache file '%s'", ErrRead, fileName)
 	}
@@ -191,8 +190,8 @@ func (c *Cache[MetadataT]) ensureRemove(key cache.CacheKey) error {
 	delete(c.entriesMetadata, key)
 	c.mu.Unlock()
 
-	cache.DecrementCacheEntries()
-	cache.DecrementCacheSize(&c.byteSize, meta.Size)
+	cache.DecrementCacheEntries(c.metrics)
+	cache.DecrementCacheSize(c.metrics, &c.byteSize, meta.Size)
 
 	return nil
 }

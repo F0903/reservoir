@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
-	"reservoir/metrics"
 	"reservoir/proxy/headers"
 	"reservoir/proxy/responder"
 	"reservoir/utils/typeutils"
@@ -34,7 +33,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	startTime := time.Now()
 
 	defer func() {
-		metrics.Global.Requests.ClientRequestLatency.Add(time.Since(startTime).Nanoseconds())
+		p.metrics.Requests.ClientRequestLatency.Add(time.Since(startTime).Nanoseconds())
 	}()
 
 	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
@@ -49,17 +48,17 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	fetchInfo := fetched.getFetchInfo()
 	switch fetchInfo.Status {
 	case hitStatusMiss:
-		metrics.Global.Cache.CacheRequestMisses.Increment()
-		metrics.Global.Cache.CacheMissLatency.Add(latency.Nanoseconds())
+		p.metrics.Cache.CacheRequestMisses.Increment()
+		p.metrics.Cache.CacheMissLatency.Add(latency.Nanoseconds())
 	case hitStatusRevalidated:
-		metrics.Global.Cache.CacheRequestRevalidations.Increment()
-		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
+		p.metrics.Cache.CacheRequestRevalidations.Increment()
+		p.metrics.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	case hitStatusStale:
-		metrics.Global.Cache.CacheRequestStales.Increment()
-		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
+		p.metrics.Cache.CacheRequestStales.Increment()
+		p.metrics.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	default:
-		metrics.Global.Cache.CacheRequestHits.Increment()
-		metrics.Global.Cache.CacheHitLatency.Add(latency.Nanoseconds())
+		p.metrics.Cache.CacheRequestHits.Increment()
+		p.metrics.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	}
 
 	switch fetched.Type {
@@ -69,10 +68,10 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		r.SetHeaders(fetched.Direct.Response.Header)
 		if fetched.Direct.UpstreamStatus >= 200 && fetched.Direct.UpstreamStatus < 300 {
 			r.SetHeader("Accept-Ranges", "bytes")
-			addCacheHeaders(r, req, typeutils.None[*cache.Entry[cachedRequestInfo]](), fetchResultToCacheStatus(fetched))
+			addCacheHeaders(r, req, typeutils.None[*cache.Entry[CacheMetadata]](), fetchResultToCacheStatus(fetched))
 		}
 
-		return finalizeAndRespond(r, fetched.Direct.Response.Body, fetched.Direct.UpstreamStatus, req)
+		return finalizeAndRespond(p.metrics, r, fetched.Direct.Response.Body, fetched.Direct.UpstreamStatus, req)
 
 	case fetchTypeCached:
 		if fetched.Cached.Entry == nil || fetched.Cached.Entry.Data == nil {
@@ -105,7 +104,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		addCacheHeaders(r, req, typeutils.Some(fetched.Cached.Entry), fetchResultToCacheStatus(fetched))
 
 		slog.Debug("Serving cached response", "url", req.URL, "key", key)
-		return finalizeAndRespond(r, fetched.Cached.Entry.Data, http.StatusOK, req)
+		return finalizeAndRespond(p.metrics, r, fetched.Cached.Entry.Data, http.StatusOK, req)
 
 	default:
 		// This should not be possible
@@ -115,7 +114,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 
 func (p *Proxy) handleHTTP(r responder.Responder, proxyReq *http.Request) error {
 	slog.Debug("Handling HTTP request", "host", proxyReq.Host, "remote_addr", proxyReq.RemoteAddr)
-	metrics.Global.Requests.HTTPProxyRequests.Increment()
+	p.metrics.Requests.HTTPProxyRequests.Increment()
 
 	clientHd := headers.ParseHeaderDirective(proxyReq.Header)
 	clientHd.StripRegularConditionals(proxyReq.Header)

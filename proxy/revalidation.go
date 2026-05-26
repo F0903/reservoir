@@ -6,16 +6,15 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
-	"reservoir/metrics"
 	"reservoir/proxy/headers"
 	"time"
 )
 
-func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Handling 304 response from upstream", "url", req.URL, "key", key)
 
 	slog.Debug("Revalidating cache metadata...", "url", req.URL, "key", key)
-	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[cachedRequestInfo]) {
+	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[CacheMetadata]) {
 		// Update the metadata to reflect that the cached response is still valid.
 		maxAge := f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
 		meta.Expires = time.Now().Add(maxAge)
@@ -84,7 +83,7 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 			return res, nil
 		}
 
-		metrics.Global.Cache.CacheErrors.Increment()
+		f.metrics.Cache.CacheErrors.Increment()
 		// We just return ErrNotCacheable to trigger direct fetch in caller
 		return fetchResult{}, ErrNotCacheable
 	}

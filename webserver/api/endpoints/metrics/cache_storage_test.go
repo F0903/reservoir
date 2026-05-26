@@ -24,19 +24,7 @@ func (f *fakeCacheController) ClearCache() error {
 	return nil
 }
 
-func useFreshMetrics(t *testing.T) {
-	t.Helper()
-
-	previous := runtimeMetrics.Global
-	runtimeMetrics.Global = runtimeMetrics.NewMetrics()
-	t.Cleanup(func() {
-		runtimeMetrics.Global = previous
-	})
-}
-
 func TestCacheMetricsEndpointIncludesCacheStorage(t *testing.T) {
-	useFreshMetrics(t)
-
 	cfg := config.NewDefault()
 	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
 	controller := &fakeCacheController{
@@ -84,8 +72,6 @@ func TestCacheMetricsEndpointIncludesCacheStorage(t *testing.T) {
 }
 
 func TestCacheMetricsEndpointIncludesHybridCacheStorage(t *testing.T) {
-	useFreshMetrics(t)
-
 	cfg := config.NewDefault()
 	cfg.Cache.Type.Overwrite(config.CacheTypeHybrid)
 	controller := &fakeCacheController{
@@ -124,8 +110,6 @@ func TestCacheMetricsEndpointIncludesHybridCacheStorage(t *testing.T) {
 }
 
 func TestAllMetricsEndpointIncludesFileCacheStorage(t *testing.T) {
-	useFreshMetrics(t)
-
 	cfg := config.NewDefault()
 	cfg.Cache.Type.Overwrite(config.CacheTypeFile)
 	controller := &fakeCacheController{

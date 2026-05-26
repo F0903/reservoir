@@ -106,7 +106,7 @@ func (b *janitorTestBackend) janitorFunctions() JanitorFunctions[janitorTestMeta
 func newTestJanitor(t *testing.T, backend *janitorTestBackend) *Janitor[janitorTestMeta] {
 	t.Helper()
 
-	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false)
+	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, nil)
 	t.Cleanup(j.subs.UnsubscribeAll)
 	return j
 }

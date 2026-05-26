@@ -5,13 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
-	"reservoir/metrics"
 	"reservoir/proxy/headers"
 	"reservoir/utils/countingreader"
 	"time"
 )
 
-func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Handling 200 response from upstream", "url", req.URL, "key", lookupKey)
 
 	decision := f.policy.Decide(req, resp, upstreamHd)
@@ -35,7 +34,7 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 	reader := countingreader.New(resp.Body, &bytesRead)
 	cacheReader := cache.WithSizeHint(reader, resp.ContentLength)
 
-	cached, err = f.cache.Cache(storeKey, cacheReader, decision.Expires, cachedRequestInfo{
+	cached, err = f.cache.Cache(storeKey, cacheReader, decision.Expires, CacheMetadata{
 		ETag:         etag,
 		LastModified: lastModified,
 		Header:       resp.Header,
@@ -46,12 +45,12 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 	}
 	f.setVariantIndex(baseKey, decision.Vary)
 
-	metrics.Global.Requests.BytesFetched.Add(int64(bytesRead))
+	f.metrics.Requests.BytesFetched.Add(int64(bytesRead))
 	slog.Info("Successfully cached response", "status", resp.Status, "url", req.URL, "key", storeKey, "expires", decision.Expires)
 	return cached, nil
 }
 
-func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Upstream responded with 416 Range Not Satisfiable, retrying without Range header...", "url", req.URL)
 
 	if noRetry || !f.cfg.Proxy.RetryOnRange416.Read() {
@@ -75,7 +74,7 @@ func (f *fetcher) handleUpstream416(req *http.Request, resp *http.Response, base
 	return f.handleUpstreamResponse(retryReq, resp, baseKey, lookupKey, clientHd, true)
 }
 
-func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[cachedRequestInfo], err error) {
+func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives, noRetry bool) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Preparing to handle upstream response...", "url", req.URL, "status", resp.StatusCode)
 
 	upstreamHd := headers.ParseHeaderDirective(resp.Header)
@@ -95,13 +94,13 @@ func (f *fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response,
 
 func (f *fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time.Duration, error) {
 	slog.Debug("Sending request to upstream", "url", req.URL)
-	metrics.Global.Requests.UpstreamRequests.Increment()
+	f.metrics.Requests.UpstreamRequests.Increment()
 
 	startTime := time.Now()
 	resp, err := sendRequestToTarget(f.client, req, f.cfg.Proxy.UpstreamDefaultHttps.Read())
 	latency := time.Since(startTime)
 
-	metrics.Global.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
+	f.metrics.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
 	if err != nil {
 		return nil, 0, err
 	}
@@ -129,7 +128,7 @@ func (f *fetcher) fetchUpstream(req *http.Request, baseKey cache.CacheKey, looku
 	if cached == nil {
 		slog.Debug("Upstream response is not cachable, returning direct result after cache miss...", "url", req.URL, "status", resp.StatusCode)
 
-		resp.Body = trackFetchedBytes(resp.Body)
+		resp.Body = trackFetchedBytes(resp.Body, f.metrics)
 
 		fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}
 		directRes := directFetchResult{Response: resp, fetchInfo: fetchInfo}
@@ -156,7 +155,7 @@ func (f *fetcher) fetchDirectlyFromUpstream(req *http.Request) (fetchResult, err
 		return fetchResult{}, err
 	}
 
-	resp.Body = trackFetchedBytes(resp.Body)
+	resp.Body = trackFetchedBytes(resp.Body, f.metrics)
 
 	slog.Debug("Returning direct fetch result", "url", req.URL, "status", resp.StatusCode)
 	fetchInfo := fetchInfo{UpstreamStatus: resp.StatusCode, Status: hitStatusMiss, UpstreamLatency: upstreamLatency}

@@ -18,7 +18,7 @@ func TestMemoryCache_Basic(t *testing.T) {
 	cfg := config.NewDefault()
 
 	// 1% memory budget, large maxCacheSize, 1 min cleanup, 16 shards
-	c := New[TestMeta](cfg, 1, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, 1, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("test-key")
@@ -69,7 +69,7 @@ func TestMemoryCache_OverwriteUpdatesAccounting(t *testing.T) {
 	ctx := t.Context()
 	cfg := config.NewDefault()
 
-	c := New[TestMeta](cfg, 1, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, 1, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("overwrite-key")
@@ -125,7 +125,7 @@ func TestMemoryCache_ReturnsMetadataSnapshots(t *testing.T) {
 	ctx := t.Context()
 	cfg := config.NewDefault()
 
-	c := New[TestMeta](cfg, 1, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, 1, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("metadata-snapshot-key")
@@ -151,7 +151,7 @@ func TestMemoryCache_ClearRemovesEntriesAndUpdatesStats(t *testing.T) {
 	cfg := config.NewDefault()
 	maxCacheSize := int64(1024 * 1024 * 1024)
 
-	c := New[TestMeta](cfg, 1, maxCacheSize, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, 1, maxCacheSize, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	firstData := []byte("first")

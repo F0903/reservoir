@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reservoir/cache"
-	"reservoir/metrics"
 	"strings"
 	"time"
 )
@@ -90,8 +89,8 @@ func (c *Cache[MetadataT]) loadMetadataSidecar(key cache.CacheKey, now time.Time
 
 	meta.Size = dataStat.Size()
 	c.entriesMetadata[key] = &meta
-	cache.AddCacheSize(&c.byteSize, meta.Size)
-	cache.IncrementCacheEntries()
+	cache.AddCacheSize(c.metrics, &c.byteSize, meta.Size)
+	cache.IncrementCacheEntries(c.metrics)
 	return true
 }
 
@@ -138,7 +137,7 @@ func (c *Cache[MetadataT]) updateMetadata(key cache.CacheKey, modifier func(*cac
 
 	if !exists {
 		if recordMetrics {
-			metrics.Global.Cache.CacheErrors.Increment()
+			c.metrics.Cache.CacheErrors.Increment()
 		}
 		slog.Error("Failed to update metadata for cache entry", "key", key.Hex, "error", cache.ErrCacheEntryNotFound)
 		return fmt.Errorf("%w: cache entry for key '%s' does not exist", cache.ErrCacheEntryNotFound, key.Hex)
@@ -149,7 +148,7 @@ func (c *Cache[MetadataT]) updateMetadata(key cache.CacheKey, modifier func(*cac
 	c.writeMetadataSidecar(key, meta)
 
 	if recordMetrics {
-		metrics.Global.Cache.CacheHits.Increment()
+		c.metrics.Cache.CacheHits.Increment()
 	}
 
 	slog.Debug("Successfully updated metadata", "key", key.Hex)
@@ -175,14 +174,14 @@ func (c *Cache[MetadataT]) getMetadata(key cache.CacheKey, recordMetrics bool) (
 
 	if !exists {
 		if recordMetrics {
-			metrics.Global.Cache.CacheMisses.Increment()
+			c.metrics.Cache.CacheMisses.Increment()
 		}
 		slog.Debug("Cache miss", "key", key.Hex)
 		return nil, false, cache.ErrCacheEntryNotFound
 	}
 
 	if recordMetrics {
-		metrics.Global.Cache.CacheHits.Increment()
+		c.metrics.Cache.CacheHits.Increment()
 	}
 
 	stale = false

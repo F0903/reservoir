@@ -13,20 +13,20 @@ func GetLock(locks []sync.RWMutex, key CacheKey) *sync.RWMutex {
 	return &locks[val%uint32(len(locks))]
 }
 
-func AddCacheSize(byteCounter *atomics.Int64, delta int64) {
+func AddCacheSize(m *metrics.Metrics, byteCounter *atomics.Int64, delta int64) {
 	byteCounter.Add(delta)
-	metrics.Global.Cache.BytesCached.Add(delta)
+	metrics.Ensure(m).Cache.BytesCached.Add(delta)
 }
 
-func DecrementCacheSize(byteCounter *atomics.Int64, delta int64) {
+func DecrementCacheSize(m *metrics.Metrics, byteCounter *atomics.Int64, delta int64) {
 	byteCounter.Sub(delta)
-	metrics.Global.Cache.BytesCached.Sub(delta)
+	metrics.Ensure(m).Cache.BytesCached.Sub(delta)
 }
 
-func IncrementCacheEntries() {
-	metrics.Global.Cache.CacheEntries.Add(1)
+func IncrementCacheEntries(m *metrics.Metrics) {
+	metrics.Ensure(m).Cache.CacheEntries.Add(1)
 }
 
-func DecrementCacheEntries() {
-	metrics.Global.Cache.CacheEntries.Sub(1)
+func DecrementCacheEntries(m *metrics.Metrics) {
+	metrics.Ensure(m).Cache.CacheEntries.Sub(1)
 }

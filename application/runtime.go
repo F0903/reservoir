@@ -8,6 +8,7 @@ import (
 	"reservoir/config"
 	"reservoir/db"
 	"reservoir/db/stores"
+	"reservoir/metrics"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
 	"reservoir/webserver"
@@ -27,12 +28,14 @@ type Runtime struct {
 	sessions         *auth.SessionManager
 	userStore        *stores.UserStore
 	services         *appservices.Container
+	metrics          *metrics.Metrics
 	webserverEnabled bool
 	sessionGCEnabled bool
 }
 
 func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
+	runtimeMetrics := metrics.NewMetrics()
 
 	var users *stores.UserStore
 	if !apiDisabled {
@@ -69,8 +72,20 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to create CA: %w", err)
 	}
 
-	p, err := proxy.NewProxy(cfg, ca, ctx)
+	cacheStore, err := NewProxyCache(cfg, runtimeMetrics, ctx)
 	if err != nil {
+		if users != nil {
+			_ = users.Close()
+		}
+		return nil, fmt.Errorf("failed to create proxy cache: %w", err)
+	}
+
+	p, err := proxy.NewProxy(cfg, ca, proxy.Dependencies{
+		Cache:   cacheStore,
+		Metrics: runtimeMetrics,
+	})
+	if err != nil {
+		cacheStore.Destroy()
 		if users != nil {
 			_ = users.Close()
 		}
@@ -78,7 +93,7 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 	}
 
 	sessions := auth.NewSessionManager()
-	svc := appservices.NewContainer(cfg, sessions, users, p)
+	svc := appservices.NewContainerWithMetrics(cfg, sessions, users, p, runtimeMetrics)
 	ws, webserverEnabled, sessionGCEnabled, err := buildWebServer(cfg, svc)
 	if err != nil {
 		p.Destroy()
@@ -95,6 +110,7 @@ func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
 		sessions:         sessions,
 		userStore:        users,
 		services:         svc,
+		metrics:          runtimeMetrics,
 		webserverEnabled: webserverEnabled,
 		sessionGCEnabled: sessionGCEnabled,
 	}, nil

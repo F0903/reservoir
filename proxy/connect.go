@@ -8,14 +8,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"reservoir/metrics"
 	"reservoir/proxy/responder"
 )
 
 func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) error {
 	slog.Info("Handling CONNECT request", "url", proxyReq.URL, "remote_addr", proxyReq.RemoteAddr)
 
-	metrics.Global.Requests.HTTPSProxyRequests.Increment()
+	p.metrics.Requests.HTTPSProxyRequests.Increment()
 
 	clientConn, _, err := r.Hijack()
 	if err != nil {

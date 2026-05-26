@@ -30,17 +30,19 @@ type Janitor[MetadataT any] struct {
 
 	functions             JanitorFunctions[MetadataT]
 	trackAggregateMetrics bool
+	metrics               *metrics.Metrics
 	subs                  config.ConfigSubscriber
 	cfg                   *config.Config
 }
 
-func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions JanitorFunctions[MetadataT], trackAggregateMetrics bool) *Janitor[MetadataT] {
+func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions JanitorFunctions[MetadataT], trackAggregateMetrics bool, m *metrics.Metrics) *Janitor[MetadataT] {
 	j := &Janitor[MetadataT]{
 		stopChan:              make(chan struct{}),
 		intervalChanged:       make(chan time.Duration, 1),
 		interval:              interval,
 		functions:             functions,
 		trackAggregateMetrics: trackAggregateMetrics,
+		metrics:               metrics.Ensure(m),
 		cfg:                   cfg,
 	}
 
@@ -88,7 +90,7 @@ func (j *Janitor[MetadataT]) Start(ctx context.Context) {
 				j.cleanExpiredEntries()
 				j.ensureCacheSize()
 				if j.trackAggregateMetrics {
-					metrics.Global.Cache.CleanupRuns.Increment()
+					j.metrics.Cache.CleanupRuns.Increment()
 				}
 				slog.Info("Cache cleanup cycle complete")
 			case newInterval := <-j.intervalChanged:
@@ -157,8 +159,8 @@ func (j *Janitor[MetadataT]) cleanExpiredEntries() {
 
 	endCacheSize := j.functions.Size()
 	if j.trackAggregateMetrics {
-		metrics.Global.Cache.BytesCached.Set(endCacheSize)
-		metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+		j.metrics.Cache.BytesCached.Set(endCacheSize)
+		j.metrics.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
 	}
 
 	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
@@ -214,7 +216,7 @@ func (j *Janitor[MetadataT]) Evict(maxCacheBytes int64) {
 			if err := j.functions.Remove(candidate.key); err != nil {
 				slog.Info("Failed to evict cache entry", "key", candidate.key.Hex, "error", err)
 			} else {
-				metrics.Global.Cache.CacheEvictions.Increment()
+				j.metrics.Cache.CacheEvictions.Increment()
 			}
 			evictions++
 			lock.Unlock()
@@ -226,8 +228,8 @@ func (j *Janitor[MetadataT]) Evict(maxCacheBytes int64) {
 
 	endCacheSize := j.functions.Size()
 	if j.trackAggregateMetrics {
-		metrics.Global.Cache.BytesCached.Set(endCacheSize)
-		metrics.Global.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
+		j.metrics.Cache.BytesCached.Set(endCacheSize)
+		j.metrics.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
 	}
 
 	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)

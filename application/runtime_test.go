@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"reservoir/config"
+	"reservoir/metrics"
 	"reservoir/proxy"
 	"reservoir/webserver"
 	"testing"
@@ -29,14 +30,24 @@ func TestRuntimeRunStopsServicesOnCancel(t *testing.T) {
 	cfg.Cache.File.Dir.Overwrite(t.TempDir())
 	cfg.Cache.LockShards.Overwrite(32)
 
-	p, err := proxy.NewProxy(cfg, runtimeTestCA{}, ctx)
+	runtimeMetrics := metrics.NewMetrics()
+	cacheStore, err := NewProxyCache(cfg, runtimeMetrics, ctx)
 	if err != nil {
+		t.Fatalf("failed to create proxy cache: %v", err)
+	}
+	p, err := proxy.NewProxy(cfg, runtimeTestCA{}, proxy.Dependencies{
+		Cache:   cacheStore,
+		Metrics: runtimeMetrics,
+	})
+	if err != nil {
+		cacheStore.Destroy()
 		t.Fatalf("failed to create proxy: %v", err)
 	}
 
 	rt := &Runtime{
 		cfg:              cfg,
 		proxy:            p,
+		metrics:          runtimeMetrics,
 		webserver:        webserver.New(),
 		webserverEnabled: true,
 		sessionGCEnabled: true,

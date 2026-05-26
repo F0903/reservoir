@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reservoir/application"
 	"reservoir/config"
 	"reservoir/logging"
+	"reservoir/metrics"
 	"reservoir/proxy"
 	"strings"
 	"sync"
@@ -151,8 +153,17 @@ func newFileCacheProxyConfig(t *testing.T) *config.Config {
 func startRestartableProxy(t *testing.T, cfg *config.Config) *restartableProxy {
 	t.Helper()
 
-	p, err := proxy.NewProxy(cfg, &FakeCA{}, t.Context())
+	runtimeMetrics := metrics.NewMetrics()
+	cacheStore, err := application.NewProxyCache(cfg, runtimeMetrics, t.Context())
 	if err != nil {
+		t.Fatalf("failed to create proxy cache: %v", err)
+	}
+	p, err := proxy.NewProxy(cfg, &FakeCA{}, proxy.Dependencies{
+		Cache:   cacheStore,
+		Metrics: runtimeMetrics,
+	})
+	if err != nil {
+		cacheStore.Destroy()
 		t.Fatalf("failed to create proxy: %v", err)
 	}
 

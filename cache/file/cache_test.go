@@ -25,7 +25,7 @@ func TestFileCache_Basic(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	c := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("test-key")
@@ -69,7 +69,7 @@ func TestFileCache_OverwriteUpdatesAccounting(t *testing.T) {
 	cfg := config.NewDefault()
 
 	tmpDir := t.TempDir()
-	c := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("overwrite-key")
@@ -126,7 +126,7 @@ func TestFileCache_ReturnsMetadataSnapshots(t *testing.T) {
 	cfg := config.NewDefault()
 
 	tmpDir := t.TempDir()
-	c := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	key := cache.FromString("metadata-snapshot-key")
@@ -161,7 +161,7 @@ func TestFileCache_DeleteMissingReturnsNotFound(t *testing.T) {
 	cfg := config.NewDefault()
 
 	tmpDir := t.TempDir()
-	c := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	if err := c.Delete(cache.FromString("missing-delete-key")); !errors.Is(err, cache.ErrCacheEntryNotFound) {
@@ -175,7 +175,7 @@ func TestFileCache_ClearRemovesEntriesAndSidecars(t *testing.T) {
 	maxCacheSize := int64(1024 * 1024 * 1024)
 
 	tmpDir := t.TempDir()
-	c := New[TestMeta](cfg, tmpDir, maxCacheSize, time.Minute, 16, ctx)
+	c := New[TestMeta](cfg, nil, tmpDir, maxCacheSize, time.Minute, 16, ctx)
 	defer c.Destroy()
 
 	firstKey := cache.FromString("clear-file-first")
@@ -247,7 +247,7 @@ func TestFileCache_LoadsMetadataSidecarsOnRestart(t *testing.T) {
 	data := []byte("restart body")
 	expires := time.Now().Add(time.Hour)
 
-	firstCache := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	firstCache := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
 	firstEntry, err := firstCache.Cache(key, bytes.NewReader(data), expires, TestMeta{ID: "restart-meta"})
 	if err != nil {
 		t.Fatalf("cache before restart failed: %v", err)
@@ -255,7 +255,7 @@ func TestFileCache_LoadsMetadataSidecarsOnRestart(t *testing.T) {
 	firstEntry.Data.Close()
 	firstCache.Destroy()
 
-	secondCache := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	secondCache := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
 	defer secondCache.Destroy()
 
 	retrieved, err := secondCache.Get(key)
@@ -287,7 +287,7 @@ func TestFileCache_RemovesExpiredSidecarsOnStartup(t *testing.T) {
 	key := cache.FromString("expired-restart-key")
 	data := []byte("expired body")
 
-	firstCache := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	firstCache := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
 	firstEntry, err := firstCache.Cache(key, bytes.NewReader(data), time.Now().Add(-time.Hour), TestMeta{ID: "expired"})
 	if err != nil {
 		t.Fatalf("cache expired entry failed: %v", err)
@@ -295,7 +295,7 @@ func TestFileCache_RemovesExpiredSidecarsOnStartup(t *testing.T) {
 	firstEntry.Data.Close()
 	firstCache.Destroy()
 
-	secondCache := New[TestMeta](cfg, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
+	secondCache := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Hour, 16, ctx)
 	defer secondCache.Destroy()
 
 	if _, err := secondCache.Get(key); !errors.Is(err, cache.ErrCacheEntryNotFound) {

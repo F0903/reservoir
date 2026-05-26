@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"net/http"
-	"reservoir/metrics"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -24,5 +23,11 @@ func (m *RequestsMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *RequestsMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	apihttp.WriteJSON(w, http.StatusOK, metrics.Global.Requests)
+	runtimeMetrics, ok := metricsFromContext(ctx)
+	if !ok {
+		apihttp.InternalServerError(w)
+		return
+	}
+
+	apihttp.WriteJSON(w, http.StatusOK, runtimeMetrics.Requests)
 }

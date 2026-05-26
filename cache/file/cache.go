@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reservoir/cache"
 	"reservoir/config"
+	"reservoir/metrics"
 	"reservoir/utils/assertedpath"
 	"reservoir/utils/atomics"
 	"reservoir/utils/bytesize"
@@ -22,23 +23,26 @@ type Cache[MetadataT any] struct {
 	maxCacheSize    atomics.Int64
 	janitor         *cache.Janitor[MetadataT]
 	subs            config.ConfigSubscriber
+	metrics         *metrics.Metrics
 }
 
-func New[MetadataT any](cfg *config.Config, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
-	return newWithAggregateMetrics[MetadataT](cfg, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx, true)
+func New[MetadataT any](cfg *config.Config, m *metrics.Metrics, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+	return newWithAggregateMetrics[MetadataT](cfg, m, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx, true)
 }
 
-func NewTier[MetadataT any](cfg *config.Config, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
-	return newWithAggregateMetrics[MetadataT](cfg, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx, false)
+func NewTier[MetadataT any](cfg *config.Config, m *metrics.Metrics, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+	return newWithAggregateMetrics[MetadataT](cfg, m, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx, false)
 }
 
-func newWithAggregateMetrics[MetadataT any](cfg *config.Config, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context, trackAggregateMetrics bool) *Cache[MetadataT] {
+func newWithAggregateMetrics[MetadataT any](cfg *config.Config, m *metrics.Metrics, rootDir string, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context, trackAggregateMetrics bool) *Cache[MetadataT] {
+	m = metrics.Ensure(m)
 	c := &Cache[MetadataT]{
 		rootDir:         assertedpath.AssertDirectory(rootDir),
 		entriesMetadata: make(map[cache.CacheKey]*cache.EntryMetadata[MetadataT]),
 		locks:           make([]sync.RWMutex, shardCount),
 		byteSize:        atomics.NewInt64(0),
 		maxCacheSize:    atomics.NewInt64(maxCacheSize),
+		metrics:         m,
 	}
 
 	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
@@ -73,7 +77,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, rootDir string, 
 		Lock: func(key cache.CacheKey) *sync.RWMutex {
 			return cache.GetLock(c.locks, key)
 		},
-	}, trackAggregateMetrics)
+	}, trackAggregateMetrics, m)
 	if c.byteSize.Get() >= c.maxCacheSize.Get() {
 		c.janitor.Evict(c.maxCacheSize.Get())
 	}

@@ -1,7 +1,5 @@
 package metrics
 
-var Global *Metrics = NewMetrics()
-
 type Metrics struct {
 	Cache    cacheMetrics   `json:"cache"`
 	Requests requestMetrics `json:"requests"`
@@ -14,6 +12,13 @@ func NewMetrics() *Metrics {
 		Requests: NewRequestMetrics(),
 		System:   NewSystemMetrics(),
 	}
+}
+
+func Ensure(m *Metrics) *Metrics {
+	if m != nil {
+		return m
+	}
+	return NewMetrics()
 }
 
 // Run collectors for metrics that are not event-driven, such as system stats.

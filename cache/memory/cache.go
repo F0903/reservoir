@@ -26,21 +26,23 @@ type Cache[MetadataT any] struct {
 
 	janitor *cache.Janitor[MetadataT]
 	subs    config.ConfigSubscriber
+	metrics *metrics.Metrics
 }
 
-func New[MetadataT any](cfg *config.Config, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
-	return newWithAggregateMetrics[MetadataT](cfg, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx, true)
+func New[MetadataT any](cfg *config.Config, m *metrics.Metrics, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+	return newWithAggregateMetrics[MetadataT](cfg, m, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx, true)
 }
 
-func NewTier[MetadataT any](cfg *config.Config, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
-	return newWithAggregateMetrics[MetadataT](cfg, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx, false)
+func NewTier[MetadataT any](cfg *config.Config, m *metrics.Metrics, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+	return newWithAggregateMetrics[MetadataT](cfg, m, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx, false)
 }
 
-func newWithAggregateMetrics[MetadataT any](cfg *config.Config, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context, trackAggregateMetrics bool) *Cache[MetadataT] {
+func newWithAggregateMetrics[MetadataT any](cfg *config.Config, m *metrics.Metrics, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context, trackAggregateMetrics bool) *Cache[MetadataT] {
 	sysMem, err := mem.VirtualMemory()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get system memory info: %v", err))
 	}
+	m = metrics.Ensure(m)
 
 	c := &Cache[MetadataT]{
 		entries:      make(map[cache.CacheKey]*memoryInternalEntry[MetadataT]),
@@ -48,6 +50,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, memoryBudgetPerc
 		memoryCap:    atomics.NewInt64(int64(sysMem.Total) * int64(memoryBudgetPercent) / 100),
 		maxCacheSize: atomics.NewInt64(maxCacheSize),
 		byteSize:     atomics.NewInt64(0),
+		metrics:      m,
 	}
 
 	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
@@ -101,22 +104,22 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, memoryBudgetPerc
 		Lock: func(key cache.CacheKey) *sync.RWMutex {
 			return cache.GetLock(c.locks, key)
 		},
-	}, trackAggregateMetrics)
+	}, trackAggregateMetrics, m)
 	c.janitor.Start(ctx)
 
 	return c
 }
 
 func (c *Cache[MetadataT]) recordCacheHit() {
-	metrics.Global.Cache.CacheHits.Increment()
+	c.metrics.Cache.CacheHits.Increment()
 }
 
 func (c *Cache[MetadataT]) recordCacheMiss() {
-	metrics.Global.Cache.CacheMisses.Increment()
+	c.metrics.Cache.CacheMisses.Increment()
 }
 
 func (c *Cache[MetadataT]) recordCacheError() {
-	metrics.Global.Cache.CacheErrors.Increment()
+	c.metrics.Cache.CacheErrors.Increment()
 }
 
 func (c *Cache[MetadataT]) Destroy() {

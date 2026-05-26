@@ -10,7 +10,7 @@ import (
 	"reservoir/proxy/responder"
 )
 
-func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[cachedRequestInfo], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
+func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[CacheMetadata], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	rangeHeader := clientHd.Range.Value()
 	start, end, err := rangeHeader.SliceSize(cached.Metadata.Size)
 	if err != nil {
@@ -39,7 +39,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 		defer data.Close()
 
 		r.SetHeaders(header)
-		return finalizeAndRespond(r, data, status, req)
+		return finalizeAndRespond(p.metrics, r, data, status, req)
 	}
 
 	if clientHd.IfRange.IsPresent() {
@@ -72,5 +72,5 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	r.SetHeader("Last-Modified", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 
 	sections := io.NewSectionReader(cached.Data, start, length)
-	return finalizeAndRespond(r, sections, http.StatusPartialContent, req)
+	return finalizeAndRespond(p.metrics, r, sections, http.StatusPartialContent, req)
 }

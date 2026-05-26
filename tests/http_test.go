@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"reservoir/metrics"
 	"sync/atomic"
 	"testing"
 )
@@ -334,7 +333,7 @@ func TestCredentialedRequestsBypassCache(t *testing.T) {
 	env.Start()
 
 	targetURL := env.Upstream.URL + "/private"
-	bytesFetchedBefore := metrics.Global.Requests.BytesFetched.Get()
+	bytesFetchedBefore := env.Metrics.Requests.BytesFetched.Get()
 	doRequest := func() string {
 		req, err := http.NewRequest(http.MethodGet, targetURL, nil)
 		if err != nil {
@@ -365,7 +364,7 @@ func TestCredentialedRequestsBypassCache(t *testing.T) {
 		t.Fatalf("expected 2 upstream requests, got %d", got)
 	}
 	expectedFetched := int64(len("response 1") + len("response 2"))
-	if got := metrics.Global.Requests.BytesFetched.Get() - bytesFetchedBefore; got < expectedFetched {
+	if got := env.Metrics.Requests.BytesFetched.Get() - bytesFetchedBefore; got < expectedFetched {
 		t.Fatalf("expected at least %d direct upstream bytes fetched, got %d", expectedFetched, got)
 	}
 }

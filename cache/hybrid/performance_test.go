@@ -118,7 +118,7 @@ func BenchmarkHybridCacheTiering(b *testing.B) {
 
 	b.Run("ColdFileHitPromote", func(b *testing.B) {
 		cfg := newBenchmarkConfig()
-		c := New[benchMetadata](cfg, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+		c := New[benchMetadata](cfg, nil, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 		b.Cleanup(c.Destroy)
 
 		expires := time.Now().Add(time.Hour)
@@ -148,7 +148,7 @@ func BenchmarkHybridCacheTiering(b *testing.B) {
 
 	b.Run("MemoryPressureSpillToFile", func(b *testing.B) {
 		cfg := newBenchmarkConfig()
-		c := New[benchMetadata](cfg, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+		c := New[benchMetadata](cfg, nil, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 		b.Cleanup(c.Destroy)
 		c.memory.OverrideMemoryCapForTesting(int64(size + size/2))
 
@@ -175,7 +175,7 @@ func BenchmarkHybridCacheTiering(b *testing.B) {
 
 	b.Run("UnknownLengthMemoryPressureSpillToFile", func(b *testing.B) {
 		cfg := newBenchmarkConfig()
-		c := New[benchMetadata](cfg, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+		c := New[benchMetadata](cfg, nil, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 		b.Cleanup(c.Destroy)
 		c.memory.OverrideMemoryCapForTesting(int64(size + size/2))
 

@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"net/http"
-	"reservoir/metrics"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -24,7 +23,13 @@ func (m *CacheMetricsEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *CacheMetricsEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	collectCacheStorage(ctx)
+	runtimeMetrics, ok := metricsFromContext(ctx)
+	if !ok {
+		apihttp.InternalServerError(w)
+		return
+	}
 
-	apihttp.WriteJSON(w, http.StatusOK, metrics.Global.Cache)
+	collectCacheStorage(ctx, runtimeMetrics)
+
+	apihttp.WriteJSON(w, http.StatusOK, runtimeMetrics.Cache)
 }

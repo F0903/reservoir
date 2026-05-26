@@ -16,22 +16,25 @@ import (
 var ErrNotCacheable = errors.New("response not cacheable")
 
 type fetcher struct {
-	cache        cache.Cache[cachedRequestInfo]
+	cache        cache.Cache[CacheMetadata]
 	cfg          *config.Config
+	metrics      *metrics.Metrics
 	policy       cachePolicy
 	client       *http.Client
 	group        singleflight.Group
 	variantIndex *syncmap.SyncMap[cache.CacheKey, []string]
 }
 
-func newFetcher(cacheStore cache.Cache[cachedRequestInfo], cfg *config.Config, upstreamClient *http.Client) fetcher {
+func newFetcher(cacheStore cache.Cache[CacheMetadata], cfg *config.Config, upstreamClient *http.Client, m *metrics.Metrics) fetcher {
 	if upstreamClient == nil {
 		upstreamClient = newUpstreamClient()
 	}
+	m = metrics.Ensure(m)
 
 	return fetcher{
 		cache:        cacheStore,
 		cfg:          cfg,
+		metrics:      m,
 		policy:       newCachePolicy(cfg),
 		client:       upstreamClient,
 		group:        singleflight.Group{},
@@ -51,7 +54,7 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 
 	if !f.policy.RequestAllowsSharedCache(req) {
 		slog.Debug("Request contains credentials, bypassing shared cache", "url", req.URL)
-		metrics.Global.Requests.NonCoalescedRequests.Increment()
+		f.metrics.Requests.NonCoalescedRequests.Increment()
 		return f.fetchDirectlyFromUpstream(req)
 	}
 
@@ -59,7 +62,7 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 	if !shouldCoalesce {
 		// These requests also aren't cacheable, so they just go straight to upstream..
 		slog.Debug("Request can't be coalesced, fetching upstream...")
-		metrics.Global.Requests.NonCoalescedRequests.Increment()
+		f.metrics.Requests.NonCoalescedRequests.Increment()
 
 		return f.fetchUpstream(req, baseKey, lookupKey, clientHd)
 	}
@@ -72,7 +75,7 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 	if err != nil {
 		if errors.Is(err, ErrNotCacheable) {
 			slog.Debug("Request was not cacheable in singleflight, falling back to direct fetch", "url", req.URL)
-			metrics.Global.Requests.NonCoalescedRequests.Increment()
+			f.metrics.Requests.NonCoalescedRequests.Increment()
 			return f.fetchDirectlyFromUpstream(req)
 		}
 		return fetchResult{}, err
@@ -83,12 +86,12 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 	// Meaning that the result is being shared with other requests in-flight.
 
 	if shared {
-		metrics.Global.Requests.CoalescedRequests.Increment()
+		f.metrics.Requests.CoalescedRequests.Increment()
 
 		// Restore the original client headers for shared requests
 		clientHd = &originalClientHd
 	} else {
-		metrics.Global.Requests.NonCoalescedRequests.Increment()
+		f.metrics.Requests.NonCoalescedRequests.Increment()
 	}
 
 	switch fetched.Type {
@@ -116,11 +119,11 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 		if shared {
 			switch fetched.Cached.Status {
 			case hitStatusHit:
-				metrics.Global.Requests.CoalescedCacheHits.Increment()
+				f.metrics.Requests.CoalescedCacheHits.Increment()
 			case hitStatusRevalidated:
-				metrics.Global.Requests.CoalescedCacheRevalidations.Increment()
+				f.metrics.Requests.CoalescedCacheRevalidations.Increment()
 			case hitStatusMiss:
-				metrics.Global.Requests.CoalescedCacheMisses.Increment()
+				f.metrics.Requests.CoalescedCacheMisses.Increment()
 			}
 		}
 

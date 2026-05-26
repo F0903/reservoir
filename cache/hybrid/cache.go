@@ -27,16 +27,19 @@ type Cache[MetadataT any] struct {
 	demoterDone chan struct{}
 	stopOnce    sync.Once
 	subs        config.ConfigSubscriber
+	metrics     *metrics.Metrics
 }
 
-func New[MetadataT any](cfg *config.Config, rootDir string, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+func New[MetadataT any](cfg *config.Config, m *metrics.Metrics, rootDir string, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
+	m = metrics.Ensure(m)
 	c := &Cache[MetadataT]{
-		file:         filecache.NewTier[MetadataT](cfg, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx),
-		memory:       memorycache.NewTier[MetadataT](cfg, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx),
+		file:         filecache.NewTier[MetadataT](cfg, m, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx),
+		memory:       memorycache.NewTier[MetadataT](cfg, m, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx),
 		maxCacheSize: atomics.NewInt64(maxCacheSize),
 		demoteAfter:  atomics.NewInt64(int64(cfg.Cache.Hybrid.DemoteAfter.Read().Cast())),
 		stopDemoter:  make(chan struct{}),
 		demoterDone:  make(chan struct{}),
+		metrics:      m,
 	}
 
 	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
@@ -84,15 +87,15 @@ func (c *Cache[MetadataT]) Destroy() {
 }
 
 func (c *Cache[MetadataT]) recordCacheHit() {
-	metrics.Global.Cache.CacheHits.Increment()
+	c.metrics.Cache.CacheHits.Increment()
 }
 
 func (c *Cache[MetadataT]) recordCacheMiss() {
-	metrics.Global.Cache.CacheMisses.Increment()
+	c.metrics.Cache.CacheMisses.Increment()
 }
 
 func (c *Cache[MetadataT]) recordCacheError() {
-	metrics.Global.Cache.CacheErrors.Increment()
+	c.metrics.Cache.CacheErrors.Increment()
 }
 
 func (c *Cache[MetadataT]) Get(key cache.CacheKey) (*cache.Entry[MetadataT], error) {

@@ -40,7 +40,7 @@ var cacheBenchmarkBackends = []cacheBenchmarkBackend{
 		name: "Memory",
 		new: func(b *testing.B, cfg *config.Config) cache.Cache[benchMetadata] {
 			b.Helper()
-			c := memorycache.New[benchMetadata](cfg, 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+			c := memorycache.New[benchMetadata](cfg, nil, 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 			b.Cleanup(c.Destroy)
 			return c
 		},
@@ -49,7 +49,7 @@ var cacheBenchmarkBackends = []cacheBenchmarkBackend{
 		name: "File",
 		new: func(b *testing.B, cfg *config.Config) cache.Cache[benchMetadata] {
 			b.Helper()
-			c := filecache.New[benchMetadata](cfg, b.TempDir(), benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+			c := filecache.New[benchMetadata](cfg, nil, b.TempDir(), benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 			b.Cleanup(c.Destroy)
 			return c
 		},
@@ -58,7 +58,7 @@ var cacheBenchmarkBackends = []cacheBenchmarkBackend{
 		name: "Hybrid",
 		new: func(b *testing.B, cfg *config.Config) cache.Cache[benchMetadata] {
 			b.Helper()
-			c := hybrid.New[benchMetadata](cfg, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
+			c := hybrid.New[benchMetadata](cfg, nil, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 			b.Cleanup(c.Destroy)
 			return c
 		},

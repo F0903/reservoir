@@ -5,17 +5,28 @@ import (
 	"reservoir/webserver/api/apitypes"
 )
 
-func collectCacheStorage(ctx apitypes.Context) {
+func metricsFromContext(ctx apitypes.Context) (*runtimeMetrics.Metrics, bool) {
+	if ctx.Services == nil || ctx.Services.Metrics == nil {
+		return nil, false
+	}
+	return ctx.Services.Metrics, true
+}
+
+func collectCacheStorage(ctx apitypes.Context, m *runtimeMetrics.Metrics) {
+	if m == nil {
+		return
+	}
+
 	if ctx.Services == nil || ctx.Services.Cache == nil {
-		runtimeMetrics.Global.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
+		m.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
 		return
 	}
 
 	storage, ok := ctx.Services.Cache.StorageMetrics()
 	if !ok {
-		runtimeMetrics.Global.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
+		m.Cache.SetStorage(runtimeMetrics.CacheStorageMetrics{})
 		return
 	}
 
-	runtimeMetrics.Global.Cache.SetStorage(storage)
+	m.Cache.SetStorage(storage)
 }

@@ -29,7 +29,7 @@ type directFetchResult struct {
 // Represents a fetch that was served from cache. Possibly revalidated from origin.
 type cachedFetchResult struct {
 	fetchInfo
-	Entry     *cache.Entry[cachedRequestInfo]
+	Entry     *cache.Entry[CacheMetadata]
 	Coalesced bool
 }
 

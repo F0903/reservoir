@@ -10,4 +10,3 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [ ] Make widgets more responsive depending on their size.
 
 ## Project Wide
-- [ ] Decouple proxy/cache packages from global metrics and concrete cache backend construction by injecting metrics and cache factories.

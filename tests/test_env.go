@@ -14,8 +14,10 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reservoir/application"
 	"reservoir/config"
 	"reservoir/logging"
+	"reservoir/metrics"
 	"reservoir/proxy"
 	"reservoir/proxy/certs"
 	"testing"
@@ -27,6 +29,7 @@ type TestEnv struct {
 	ProxyServer *httptest.Server
 	Client      *http.Client
 	Proxy       *proxy.Proxy
+	Metrics     *metrics.Metrics
 	Cfg         *config.Config
 	CacheDir    string
 	T           testing.TB
@@ -91,8 +94,17 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 
 	ctx := t.Context()
 
-	p, err := proxy.NewProxy(cfg, &FakeCA{}, ctx)
+	runtimeMetrics := metrics.NewMetrics()
+	cacheStore, err := application.NewProxyCache(cfg, runtimeMetrics, ctx)
 	if err != nil {
+		t.Fatalf("Failed to create proxy cache: %v", err)
+	}
+	p, err := proxy.NewProxy(cfg, &FakeCA{}, proxy.Dependencies{
+		Cache:   cacheStore,
+		Metrics: runtimeMetrics,
+	})
+	if err != nil {
+		cacheStore.Destroy()
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
 
@@ -118,6 +130,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		ProxyServer: proxyServer,
 		Client:      proxyClient,
 		Proxy:       p,
+		Metrics:     runtimeMetrics,
 		Cfg:         cfg,
 		CacheDir:    cacheDir,
 		T:           t,
@@ -213,8 +226,18 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 
 	ctx := t.Context()
 
-	p, err := proxy.NewProxyWithUpstreamClient(cfg, ca, upstreamClient, ctx)
+	runtimeMetrics := metrics.NewMetrics()
+	cacheStore, err := application.NewProxyCache(cfg, runtimeMetrics, ctx)
 	if err != nil {
+		t.Fatalf("Failed to create proxy cache: %v", err)
+	}
+	p, err := proxy.NewProxy(cfg, ca, proxy.Dependencies{
+		Cache:          cacheStore,
+		Metrics:        runtimeMetrics,
+		UpstreamClient: upstreamClient,
+	})
+	if err != nil {
+		cacheStore.Destroy()
 		t.Fatalf("Failed to create proxy: %v", err)
 	}
 
@@ -248,6 +271,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 		ProxyServer: proxyServer,
 		Client:      proxyClient,
 		Proxy:       p,
+		Metrics:     runtimeMetrics,
 		Cfg:         cfg,
 		CacheDir:    cacheDir,
 		T:           t,

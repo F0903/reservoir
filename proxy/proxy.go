@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reservoir/cache"
 	"reservoir/config"
+	"reservoir/metrics"
 	"reservoir/proxy/certs"
 	"reservoir/utils/httplistener"
 	"time"
@@ -22,9 +23,10 @@ var (
 	ErrRangeNotSatisfiable  = errors.New("range not satisfiable")
 	ErrIfRangeMismatch      = errors.New("If-Range header mismatch")
 	ErrBadGateway           = errors.New("bad gateway. Error when sending request to upstream")
+	ErrCacheStoreRequired   = errors.New("proxy cache store is required")
 )
 
-type cachedRequestInfo struct {
+type CacheMetadata struct {
 	ETag         string
 	LastModified time.Time
 	Header       http.Header
@@ -32,10 +34,17 @@ type cachedRequestInfo struct {
 }
 
 type Proxy struct {
-	ca    certs.CertAuthority
-	cache cache.Cache[cachedRequestInfo]
-	fetch fetcher
-	cfg   *config.Config
+	ca      certs.CertAuthority
+	cache   cache.Cache[CacheMetadata]
+	fetch   fetcher
+	cfg     *config.Config
+	metrics *metrics.Metrics
+}
+
+type Dependencies struct {
+	Cache          cache.Cache[CacheMetadata]
+	Metrics        *metrics.Metrics
+	UpstreamClient *http.Client
 }
 
 func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
@@ -61,23 +70,17 @@ func (p *Proxy) ClearCache() error {
 	return p.cache.Clear()
 }
 
-func NewProxy(cfg *config.Config, ca certs.CertAuthority, ctx context.Context) (*Proxy, error) {
-	return NewProxyWithUpstreamClient(cfg, ca, nil, ctx)
-}
-
-// Creates a new MITM proxy. It should be passed the filenames
-// for the certificate and private key of a certificate authority trusted by the
-// client's machine.
-func NewProxyWithUpstreamClient(cfg *config.Config, ca certs.CertAuthority, upstreamClient *http.Client, ctx context.Context) (*Proxy, error) {
-	cacheStore, err := newCacheStore(cfg, ctx)
-	if err != nil {
-		return nil, err
+func NewProxy(cfg *config.Config, ca certs.CertAuthority, deps Dependencies) (*Proxy, error) {
+	if deps.Cache == nil {
+		return nil, ErrCacheStoreRequired
 	}
 
+	m := metrics.Ensure(deps.Metrics)
 	return &Proxy{
-		ca:    ca,
-		cache: cacheStore,
-		fetch: newFetcher(cacheStore, cfg, upstreamClient),
-		cfg:   cfg,
+		ca:      ca,
+		cache:   deps.Cache,
+		fetch:   newFetcher(deps.Cache, cfg, deps.UpstreamClient, m),
+		cfg:     cfg,
+		metrics: m,
 	}, nil
 }

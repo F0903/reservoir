@@ -103,11 +103,11 @@ func (c *Cache[MetadataT]) cacheBytesInternal(key cache.CacheKey, dataBytes []by
 	c.mu.Unlock()
 
 	if replaced {
-		cache.DecrementCacheSize(&c.byteSize, previousEntry.meta.Size)
+		cache.DecrementCacheSize(c.metrics, &c.byteSize, previousEntry.meta.Size)
 	} else {
-		cache.IncrementCacheEntries()
+		cache.IncrementCacheEntries(c.metrics)
 	}
-	cache.AddCacheSize(&c.byteSize, int64(count))
+	cache.AddCacheSize(c.metrics, &c.byteSize, int64(count))
 
 	return &cache.Entry[MetadataT]{
 		Data:     &memoryReadSeekCloser{bytes.NewReader(dataBytes)},
@@ -200,8 +200,8 @@ func (c *Cache[MetadataT]) deleteInternal(key cache.CacheKey) error {
 	delete(c.entries, key)
 	c.mu.Unlock()
 
-	cache.DecrementCacheEntries()
-	cache.DecrementCacheSize(&c.byteSize, entry.meta.Size)
+	cache.DecrementCacheEntries(c.metrics)
+	cache.DecrementCacheSize(c.metrics, &c.byteSize, entry.meta.Size)
 
 	return nil
 }

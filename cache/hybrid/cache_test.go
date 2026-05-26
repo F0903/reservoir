@@ -15,16 +15,6 @@ type TestMeta struct {
 	ID string
 }
 
-func useFreshCacheMetrics(t *testing.T) {
-	t.Helper()
-
-	previous := metrics.Global
-	metrics.Global = metrics.NewMetrics()
-	t.Cleanup(func() {
-		metrics.Global = previous
-	})
-}
-
 func newTestHybridCache(t *testing.T, demoteAfter time.Duration) *Cache[TestMeta] {
 	t.Helper()
 
@@ -37,7 +27,7 @@ func newTestHybridCacheWithMax(t *testing.T, demoteAfter time.Duration, maxCache
 	cfg := config.NewDefault()
 	cfg.Cache.Hybrid.DemoteAfter.Overwrite(duration.Duration(demoteAfter))
 
-	c := New[TestMeta](cfg, t.TempDir(), 50, maxCacheSize, time.Hour, 16, t.Context())
+	c := New[TestMeta](cfg, metrics.NewMetrics(), t.TempDir(), 50, maxCacheSize, time.Hour, 16, t.Context())
 	t.Cleanup(c.Destroy)
 	return c
 }
@@ -436,7 +426,6 @@ func TestHybridCache_BackgroundDemoterMovesIdleEntries(t *testing.T) {
 }
 
 func TestHybridCache_MetricsTrackShadowedFileAcrossDemotionAndPromotion(t *testing.T) {
-	useFreshCacheMetrics(t)
 	c := newTestHybridCache(t, time.Hour)
 
 	key := cache.FromString("hybrid-metrics-key")
@@ -447,20 +436,20 @@ func TestHybridCache_MetricsTrackShadowedFileAcrossDemotionAndPromotion(t *testi
 	}
 	entry.Data.Close()
 
-	if got := metrics.Global.Cache.CacheEntries.Get(); got != 1 {
-		t.Fatalf("expected global entry count 1 after hybrid cache write, got %d", got)
+	if got := c.metrics.Cache.CacheEntries.Get(); got != 1 {
+		t.Fatalf("expected aggregate entry count 1 after hybrid cache write, got %d", got)
 	}
-	if got := metrics.Global.Cache.BytesCached.Get(); got != int64(len(data)) {
-		t.Fatalf("expected global cached bytes %d, got %d", len(data), got)
+	if got := c.metrics.Cache.BytesCached.Get(); got != int64(len(data)) {
+		t.Fatalf("expected aggregate cached bytes %d, got %d", len(data), got)
 	}
 
 	setHybridMemoryLastAccess(t, c, key, time.Now().Add(-2*time.Hour))
 	c.demoteIdleEntries()
-	if got := metrics.Global.Cache.CacheEntries.Get(); got != 1 {
-		t.Fatalf("expected global entry count 1 after demotion, got %d", got)
+	if got := c.metrics.Cache.CacheEntries.Get(); got != 1 {
+		t.Fatalf("expected aggregate entry count 1 after demotion, got %d", got)
 	}
-	if got := metrics.Global.Cache.BytesCached.Get(); got != int64(len(data)) {
-		t.Fatalf("expected global cached bytes %d after demotion, got %d", len(data), got)
+	if got := c.metrics.Cache.BytesCached.Get(); got != int64(len(data)) {
+		t.Fatalf("expected aggregate cached bytes %d after demotion, got %d", len(data), got)
 	}
 
 	retrieved, err := c.Get(key)
@@ -468,19 +457,18 @@ func TestHybridCache_MetricsTrackShadowedFileAcrossDemotionAndPromotion(t *testi
 		t.Fatalf("Get failed: %v", err)
 	}
 	retrieved.Data.Close()
-	if got := metrics.Global.Cache.CacheHits.Get(); got != 1 {
+	if got := c.metrics.Cache.CacheHits.Get(); got != 1 {
 		t.Fatalf("expected one externally visible cache hit, got %d", got)
 	}
-	if got := metrics.Global.Cache.CacheEntries.Get(); got != 2 {
+	if got := c.metrics.Cache.CacheEntries.Get(); got != 2 {
 		t.Fatalf("expected memory promotion to track the shadowed file entry, got %d", got)
 	}
-	if got := metrics.Global.Cache.BytesCached.Get(); got != int64(len(data))*2 {
-		t.Fatalf("expected global cached bytes %d after shadowed promotion, got %d", len(data)*2, got)
+	if got := c.metrics.Cache.BytesCached.Get(); got != int64(len(data))*2 {
+		t.Fatalf("expected aggregate cached bytes %d after shadowed promotion, got %d", len(data)*2, got)
 	}
 }
 
-func TestHybridCache_MemoryTierEvictionPreservesGlobalByteMetrics(t *testing.T) {
-	useFreshCacheMetrics(t)
+func TestHybridCache_MemoryTierEvictionPreservesAggregateByteMetrics(t *testing.T) {
 	c := newTestHybridCacheWithMax(t, time.Hour, 3000)
 	setHybridMemoryCap(c, 1000)
 
@@ -506,16 +494,15 @@ func TestHybridCache_MemoryTierEvictionPreservesGlobalByteMetrics(t *testing.T) 
 	newMemoryEntry.Data.Close()
 
 	expectedBytes := int64(len(fileData) + len(newMemoryData))
-	if got := metrics.Global.Cache.BytesCached.Get(); got != expectedBytes {
-		t.Fatalf("expected global cached bytes %d after memory-tier eviction, got %d", expectedBytes, got)
+	if got := c.metrics.Cache.BytesCached.Get(); got != expectedBytes {
+		t.Fatalf("expected aggregate cached bytes %d after memory-tier eviction, got %d", expectedBytes, got)
 	}
 	if stats := c.Stats(); stats.Bytes != expectedBytes {
 		t.Fatalf("expected hybrid stats bytes %d after memory-tier eviction, got %d", expectedBytes, stats.Bytes)
 	}
 }
 
-func TestHybridCache_FileTierEvictionPreservesGlobalByteMetrics(t *testing.T) {
-	useFreshCacheMetrics(t)
+func TestHybridCache_FileTierEvictionPreservesAggregateByteMetrics(t *testing.T) {
 	c := newTestHybridCacheWithMax(t, time.Hour, 1500)
 	setHybridMemoryCap(c, 1000)
 
@@ -534,8 +521,8 @@ func TestHybridCache_FileTierEvictionPreservesGlobalByteMetrics(t *testing.T) {
 	fileEntry.Data.Close()
 
 	expectedBytes := int64(len(memoryData))
-	if got := metrics.Global.Cache.BytesCached.Get(); got != expectedBytes {
-		t.Fatalf("expected global cached bytes %d after file-tier eviction, got %d", expectedBytes, got)
+	if got := c.metrics.Cache.BytesCached.Get(); got != expectedBytes {
+		t.Fatalf("expected aggregate cached bytes %d after file-tier eviction, got %d", expectedBytes, got)
 	}
 	if stats := c.Stats(); stats.Bytes != expectedBytes {
 		t.Fatalf("expected hybrid stats bytes %d after file-tier eviction, got %d", expectedBytes, stats.Bytes)
