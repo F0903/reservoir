@@ -81,6 +81,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 	cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
 	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
 	cfg.Cache.LockShards.Overwrite(32)
+	cfg.Logging.File.Overwrite("")
 
 	if _, ok := t.(*testing.B); ok {
 		cfg.Logging.ToStdout.Overwrite(false)

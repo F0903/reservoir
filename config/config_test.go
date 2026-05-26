@@ -21,6 +21,14 @@ type testConfig struct {
 	Flat ConfigProp[int] `json:"flat"`
 }
 
+func newTestConfig(t *testing.T) *Config {
+	t.Helper()
+
+	cfg := NewDefault()
+	cfg.path = filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
+	return cfg
+}
+
 func TestSetPropsFromMapRecursive(t *testing.T) {
 	cfg := &testConfig{
 		Sub: subConfig{
@@ -94,7 +102,7 @@ func TestSetPropsFromMapRecursive_Partial(t *testing.T) {
 }
 
 func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
-	cfg := NewDefault()
+	cfg := newTestConfig(t)
 
 	updates := map[string]any{
 		"cache": map[string]any{
@@ -185,8 +193,7 @@ func TestUpdatePartialFromConfig_NilUpdateReturnsValidationError(t *testing.T) {
 }
 
 func TestLoadOrDefault_StrictPolicy(t *testing.T) {
-	tmpFile := "var/test_config_strict.json"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "test_config_strict.json"))
 
 	// Write invalid JSON
 	err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644)
@@ -249,8 +256,7 @@ func TestLoadOrDefaultPersistsResetToProvidedPath(t *testing.T) {
 }
 
 func TestLoadOrDefault_MissingFields(t *testing.T) {
-	tmpFile := "var/test_config_missing.json"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "test_config_missing.json"))
 
 	// Write JSON with missing fields (e.g. no proxy section)
 	err := os.WriteFile(tmpFile, []byte(`{"cache": {"type": "memory"}}`), 0644)

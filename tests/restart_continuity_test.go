@@ -142,6 +142,7 @@ func newFileCacheProxyConfig(t *testing.T) *config.Config {
 	cfg.Cache.File.Dir.Overwrite(t.TempDir())
 	cfg.Cache.LockShards.Overwrite(32)
 	cfg.Logging.ToStdout.Overwrite(false)
+	cfg.Logging.File.Overwrite("")
 
 	logging.Init(cfg)
 	return cfg
