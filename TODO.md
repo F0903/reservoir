@@ -10,6 +10,5 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 - [ ] Make widgets more responsive depending on their size.
 
 ## Project Wide
-- [ ] Make config PATCH handling reject unknown keys and move update/persist/restart tracking behind a synchronized config service.
 - [ ] Decouple proxy/cache packages from global metrics and concrete cache backend construction by injecting metrics and cache factories.
 - [ ] Split dashboard-specific CSP/assets from generic webserver hardening so API-only or dashboard-disabled builds remain clean.

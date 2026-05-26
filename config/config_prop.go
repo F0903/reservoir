@@ -58,11 +58,11 @@ func (p *ConfigProp[T]) Stage(newValue T) {
 	p.value.Store(commit)
 }
 
-func (p *ConfigProp[T]) CommitStaged() {
+func (p *ConfigProp[T]) CommitStaged() CommitResult {
 	commit, _ := p.value.Load()
 	staged, ok := commit.stagedValue.Get()
 	if !ok {
-		return
+		return CommitResult{}
 	}
 
 	oldOverwritable := commit.Value()
@@ -74,12 +74,13 @@ func (p *ConfigProp[T]) CommitStaged() {
 	commit.Commit()
 	p.value.Store(commit)
 
-	if p.requiresRestart && oldOriginal != newOriginal {
-		setRestartNeeded()
+	result := CommitResult{
+		RestartRequired: p.requiresRestart && oldOriginal != newOriginal,
 	}
 	if oldEffective != newEffective {
 		p.onChange.Fire(newEffective)
 	}
+	return result
 }
 
 func (p *ConfigProp[T]) String() string {

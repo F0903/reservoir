@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"reflect"
+	"strings"
 )
 
 var (
@@ -13,16 +14,12 @@ var (
 	ErrValidationFailed = errors.New("config validation failed")
 )
 
-type UpdateStatus int
-
-const (
-	UpdateStatusFailed UpdateStatus = iota
-	UpdateStatusSuccess
-	UpdateStatusRestartRequired
-)
+type CommitResult struct {
+	RestartRequired bool
+}
 
 type stagedProp interface {
-	CommitStaged()
+	CommitStaged() CommitResult
 }
 
 type StagedConfigProp interface {
@@ -41,21 +38,111 @@ func cloneConfig(cfg *Config) (*Config, error) {
 	if err := json.Unmarshal(data, &cloned); err != nil {
 		return nil, err
 	}
+	cloned.setRestartNeededProps()
 	cloned.path = cfg.path
 
 	return &cloned, nil
 }
 
-func commitStagedProps(stagedProps []stagedProp) {
+func (c *Config) Clone() (*Config, error) {
+	if c == nil {
+		return nil, fmt.Errorf("%w: config cannot be nil", ErrValidationFailed)
+	}
+	return cloneConfig(c)
+}
+
+func commitStagedProps(stagedProps []stagedProp) CommitResult {
+	var result CommitResult
 	for _, prop := range stagedProps {
 		slog.Debug("Committing property...", "prop", prop)
-		prop.CommitStaged()
+		propResult := prop.CommitStaged()
+		result.RestartRequired = result.RestartRequired || propResult.RestartRequired
 	}
+	return result
+}
+
+type PartialUpdate struct {
+	cfg     *Config
+	updates map[string]any
+	next    *Config
+}
+
+func PreparePartialUpdate(cfg *Config, updates map[string]any) (*PartialUpdate, error) {
+	slog.Info("Preparing config partial update", "updates", updates)
+
+	if cfg == nil {
+		return nil, fmt.Errorf("%w: config cannot be nil", ErrValidationFailed)
+	}
+	if updates == nil {
+		return nil, fmt.Errorf("%w: updates cannot be nil", ErrValidationFailed)
+	}
+
+	slog.Debug("Setting properties from JSON map...", "updates", updates)
+	candidate, err := cloneConfig(cfg)
+	if err != nil {
+		slog.Error("Failed to clone config before update", "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	candidateStagedProps, err := setPropsFromMap(candidate, updates)
+	if err != nil {
+		slog.Error("Failed to set properties from map", "error", err)
+		if errors.Is(err, ErrValidationFailed) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	commitStagedProps(candidateStagedProps)
+
+	if err := candidate.verify(); err != nil {
+		slog.Error("Updated config failed verification", "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrValidationFailed, err)
+	}
+
+	return &PartialUpdate{
+		cfg:     cfg,
+		updates: updates,
+		next:    candidate,
+	}, nil
+}
+
+func (u *PartialUpdate) Persist() error {
+	if u == nil || u.next == nil {
+		return fmt.Errorf("%w: partial update is not prepared", ErrUpdateFailed)
+	}
+	if err := u.next.persist(); err != nil {
+		slog.Error("Failed to persist updated config", "error", err)
+		return fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+	return nil
+}
+
+func (u *PartialUpdate) Commit() (CommitResult, error) {
+	if u == nil || u.cfg == nil {
+		return CommitResult{}, fmt.Errorf("%w: partial update is not prepared", ErrUpdateFailed)
+	}
+
+	stagedProps, err := setPropsFromMap(u.cfg, u.updates)
+	if err != nil {
+		slog.Error("Failed to apply verified config update", "error", err)
+		if errors.Is(err, ErrValidationFailed) {
+			return CommitResult{}, err
+		}
+		return CommitResult{}, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	}
+
+	slog.Info("Committing updated properties...", "staged_count", len(stagedProps))
+	return commitStagedProps(stagedProps), nil
 }
 
 // Dynamically sets the properties of a struct based on the provided map.
 // Supports nested structs.
 func setPropsFromMapRecursive(val reflect.Value, updates map[string]any) (stagedProps []stagedProp, err error) {
+	return setPropsFromMapRecursiveAtPath(val, updates, "")
+}
+
+func setPropsFromMapRecursiveAtPath(val reflect.Value, updates map[string]any, path string) (stagedProps []stagedProp, err error) {
 	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
@@ -69,23 +156,14 @@ func setPropsFromMapRecursive(val reflect.Value, updates map[string]any) (staged
 			field := typ.Field(i)
 			fieldVal := val.Field(i)
 
-			jsonTag, _ := field.Tag.Lookup("json")
-			if jsonTag != key {
+			jsonName, ok := jsonFieldName(field)
+			if !ok || jsonName != key {
 				continue
 			}
 
 			found = true
+			keyPath := joinConfigPath(path, key)
 			if fieldVal.Kind() == reflect.Struct {
-				// If the value is a map, it's a nested update
-				if nestedUpdates, ok := value.(map[string]any); ok {
-					nestedStaged, err := setPropsFromMapRecursive(fieldVal.Addr(), nestedUpdates)
-					if err != nil {
-						return nil, err
-					}
-					stagedProps = append(stagedProps, nestedStaged...)
-					break
-				}
-
 				// Check if it's a ConfigProp
 				if fieldVal.CanAddr() {
 					fieldAddr := fieldVal.Addr()
@@ -96,18 +174,31 @@ func setPropsFromMapRecursive(val reflect.Value, updates map[string]any) (staged
 						}
 
 						if err := prop.UnmarshalJSONStaged(valueBytes); err != nil {
-							return nil, err
+							return nil, fmt.Errorf("%w: invalid value for config key %q: %v", ErrValidationFailed, keyPath, err)
 						}
 
 						stagedProps = append(stagedProps, prop)
 						break
 					}
 				}
+
+				// If the value is a map, it's a nested update
+				if nestedUpdates, ok := value.(map[string]any); ok {
+					nestedStaged, err := setPropsFromMapRecursiveAtPath(fieldVal.Addr(), nestedUpdates, keyPath)
+					if err != nil {
+						return nil, err
+					}
+					stagedProps = append(stagedProps, nestedStaged...)
+					break
+				}
+
+				return nil, fmt.Errorf("%w: config key %q expects an object", ErrValidationFailed, keyPath)
 			}
-			break
+
+			return nil, fmt.Errorf("%w: unsupported config key %q", ErrValidationFailed, keyPath)
 		}
 		if !found {
-			slog.Warn("Config property not found", "key", key)
+			return nil, fmt.Errorf("%w: unknown config key %q", ErrValidationFailed, joinConfigPath(path, key))
 		}
 	}
 
@@ -118,52 +209,27 @@ func setPropsFromMap(cfg *Config, updates map[string]any) (stagedProps []stagedP
 	return setPropsFromMapRecursive(reflect.ValueOf(cfg), updates)
 }
 
-func UpdatePartialFromConfig(cfg *Config, updates map[string]any) (UpdateStatus, error) {
-	slog.Info("Updating config with partial JSON", "updates", updates)
-
-	if updates == nil {
-		slog.Error("UpdatePartialFromConfig called with nil updates")
-		return UpdateStatusFailed, fmt.Errorf("%w: updates cannot be nil", ErrValidationFailed)
+func jsonFieldName(field reflect.StructField) (string, bool) {
+	if field.PkgPath != "" {
+		return "", false
 	}
 
-	slog.Debug("Setting properties from JSON map...", "updates", updates)
-	candidate, err := cloneConfig(cfg)
-	if err != nil {
-		slog.Error("Failed to clone config before update", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	jsonTag, ok := field.Tag.Lookup("json")
+	if !ok {
+		return "", false
 	}
 
-	candidateStagedProps, err := setPropsFromMap(candidate, updates)
-	if err != nil {
-		slog.Error("Failed to set properties from map", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
+	name, _, _ := strings.Cut(jsonTag, ",")
+	if name == "" || name == "-" {
+		return "", false
 	}
 
-	commitStagedProps(candidateStagedProps)
+	return name, true
+}
 
-	if err := candidate.verify(); err != nil {
-		slog.Error("Updated config failed verification", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrValidationFailed, err)
+func joinConfigPath(prefix string, key string) string {
+	if prefix == "" {
+		return key
 	}
-
-	if err := candidate.persist(); err != nil {
-		slog.Error("Failed to persist updated config", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
-	}
-
-	stagedProps, err := setPropsFromMap(cfg, updates)
-	if err != nil {
-		slog.Error("Failed to apply verified config update", "error", err)
-		return UpdateStatusFailed, fmt.Errorf("%w: %v", ErrUpdateFailed, err)
-	}
-
-	slog.Info("Committing updated properties...", "staged_count", len(stagedProps))
-	commitStagedProps(stagedProps)
-
-	status := UpdateStatusSuccess
-	if IsRestartNeeded() {
-		slog.Info("Restart is required after updating config")
-		status = UpdateStatusRestartRequired
-	}
-	return status, nil
+	return prefix + "." + key
 }

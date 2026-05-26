@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"reservoir/utils/bytesize"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,6 +28,24 @@ func newTestConfig(t *testing.T) *Config {
 	cfg := NewDefault()
 	cfg.path = filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
 	return cfg
+}
+
+func applyPartialUpdate(t *testing.T, cfg *Config, updates map[string]any) CommitResult {
+	t.Helper()
+
+	update, err := PreparePartialUpdate(cfg, updates)
+	if err != nil {
+		t.Fatalf("PreparePartialUpdate failed: %v", err)
+	}
+	if err := update.Persist(); err != nil {
+		t.Fatalf("Persist failed: %v", err)
+	}
+	result, err := update.Commit()
+	if err != nil {
+		t.Fatalf("Commit failed: %v", err)
+	}
+
+	return result
 }
 
 func TestSetPropsFromMapRecursive(t *testing.T) {
@@ -63,6 +82,33 @@ func TestSetPropsFromMapRecursive(t *testing.T) {
 
 	if cfg.Flat.Read() != 2 {
 		t.Errorf("Expected Flat to be 2, got %d", cfg.Flat.Read())
+	}
+}
+
+func TestSetPropsFromMapRecursive_UnknownKeyReturnsValidationError(t *testing.T) {
+	cfg := &testConfig{
+		Sub: subConfig{
+			Prop: NewConfigProp("old"),
+		},
+		Flat: NewConfigProp(1),
+	}
+
+	_, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), map[string]any{
+		"sub": map[string]any{
+			"unknown": "new",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unknown key to return an error")
+	}
+	if !errors.Is(err, ErrValidationFailed) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "sub.unknown") {
+		t.Fatalf("expected error to include unknown key path, got %v", err)
+	}
+	if got := cfg.Sub.Prop.Read(); got != "old" {
+		t.Fatalf("unknown key update changed config: got %q", got)
 	}
 }
 
@@ -121,14 +167,7 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 		},
 	}
 
-	status, err := UpdatePartialFromConfig(cfg, updates)
-	if err != nil {
-		t.Fatalf("UpdatePartialFromConfig failed: %v", err)
-	}
-
-	if status == UpdateStatusFailed {
-		t.Errorf("Expected UpdateStatusSuccess or RestartRequired, got %v", status)
-	}
+	applyPartialUpdate(t, cfg, updates)
 
 	if cfg.Cache.MaxCacheSize.Read().String() != "50G" {
 		t.Errorf("Expected MaxCacheSize to be 50G, got %s", cfg.Cache.MaxCacheSize.Read().String())
@@ -147,7 +186,61 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 	}
 }
 
-func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T) {
+func TestPreparePartialUpdateRejectsUnknownNestedKey(t *testing.T) {
+	cfg := newTestConfig(t)
+	originalDir := cfg.Cache.File.Dir.Read()
+
+	update, err := PreparePartialUpdate(cfg, map[string]any{
+		"cache": map[string]any{
+			"file": map[string]any{
+				"missing": "value",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unknown nested key to return an error")
+	}
+	if update != nil {
+		t.Fatal("expected failed update preparation to return nil update")
+	}
+	if !errors.Is(err, ErrValidationFailed) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "cache.file.missing") {
+		t.Fatalf("expected error to include full key path, got %v", err)
+	}
+	if got := cfg.Cache.File.Dir.Read(); got != originalDir {
+		t.Fatalf("unknown update committed cache dir: got %q, want %q", got, originalDir)
+	}
+}
+
+func TestPartialUpdateCommitReportsRestartRequired(t *testing.T) {
+	cfg := newTestConfig(t)
+
+	result := applyPartialUpdate(t, cfg, map[string]any{
+		"proxy": map[string]any{
+			"listen": ":10000",
+		},
+	})
+	if !result.RestartRequired {
+		t.Fatal("expected proxy.listen update to require restart")
+	}
+}
+
+func TestPartialUpdateCommitDoesNotReportRestartForHotSwapProperty(t *testing.T) {
+	cfg := newTestConfig(t)
+
+	result := applyPartialUpdate(t, cfg, map[string]any{
+		"logging": map[string]any{
+			"level": "DEBUG",
+		},
+	})
+	if result.RestartRequired {
+		t.Fatal("expected logging.level update to avoid restart")
+	}
+}
+
+func TestPreparePartialUpdate_InvalidUpdateDoesNotCommitOrNotify(t *testing.T) {
 	cfg := NewDefault()
 	originalSize := cfg.Cache.MaxCacheSize.Read()
 
@@ -157,7 +250,7 @@ func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T
 	})
 	defer unsub()
 
-	status, err := UpdatePartialFromConfig(cfg, map[string]any{
+	update, err := PreparePartialUpdate(cfg, map[string]any{
 		"cache": map[string]any{
 			"max_cache_size": "0B",
 		},
@@ -165,11 +258,11 @@ func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T
 	if err == nil {
 		t.Fatal("expected invalid update to return an error")
 	}
+	if update != nil {
+		t.Fatal("expected invalid update to return nil update")
+	}
 	if !errors.Is(err, ErrValidationFailed) {
 		t.Fatalf("expected validation error, got %v", err)
-	}
-	if status != UpdateStatusFailed {
-		t.Fatalf("expected failed status, got %v", status)
 	}
 	if got := cfg.Cache.MaxCacheSize.Read(); got != originalSize {
 		t.Fatalf("invalid update committed max cache size: got %s, want %s", got, originalSize)
@@ -179,16 +272,16 @@ func TestUpdatePartialFromConfig_InvalidUpdateDoesNotCommitOrNotify(t *testing.T
 	}
 }
 
-func TestUpdatePartialFromConfig_NilUpdateReturnsValidationError(t *testing.T) {
-	status, err := UpdatePartialFromConfig(NewDefault(), nil)
+func TestPreparePartialUpdate_NilUpdateReturnsValidationError(t *testing.T) {
+	update, err := PreparePartialUpdate(NewDefault(), nil)
 	if err == nil {
 		t.Fatal("expected nil update to return an error")
 	}
+	if update != nil {
+		t.Fatal("expected nil update to return nil update")
+	}
 	if !errors.Is(err, ErrValidationFailed) {
 		t.Fatalf("expected validation error, got %v", err)
-	}
-	if status != UpdateStatusFailed {
-		t.Fatalf("expected failed status, got %v", status)
 	}
 }
 

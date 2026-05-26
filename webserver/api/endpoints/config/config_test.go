@@ -38,6 +38,31 @@ func TestPatchReturnsBadRequestForValidationError(t *testing.T) {
 	}
 }
 
+func TestPatchReturnsBadRequestForUnknownKey(t *testing.T) {
+	cfg := coreconfig.NewDefault()
+	originalDir := cfg.Cache.File.Dir.Read()
+	rec := httptest.NewRecorder()
+
+	(&ConfigEndpoint{}).Patch(
+		rec,
+		newPatchRequest(`{"cache":{"file":{"missing":"value"}}}`),
+		apitypes.Context{Services: appservices.NewContainer(cfg, nil, nil, nil)},
+	)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), coreconfig.ErrValidationFailed.Error()) {
+		t.Fatalf("expected validation error body, got %q", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "cache.file.missing") {
+		t.Fatalf("expected unknown key path in body, got %q", rec.Body.String())
+	}
+	if got := cfg.Cache.File.Dir.Read(); got != originalDir {
+		t.Fatalf("unknown update committed cache dir: got %q, want %q", got, originalDir)
+	}
+}
+
 func TestPatchReturnsBadRequestForNullBody(t *testing.T) {
 	rec := httptest.NewRecorder()
 
