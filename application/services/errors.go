@@ -8,6 +8,7 @@ var (
 	ErrCacheUnavailable         = errors.New("cache unavailable")
 	ErrConfigUnavailable        = errors.New("config unavailable")
 	ErrNoSession                = errors.New("no user session found")
+	ErrNoLogFile                = errors.New("no log file configured")
 	ErrAlreadyAuthenticated     = errors.New("already authenticated")
 	ErrInvalidCredentials       = errors.New("invalid credentials")
 	ErrCurrentPasswordIncorrect = errors.New("current password is incorrect")

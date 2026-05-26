@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.LoadOrDefault("var/config.json")
+	cfg, err := config.LoadOrDefault(config.DefaultConfigPath)
 	if err != nil {
 		slog.Error("Failed to load configuration", "error", err)
 		panic(err)

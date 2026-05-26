@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"reflect"
 	"reservoir/utils/bytesize"
 	"sync/atomic"
@@ -217,6 +218,36 @@ func TestLoadOrDefault_StrictPolicy(t *testing.T) {
 	}
 }
 
+func TestLoadOrDefaultPersistsResetToProvidedPath(t *testing.T) {
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "nested", "config.json"))
+
+	if err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644); err == nil {
+		t.Fatal("expected initial write to fail before config creates parent directory")
+	}
+	if err := os.MkdirAll(filepath.Dir(tmpFile), 0755); err != nil {
+		t.Fatalf("failed to create temp config directory: %v", err)
+	}
+	if err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644); err != nil {
+		t.Fatalf("failed to write invalid config: %v", err)
+	}
+
+	cfg, err := LoadOrDefault(tmpFile)
+	if err != nil {
+		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected non-nil config after reset")
+	}
+
+	reloaded, err := load(tmpFile)
+	if err != nil {
+		t.Fatalf("expected reset config at provided path to be loadable: %v", err)
+	}
+	if got := reloaded.Database.File.Read(); got != "var/database.db" {
+		t.Fatalf("expected default database file in reset config, got %q", got)
+	}
+}
+
 func TestLoadOrDefault_MissingFields(t *testing.T) {
 	tmpFile := "var/test_config_missing.json"
 	defer os.Remove(tmpFile)
@@ -335,6 +366,13 @@ func TestConfig_Verify(t *testing.T) {
 			name: "empty cache dir",
 			modify: func(c *Config) {
 				c.Cache.File.Dir.Overwrite("")
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty database file",
+			modify: func(c *Config) {
+				c.Database.File.Overwrite("")
 			},
 			wantErr: true,
 		},

@@ -3,8 +3,10 @@ package services
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"reservoir/config"
+	"reservoir/utils/assertedpath"
 )
 
 type ConfigUpdateStatus int
@@ -55,4 +57,23 @@ func (s *ConfigService) LogFilePath() string {
 		return ""
 	}
 	return s.cfg.Logging.File.Read()
+}
+
+func (s *ConfigService) OpenLogFileRead() (*os.File, error) {
+	logFilePath := s.LogFilePath()
+	if logFilePath == "" {
+		return nil, ErrNoLogFile
+	}
+
+	assertedPath, err := assertedpath.TryAssert(logFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	logFile, err := os.OpenFile(assertedPath.Path, os.O_RDONLY, 0444)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	return logFile, nil
 }

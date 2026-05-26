@@ -41,6 +41,7 @@ func cloneConfig(cfg *Config) (*Config, error) {
 	if err := json.Unmarshal(data, &cloned); err != nil {
 		return nil, err
 	}
+	cloned.path = cfg.path
 
 	return &cloned, nil
 }

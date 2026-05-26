@@ -18,6 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const databaseBusyTimeout = 5000
+
 type Runtime struct {
 	cfg              *config.Config
 	proxy            *proxy.Proxy
@@ -30,17 +32,18 @@ type Runtime struct {
 }
 
 func NewRuntime(cfg *config.Config, ctx context.Context) (*Runtime, error) {
-	if err := db.MigrateDatabases(); err != nil {
-		return nil, fmt.Errorf("failed to migrate databases: %w", err)
-	}
-
 	apiDisabled := cfg.Webserver.ApiDisabled.Read()
 
 	var users *stores.UserStore
 	if !apiDisabled {
-		database, err := db.OpenMainDatabase()
+		databasePath := cfg.Database.File.Read()
+		database, err := db.Open(databasePath, databaseBusyTimeout)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open main database: %w", err)
+			return nil, fmt.Errorf("failed to open main database %q: %w", databasePath, err)
+		}
+		if err := database.Migrate(); err != nil {
+			_ = database.Close()
+			return nil, fmt.Errorf("failed to migrate main database %q: %w", databasePath, err)
 		}
 		users = stores.NewUserStore(database)
 

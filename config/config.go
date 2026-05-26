@@ -17,13 +17,16 @@ var (
 	ErrConfigPersist       = errors.New("config persist failed")
 )
 
-var configPath = assertedpath.Assert("var/config.json")
+const DefaultConfigPath = "var/config.json"
 
 type Config struct {
 	Proxy     ProxyConfig     `json:"proxy"`
 	Webserver WebserverConfig `json:"webserver"`
 	Cache     CacheConfig     `json:"cache"`
 	Logging   LogConfig       `json:"logging"`
+	Database  DatabaseConfig  `json:"database"`
+
+	path string
 }
 
 // Marks all properties that require a restart to take effect as needing a restart.
@@ -32,6 +35,7 @@ func (c *Config) setRestartNeededProps() {
 	c.Webserver.setRestartNeededProps()
 	c.Cache.setRestartNeededProps()
 	c.Logging.setRestartNeededProps()
+	c.Database.setRestartNeededProps()
 }
 
 func NewDefault() *Config {
@@ -40,6 +44,8 @@ func NewDefault() *Config {
 		Webserver: defaultWebserverConfig(),
 		Cache:     defaultCacheConfig(),
 		Logging:   defaultLogConfig(),
+		Database:  defaultDatabaseConfig(),
+		path:      DefaultConfigPath,
 	}
 	cfg.setRestartNeededProps()
 	return cfg
@@ -47,21 +53,32 @@ func NewDefault() *Config {
 
 // Writes the configuration to disk.
 func (c *Config) persist() error {
-	f, err := os.Create(configPath.Path)
+	path := c.path
+	if path == "" {
+		path = DefaultConfigPath
+	}
+
+	assertedPath, err := assertedpath.TryAssert(path)
 	if err != nil {
-		slog.Error("Failed to create config file", "path", configPath.Path, "error", err)
-		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, configPath.Path)
+		slog.Error("Failed to assert config file path", "path", path, "error", err)
+		return fmt.Errorf("%w: failed to assert config file path '%s'", ErrConfigFileOpen, path)
+	}
+
+	f, err := os.Create(assertedPath.Path)
+	if err != nil {
+		slog.Error("Failed to create config file", "path", assertedPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, assertedPath.Path)
 	}
 	defer f.Close()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ") // Pretty print the JSON output
 	if err := enc.Encode(c); err != nil {
-		slog.Error("Failed to encode config to JSON", "path", configPath.Path, "error", err)
-		return fmt.Errorf("%w: failed to write config to file '%s'", ErrConfigFileWrite, configPath.Path)
+		slog.Error("Failed to encode config to JSON", "path", assertedPath.Path, "error", err)
+		return fmt.Errorf("%w: failed to write config to file '%s'", ErrConfigFileWrite, assertedPath.Path)
 	}
 
-	slog.Info("Successfully persisted config", "path", configPath.Path)
+	slog.Info("Successfully persisted config", "path", assertedPath.Path)
 	return nil
 }
 
@@ -88,6 +105,7 @@ func load(path string) (*Config, error) {
 	}
 
 	cfg.setRestartNeededProps()
+	cfg.path = path
 
 	slog.Info("Successfully loaded config", "path", path)
 	return &cfg, nil
@@ -98,6 +116,7 @@ func LoadOrDefault(path string) (*Config, error) {
 	if err != nil {
 		slog.Error("Config load failed. Resetting to defaults.", "path", path, "error", err)
 		cfg = NewDefault()
+		cfg.path = path
 		if err := cfg.persist(); err != nil {
 			slog.Error("Failed to persist default config after reset", "error", err)
 			return nil, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)

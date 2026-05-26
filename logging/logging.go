@@ -2,37 +2,16 @@ package logging
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"reservoir/config"
 	"reservoir/logging/early"
-	"reservoir/utils/assertedpath"
 	"reservoir/utils/bytesize"
-)
-
-var (
-	ErrNoLogFile = errors.New("no log file configured")
 )
 
 var fileLog *fileLogger = nil // Current file logger instance if any
 var logLevel slog.LevelVar
-
-func OpenLogFileRead() (*os.File, error) {
-	assertedPath, err := assertedpath.TryAssert(fileLog.Path())
-	if err != nil {
-		return nil, err
-	}
-
-	logFile, err := os.OpenFile(assertedPath.Path, os.O_RDONLY, 0444)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
-	return logFile, nil
-}
 
 // Initializes and appends a log file writer to the provided writers slice if configured and returns it.
 // If file logging is disabled in config, this will return nil.

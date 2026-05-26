@@ -31,6 +31,9 @@ func OverrideFromFlags(cfg *Config) {
 	fl.AddString("cache-dir", "var/cache/", "Path to cache directory").OnSet(func(val flags.FlagValue) {
 		cfg.Cache.File.Dir.Overwrite(val.AsString())
 	})
+	fl.AddString("database-file", "var/database.db", "Path to SQLite database file").OnSet(func(val flags.FlagValue) {
+		cfg.Database.File.Overwrite(val.AsString())
+	})
 
 	fl.AddString("webserver-listen", "localhost:8080", "The address and port that the webserver (dashboard and API) will listen on").OnSet(func(val flags.FlagValue) {
 		cfg.Webserver.Listen.Overwrite(val.AsString())

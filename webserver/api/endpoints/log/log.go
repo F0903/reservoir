@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
-	"reservoir/logging"
+	appservices "reservoir/application/services"
 	"reservoir/webserver/api/apihttp"
 	"reservoir/webserver/api/apitypes"
 )
@@ -27,9 +27,9 @@ func (m *LogEndpoint) EndpointMethods() []apitypes.EndpointMethod {
 }
 
 func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.Context) {
-	logFile, err := logging.OpenLogFileRead()
+	logFile, err := ctx.Services.Config.OpenLogFileRead()
 	if err != nil {
-		if errors.Is(err, logging.ErrNoLogFile) {
+		if errors.Is(err, appservices.ErrNoLogFile) {
 			slog.Warn("tried to call /log but no log file is configured")
 			apihttp.Error(w, "No Log File Configured", http.StatusNotFound)
 			return

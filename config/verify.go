@@ -22,6 +22,10 @@ func (c *Config) verify() error {
 		return err
 	}
 
+	if err := c.Database.verify(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -38,13 +42,17 @@ func checkIsSetRecursive(val reflect.Value) error {
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
+		jsonTag, _ := fieldType.Tag.Lookup("json")
+
+		if fieldType.PkgPath != "" || jsonTag == "-" {
+			continue
+		}
 
 		// Check if it's a ConfigProp. We need to get the pointer to call methods.
 		// If it's a field in a struct we just Elem'd from a pointer, it should be addressable.
 		if field.CanAddr() {
 			if prop, ok := field.Addr().Interface().(StagedConfigProp); ok {
 				if !prop.IsSet() {
-					jsonTag, _ := fieldType.Tag.Lookup("json")
 					return fmt.Errorf("missing or uninitialized required configuration property: '%s'", jsonTag)
 				}
 				continue
