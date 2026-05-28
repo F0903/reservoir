@@ -61,7 +61,7 @@ func (e *BootstrapEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx api
 		return
 	}
 
-	user, cookie, err := ctx.Services.Auth.CreateBootstrapAdmin(req.Username, req.Password)
+	user, cookie, err := ctx.Services.Auth.CreateBootstrapAdmin(ctx.Request, req.Username, req.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, appservices.ErrBootstrapNotRequired):

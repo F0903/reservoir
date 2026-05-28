@@ -76,6 +76,20 @@ func TestSessionManagersKeepIndependentStores(t *testing.T) {
 	}
 }
 
+func TestBuildSessionCookieWithSecure(t *testing.T) {
+	session := &Session{ID: "sid"}
+
+	insecure := session.BuildSessionCookie()
+	if insecure.Secure {
+		t.Fatal("expected default session cookie to be insecure")
+	}
+
+	secure := session.BuildSessionCookieWithSecure(true)
+	if !secure.Secure {
+		t.Fatal("expected explicit secure session cookie")
+	}
+}
+
 func TestSessionManagerGetRejectsExpiredSessions(t *testing.T) {
 	now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 	manager := NewSessionManager()

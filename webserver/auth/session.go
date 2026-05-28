@@ -225,10 +225,15 @@ func SessionFromRequest(r *http.Request) (sess *Session, ok bool) {
 }
 
 func (s *Session) BuildSessionCookie() *http.Cookie {
+	return s.BuildSessionCookieWithSecure(false)
+}
+
+func (s *Session) BuildSessionCookieWithSecure(secure bool) *http.Cookie {
 	return &http.Cookie{
 		Path:     "/",
 		Name:     sessionCookieName,
 		Value:    s.ID,
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	}

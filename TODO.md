@@ -13,7 +13,7 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 ## Dashboard 
 - [ ] Make widgets more responsive depending on their size.
-- [ ] Set session cookies `Secure` when the dashboard/API are served over HTTPS.
+- [x] Set session cookies `Secure` when the dashboard/API are served over HTTPS.
 
 ## Project Wide
 - [x] Upgrade vulnerable Go toolchain/module versions flagged by `govulncheck`.

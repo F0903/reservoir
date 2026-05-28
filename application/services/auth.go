@@ -18,16 +18,19 @@ type AuthService struct {
 }
 
 type RequestContext struct {
-	session *coreauth.Session
+	session             *coreauth.Session
+	secureSessionCookie bool
 }
 
 func (s *AuthService) RequestFromHTTP(r *http.Request) (RequestContext, bool) {
+	req := RequestContext{secureSessionCookie: coreauth.RequestUsesHTTPS(r)}
 	if s == nil || s.sessions == nil {
-		return RequestContext{}, false
+		return req, false
 	}
 
 	session, ok := s.sessions.SessionFromRequest(r)
-	return RequestContext{session: session}, ok
+	req.session = session
+	return req, ok
 }
 
 func (s *AuthService) CurrentUser(req RequestContext) (*dbmodels.User, error) {
@@ -65,7 +68,7 @@ func (s *AuthService) Login(req RequestContext, username string, password string
 		return nil, nil, err
 	}
 
-	cookie := s.createSessionCookie(user.ID)
+	cookie := s.createSessionCookie(req, user.ID)
 	return user, cookie, nil
 }
 
@@ -79,7 +82,7 @@ func (s *AuthService) Logout(req RequestContext) (*http.Cookie, error) {
 
 	s.sessions.Destroy(req.session)
 
-	cookie := req.session.BuildSessionCookie()
+	cookie := req.session.BuildSessionCookieWithSecure(req.secureSessionCookie)
 	cookie.Value = ""
 	cookie.Expires = time.Unix(0, 0).UTC()
 	cookie.MaxAge = -1
@@ -94,7 +97,7 @@ func (s *AuthService) BootstrapRequired() (bool, error) {
 	return coreauth.BootstrapRequired(s.users)
 }
 
-func (s *AuthService) CreateBootstrapAdmin(username string, password string) (*dbmodels.User, *http.Cookie, error) {
+func (s *AuthService) CreateBootstrapAdmin(req RequestContext, username string, password string) (*dbmodels.User, *http.Cookie, error) {
 	if s == nil || s.users == nil || s.sessions == nil {
 		return nil, nil, ErrUserStoreUnavailable
 	}
@@ -104,7 +107,7 @@ func (s *AuthService) CreateBootstrapAdmin(username string, password string) (*d
 		return nil, nil, mapBootstrapError(err)
 	}
 
-	cookie := s.createSessionCookie(user.ID)
+	cookie := s.createSessionCookie(req, user.ID)
 	return user, cookie, nil
 }
 
@@ -157,9 +160,9 @@ func (s *AuthService) UpdateCurrentUsername(req RequestContext, username string)
 	return updated, nil
 }
 
-func (s *AuthService) createSessionCookie(userID int64) *http.Cookie {
+func (s *AuthService) createSessionCookie(req RequestContext, userID int64) *http.Cookie {
 	session := s.sessions.Create(userID)
-	return session.BuildSessionCookie()
+	return session.BuildSessionCookieWithSecure(req.secureSessionCookie)
 }
 
 func mapBootstrapError(err error) error {
