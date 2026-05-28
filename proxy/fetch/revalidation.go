@@ -1,4 +1,4 @@
-package proxy
+package fetch
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[CacheMetadata], err error) {
+func (f *Fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Handling 304 response from upstream", "url", req.URL, "key", key)
 
 	slog.Debug("Revalidating cache metadata...", "url", req.URL, "key", key)
@@ -20,24 +20,14 @@ func (f *fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cach
 		meta.Expires = time.Now().Add(maxAge)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrUpdateCacheMetadata, err)
+		return nil, fmt.Errorf("%w: %v", errUpdateCacheMetadata, err)
 	}
 
 	slog.Debug("Successfully revalidated cache metadata", "url", req.URL, "key", key)
 	return f.cache.Get(key)
 }
 
-func (f *fetcher) handleCacheMiss(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
-	slog.Debug("Cache miss, fetching upstream...", "url", req.URL, "key", lookupKey)
-	upFetch, err := f.fetchUpstream(req, baseKey, lookupKey, clientHd)
-	if err != nil {
-		return fetchResult{}, err
-	}
-
-	return upFetch, nil
-}
-
-func (f *fetcher) serveStaleCachedResponse(req *http.Request, lookupKey cache.CacheKey, upstreamStatus int, upstreamErr error) (fetchResult, error) {
+func (f *Fetcher) serveStaleCachedResponse(req *http.Request, lookupKey cache.CacheKey, upstreamStatus int, upstreamErr error) (Result, error) {
 	if upstreamErr != nil {
 		slog.Warn("Serving stale cached response because upstream revalidation failed", "url", req.URL, "key", lookupKey, "error", upstreamErr)
 	} else {
@@ -47,52 +37,37 @@ func (f *fetcher) serveStaleCachedResponse(req *http.Request, lookupKey cache.Ca
 	cached, err := f.cache.Get(lookupKey)
 	if err != nil {
 		if upstreamErr != nil {
-			return fetchResult{}, upstreamErr
+			return Result{}, upstreamErr
 		}
-		return fetchResult{}, err
+		return Result{}, err
 	}
 
-	return fetchResult{
-		Type: fetchTypeCached,
-		Cached: cachedFetchResult{
-			fetchInfo: fetchInfo{
-				UpstreamStatus: upstreamStatus,
-				Status:         hitStatusStale,
-			},
-			Entry: cached,
-		},
-	}, nil
+	return newCachedResult(cached, StatusStale, upstreamStatus, 0), nil
 }
 
 // Fetches the requested resource either from cache or upstream.
-func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetchResult, error) {
+func (f *Fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (Result, error) {
 	slog.Debug("Trying to get request from cache...")
 
 	cached, err := f.cache.Get(lookupKey)
 	if err != nil {
 		if errors.Is(err, cache.ErrCacheEntryNotFound) {
 			slog.Debug("Cache miss, will fetch from upstream.", "url", req.URL, "key", lookupKey)
-			res, err := f.handleCacheMiss(req, baseKey, lookupKey, clientHd)
+			res, err := f.fetchUpstream(req, baseKey, lookupKey, clientHd)
 			if err != nil {
-				return fetchResult{}, err
-			}
-			if res.Type == fetchTypeDirect {
-				return res, nil
+				return Result{}, err
 			}
 			return res, nil
 		}
 
 		f.metrics.Cache.CacheErrors.Increment()
-		// We just return ErrNotCacheable to trigger direct fetch in caller
-		return fetchResult{}, ErrNotCacheable
+		// We just return errNotCacheable to trigger direct fetch in caller
+		return Result{}, errNotCacheable
 	}
 
 	if !cached.Stale {
 		slog.Debug("Cache hit, returning cached response.", "url", req.URL, "key", lookupKey)
-		fetchInfo := fetchInfo{Status: hitStatusHit}
-
-		cachedResult := cachedFetchResult{fetchInfo: fetchInfo, Entry: cached}
-		return fetchResult{Type: fetchTypeCached, Cached: cachedResult}, nil
+		return newCachedResult(cached, StatusHit, 0, 0), nil
 	}
 
 	slog.Debug("Cached response is stale, fetching upstream.", "url", req.URL, "key", lookupKey)
@@ -113,23 +88,23 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 		up.Header.Set("If-Modified-Since", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 	}
 
-	fetch, err := f.fetchUpstream(up, baseKey, lookupKey, clientHd)
+	fetched, err := f.fetchUpstream(up, baseKey, lookupKey, clientHd)
 	if err != nil {
 		return f.serveStaleCachedResponse(req, lookupKey, 0, err)
 	}
-	if fetch.Type == fetchTypeDirect {
-		if fetch.Direct.UpstreamStatus >= 500 {
-			status := fetch.Direct.UpstreamStatus
-			fetch.Direct.Response.Body.Close()
+	if fetched.Type == TypeDirect {
+		if fetched.Direct.UpstreamStatus >= 500 {
+			status := fetched.Direct.UpstreamStatus
+			fetched.Direct.Response.Body.Close()
 			return f.serveStaleCachedResponse(req, lookupKey, status, nil)
 		}
 
 		// The upstream response is authoritative but not cacheable. Return it
 		// directly instead of retrying a second upstream request.
-		slog.Debug("Stale revalidation returned a non-cacheable direct response", "url", req.URL, "status", fetch.Direct.UpstreamStatus)
-		return fetch, nil
+		slog.Debug("Stale revalidation returned a non-cacheable direct response", "url", req.URL, "status", fetched.Direct.UpstreamStatus)
+		return fetched, nil
 	}
-	fetch.getFetchInfoRef().Status = hitStatusRevalidated
+	fetched.Cached.Status = StatusRevalidated
 
-	return fetch, nil
+	return fetched, nil
 }

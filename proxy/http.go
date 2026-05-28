@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
+	"reservoir/proxy/fetch"
 	"reservoir/proxy/headers"
 	"reservoir/proxy/responder"
 	"reservoir/utils/typeutils"
@@ -36,7 +37,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		p.metrics.Requests.ClientRequestLatency.Add(time.Since(startTime).Nanoseconds())
 	}()
 
-	fetched, err := p.fetch.dedupFetch(req, key, clientHd)
+	fetched, err := p.fetcher.Fetch(req, key, clientHd)
 	latency := time.Since(startTime)
 
 	if err != nil {
@@ -45,15 +46,15 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 		return err
 	}
 
-	fetchInfo := fetched.getFetchInfo()
+	fetchInfo := fetched.FetchInfo()
 	switch fetchInfo.Status {
-	case hitStatusMiss:
+	case fetch.StatusMiss:
 		p.metrics.Cache.CacheRequestMisses.Increment()
 		p.metrics.Cache.CacheMissLatency.Add(latency.Nanoseconds())
-	case hitStatusRevalidated:
+	case fetch.StatusRevalidated:
 		p.metrics.Cache.CacheRequestRevalidations.Increment()
 		p.metrics.Cache.CacheHitLatency.Add(latency.Nanoseconds())
-	case hitStatusStale:
+	case fetch.StatusStale:
 		p.metrics.Cache.CacheRequestStales.Increment()
 		p.metrics.Cache.CacheHitLatency.Add(latency.Nanoseconds())
 	default:
@@ -62,20 +63,20 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	}
 
 	switch fetched.Type {
-	case fetchTypeDirect:
+	case fetch.TypeDirect:
 		defer fetched.Direct.Response.Body.Close()
 
 		r.SetHeaders(fetched.Direct.Response.Header)
 		if fetched.Direct.UpstreamStatus >= 200 && fetched.Direct.UpstreamStatus < 300 {
 			r.SetHeader("Accept-Ranges", "bytes")
-			addCacheHeaders(r, req, typeutils.None[*cache.Entry[CacheMetadata]](), fetchResultToCacheStatus(fetched))
+			addCacheHeaders(r, req, typeutils.None[*cache.Entry[fetch.CacheMetadata]](), fetchResultToCacheStatus(fetched))
 		}
 
 		return finalizeAndRespond(p.metrics, r, fetched.Direct.Response.Body, fetched.Direct.UpstreamStatus, req)
 
-	case fetchTypeCached:
+	case fetch.TypeCached:
 		if fetched.Cached.Entry == nil || fetched.Cached.Entry.Data == nil {
-			slog.Error("fetchTypeCached: entry or data is nil", "url", req.URL)
+			slog.Error("fetch.TypeCached: entry or data is nil", "url", req.URL)
 			r.WriteError("internal error: cache entry data is nil", http.StatusInternalServerError)
 			return fmt.Errorf("cache entry data is nil")
 		}

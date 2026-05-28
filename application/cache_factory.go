@@ -10,10 +10,10 @@ import (
 	memorycache "reservoir/cache/memory"
 	"reservoir/config"
 	"reservoir/metrics"
-	"reservoir/proxy"
+	"reservoir/proxy/fetch"
 )
 
-func NewProxyCache(cfg *config.Config, m *metrics.Metrics, ctx context.Context) (cache.Cache[proxy.CacheMetadata], error) {
+func NewProxyCache(cfg *config.Config, m *metrics.Metrics, ctx context.Context) (cache.Cache[fetch.CacheMetadata], error) {
 	m = metrics.Ensure(m)
 	cleanupInterval := cfg.Cache.CleanupInterval.Read().Cast()
 	maxCacheSize := cfg.Cache.MaxCacheSize.Read().Bytes()
@@ -22,14 +22,14 @@ func NewProxyCache(cfg *config.Config, m *metrics.Metrics, ctx context.Context) 
 	switch cfg.Cache.Type.Read() {
 	case config.CacheTypeFile:
 		cacheDir := cfg.Cache.File.Dir.Read()
-		return filecache.New[proxy.CacheMetadata](cfg, m, cacheDir, maxCacheSize, cleanupInterval, shardCount, ctx), nil
+		return filecache.New[fetch.CacheMetadata](cfg, m, cacheDir, maxCacheSize, cleanupInterval, shardCount, ctx), nil
 	case config.CacheTypeHybrid:
 		cacheDir := cfg.Cache.File.Dir.Read()
 		memoryBudget := cfg.Cache.Memory.MemoryBudgetPercent.Read()
-		return hybrid.New[proxy.CacheMetadata](cfg, m, cacheDir, memoryBudget, maxCacheSize, cleanupInterval, shardCount, ctx), nil
+		return hybrid.New[fetch.CacheMetadata](cfg, m, cacheDir, memoryBudget, maxCacheSize, cleanupInterval, shardCount, ctx), nil
 	case config.CacheTypeMemory:
 		memoryBudget := cfg.Cache.Memory.MemoryBudgetPercent.Read()
-		return memorycache.New[proxy.CacheMetadata](cfg, m, memoryBudget, maxCacheSize, cleanupInterval, shardCount, ctx), nil
+		return memorycache.New[fetch.CacheMetadata](cfg, m, memoryBudget, maxCacheSize, cleanupInterval, shardCount, ctx), nil
 	default:
 		return nil, fmt.Errorf("unsupported cache type: %v", cfg.Cache.Type.Read())
 	}

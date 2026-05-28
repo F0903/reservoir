@@ -5,20 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
+	"reservoir/proxy/fetch"
 	"reservoir/proxy/responder"
 	"reservoir/utils/typeutils"
 	"strconv"
 	"strings"
 	"time"
-)
-
-type hitStatus int
-
-const (
-	hitStatusMiss hitStatus = iota
-	hitStatusRevalidated
-	hitStatusHit
-	hitStatusStale
 )
 
 type fwdReason int
@@ -30,26 +22,30 @@ const (
 )
 
 type cacheStatus struct {
-	hitStatus hitStatus
+	status    fetch.Status
 	fwdReason typeutils.Optional[fwdReason]
 	fwdStatus typeutils.Optional[int]
 	stored    bool
 }
 
-func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[CacheMetadata]], cacheStatus cacheStatus) string {
+func isServedFromCache(status fetch.Status) bool {
+	return status == fetch.StatusHit || status == fetch.StatusRevalidated || status == fetch.StatusStale
+}
+
+func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[fetch.CacheMetadata]], cacheStatus cacheStatus) string {
 	slog.Debug("Making Cache-Status header...", "cached", cached, "cacheStatus", cacheStatus)
 
 	params := make([]string, 0, 6)
 	params = append(params, "reservoir")
 
-	switch cacheStatus.hitStatus {
-	case hitStatusHit:
+	switch cacheStatus.status {
+	case fetch.StatusHit:
 		params = append(params, "hit")
-	case hitStatusRevalidated:
+	case fetch.StatusRevalidated:
 		params = append(params, "hit; detail=\"revalidated\"")
-	case hitStatusMiss:
+	case fetch.StatusMiss:
 		params = append(params, "miss")
-	case hitStatusStale:
+	case fetch.StatusStale:
 		params = append(params, "hit; detail=\"stale\"")
 	}
 
@@ -74,7 +70,7 @@ func makeCacheStatusHeader(cached typeutils.Optional[*cache.Entry[CacheMetadata]
 		params = append(params, "stored")
 	}
 
-	if cached.IsSome() && (cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated || cacheStatus.hitStatus == hitStatusStale) {
+	if cached.IsSome() && isServedFromCache(cacheStatus.status) {
 		ttl := max(0, int(time.Until(cached.ForceUnwrap().Metadata.Expires).Seconds()))
 		params = append(params, fmt.Sprintf("ttl=%d", ttl))
 	}
@@ -114,20 +110,20 @@ func getCurrentAge(originalHead http.Header, storedAt time.Time) int {
 	return currentAge
 }
 
-func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.Optional[*cache.Entry[CacheMetadata]], cacheStatus cacheStatus) {
+func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.Optional[*cache.Entry[fetch.CacheMetadata]], cacheStatus cacheStatus) {
 	cacheStatusHeader := makeCacheStatusHeader(cached, cacheStatus)
 	r.AddHeader("Cache-Status", cacheStatusHeader)
 	slog.Debug("Cache-Status header set:", "cache_status", cacheStatusHeader)
 
 	var xCache string
-	switch cacheStatus.hitStatus {
-	case hitStatusHit:
+	switch cacheStatus.status {
+	case fetch.StatusHit:
 		xCache = "HIT"
-	case hitStatusMiss:
+	case fetch.StatusMiss:
 		xCache = "MISS"
-	case hitStatusRevalidated:
+	case fetch.StatusRevalidated:
 		xCache = "REVALIDATED"
-	case hitStatusStale:
+	case fetch.StatusStale:
 		xCache = "STALE"
 	}
 	r.AddHeader("X-Cache", xCache)
@@ -137,8 +133,8 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 	if cached.IsSome() {
 		cached := cached.ForceUnwrap()
 
-		wasCached := cacheStatus.hitStatus == hitStatusHit || cacheStatus.hitStatus == hitStatusRevalidated || cacheStatus.hitStatus == hitStatusStale
-		justCached := cacheStatus.hitStatus == hitStatusHit && cacheStatus.stored
+		wasCached := isServedFromCache(cacheStatus.status)
+		justCached := cacheStatus.status == fetch.StatusHit && cacheStatus.stored
 		if wasCached || justCached {
 			currentAge := getCurrentAge(cached.Metadata.Object.Header, cached.Metadata.TimeWritten)
 			ageStr := strconv.Itoa(currentAge)
@@ -147,12 +143,12 @@ func addCacheHeaders(r responder.Responder, req *http.Request, cached typeutils.
 	}
 }
 
-func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
-	fetchInfo := fetched.getFetchInfo()
+func fetchResultToCacheStatus(fetched fetch.Result) cacheStatus {
+	fetchInfo := fetched.FetchInfo()
 
-	isRevalidated := fetchInfo.Status == hitStatusRevalidated
-	isStale := fetchInfo.Status == hitStatusStale
-	isMiss := fetchInfo.Status == hitStatusMiss
+	isRevalidated := fetchInfo.Status == fetch.StatusRevalidated
+	isStale := fetchInfo.Status == fetch.StatusStale
+	isMiss := fetchInfo.Status == fetch.StatusMiss
 
 	fwdReason := typeutils.None[fwdReason]()
 	if isRevalidated || isStale {
@@ -167,10 +163,10 @@ func fetchResultToCacheStatus(fetched fetchResult) cacheStatus {
 	}
 
 	cacheStatus := cacheStatus{
-		hitStatus: fetchInfo.Status,
+		status:    fetchInfo.Status,
 		fwdReason: fwdReason,
 		fwdStatus: fwdStatus,
-		stored:    fetched.Type == fetchTypeCached && fetched.Cached.fetchInfo.Status == hitStatusMiss,
+		stored:    fetched.Type == fetch.TypeCached && fetched.Cached.Status == fetch.StatusMiss,
 	}
 
 	return cacheStatus

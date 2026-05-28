@@ -1,4 +1,4 @@
-package proxy
+package fetch
 
 import (
 	"errors"
@@ -13,9 +13,9 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-var ErrNotCacheable = errors.New("response not cacheable")
+var errNotCacheable = errors.New("response not cacheable")
 
-type fetcher struct {
+type Fetcher struct {
 	cache        cache.Cache[CacheMetadata]
 	cfg          *config.Config
 	metrics      *metrics.Metrics
@@ -25,13 +25,13 @@ type fetcher struct {
 	variantIndex *syncmap.SyncMap[cache.CacheKey, []string]
 }
 
-func newFetcher(cacheStore cache.Cache[CacheMetadata], cfg *config.Config, upstreamClient *http.Client, m *metrics.Metrics) fetcher {
+func New(cacheStore cache.Cache[CacheMetadata], cfg *config.Config, upstreamClient *http.Client, m *metrics.Metrics) *Fetcher {
 	if upstreamClient == nil {
 		upstreamClient = newUpstreamClient()
 	}
 	m = metrics.Ensure(m)
 
-	return fetcher{
+	return &Fetcher{
 		cache:        cacheStore,
 		cfg:          cfg,
 		metrics:      m,
@@ -42,13 +42,13 @@ func newFetcher(cacheStore cache.Cache[CacheMetadata], cfg *config.Config, upstr
 	}
 }
 
-func (f *fetcher) closeIdleConnections() {
+func (f *Fetcher) CloseIdleConnections() {
 	f.client.CloseIdleConnections()
 }
 
-// Will deduplicate cachable requests and otherwise return the bypassed upstream response.
+// Fetch deduplicates cacheable requests and otherwise returns the bypassed upstream response.
 // IMPORTANT: Remember to close data streams!
-func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched fetchResult, err error) {
+func (f *Fetcher) Fetch(req *http.Request, baseKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched Result, err error) {
 	slog.Debug("Attempting to dedup fetch...")
 	lookupKey := f.lookupCacheKey(req, baseKey)
 
@@ -60,43 +60,37 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 
 	shouldCoalesce := !clientHd.Range.IsPresent() && req.Method == http.MethodGet
 	if !shouldCoalesce {
-		// These requests also aren't cacheable, so they just go straight to upstream..
+		// These requests also aren't cacheable, so they go straight to upstream.
 		slog.Debug("Request can't be coalesced, fetching upstream...")
 		f.metrics.Requests.NonCoalescedRequests.Increment()
 
 		return f.fetchUpstream(req, baseKey, lookupKey, clientHd)
 	}
 
-	originalClientHd := *clientHd // Copy the original client headers so the shared requests don't get a modified version
-
 	fetchedObj, err, shared := f.group.Do(f.singleflightKey(req, baseKey), func() (any, error) {
 		return f.getFromCacheOrFetch(req, baseKey, lookupKey, clientHd)
 	})
 	if err != nil {
-		if errors.Is(err, ErrNotCacheable) {
+		if errors.Is(err, errNotCacheable) {
 			slog.Debug("Request was not cacheable in singleflight, falling back to direct fetch", "url", req.URL)
 			f.metrics.Requests.NonCoalescedRequests.Increment()
 			return f.fetchDirectlyFromUpstream(req)
 		}
-		return fetchResult{}, err
+		return Result{}, err
 	}
-	fetched = fetchedObj.(fetchResult)
+	fetched = fetchedObj.(Result)
 
 	// If shared is true, this means the request was coalesced.
 	// Meaning that the result is being shared with other requests in-flight.
 
 	if shared {
 		f.metrics.Requests.CoalescedRequests.Increment()
-
-		// Restore the original client headers for shared requests
-		clientHd = &originalClientHd
 	} else {
 		f.metrics.Requests.NonCoalescedRequests.Increment()
 	}
 
 	switch fetched.Type {
-	case fetchTypeCached:
-		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
+	case TypeCached:
 		fetched.Cached.Coalesced = shared
 
 		// If the result is shared, we cannot share the same Data (seeker) between goroutines.
@@ -118,11 +112,11 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 		// Track coalesced cache hits/misses
 		if shared {
 			switch fetched.Cached.Status {
-			case hitStatusHit:
+			case StatusHit:
 				f.metrics.Requests.CoalescedCacheHits.Increment()
-			case hitStatusRevalidated:
+			case StatusRevalidated:
 				f.metrics.Requests.CoalescedCacheRevalidations.Increment()
-			case hitStatusMiss:
+			case StatusMiss:
 				f.metrics.Requests.CoalescedCacheMisses.Increment()
 			}
 		}
@@ -130,7 +124,7 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 		slog.Debug("Fetched cached response", "url", req.URL, "status", fetched.Cached.Status, "upstream_status", fetched.Cached.UpstreamStatus, "coalesced", shared)
 		return fetched, nil
 
-	case fetchTypeDirect:
+	case TypeDirect:
 		if shared {
 			if fetched.Direct.Response != nil && fetched.Direct.Response.Body != nil {
 				fetched.Direct.Response.Body.Close()
@@ -144,6 +138,6 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 	default:
 		// This should not be possible unless new fetch types are introduced and not correctly implemented.
 		slog.Error("Unknown fetch result type", "type", fetched.Type)
-		return fetchResult{}, errors.ErrUnsupported
+		return Result{}, errors.ErrUnsupported
 	}
 }

@@ -8,15 +8,13 @@ import (
 	"reservoir/config"
 	"reservoir/metrics"
 	"reservoir/proxy/certs"
+	"reservoir/proxy/fetch"
 	"reservoir/utils/httplistener"
-	"time"
 )
 
 var (
 	ErrCacheGetFailed       = errors.New("error getting cache for key")
 	ErrNoCachedResponse304  = errors.New("received 304 Not Modified but no cached response found")
-	ErrUpdateCacheMetadata  = errors.New("error updating cache metadata")
-	ErrCacheResponseFailed  = errors.New("error caching response")
 	ErrTLSCertFailed        = errors.New("error getting TLS certificate")
 	ErrClientResponseFailed = errors.New("failed to write HTTP OK response to client")
 	ErrReadRequestFailed    = errors.New("error reading request from client")
@@ -26,23 +24,16 @@ var (
 	ErrCacheStoreRequired   = errors.New("proxy cache store is required")
 )
 
-type CacheMetadata struct {
-	ETag         string
-	LastModified time.Time
-	Header       http.Header
-	Vary         []string
-}
-
 type Proxy struct {
 	ca      certs.CertAuthority
-	cache   cache.Cache[CacheMetadata]
-	fetch   fetcher
+	cache   cache.Cache[fetch.CacheMetadata]
+	fetcher *fetch.Fetcher
 	cfg     *config.Config
 	metrics *metrics.Metrics
 }
 
 type Dependencies struct {
-	Cache          cache.Cache[CacheMetadata]
+	Cache          cache.Cache[fetch.CacheMetadata]
 	Metrics        *metrics.Metrics
 	UpstreamClient *http.Client
 }
@@ -58,7 +49,7 @@ func (p *Proxy) Run(address string, ctx context.Context) error {
 }
 
 func (p *Proxy) Destroy() {
-	p.fetch.closeIdleConnections()
+	p.fetcher.CloseIdleConnections()
 	p.cache.Destroy()
 }
 
@@ -79,7 +70,7 @@ func NewProxy(cfg *config.Config, ca certs.CertAuthority, deps Dependencies) (*P
 	return &Proxy{
 		ca:      ca,
 		cache:   deps.Cache,
-		fetch:   newFetcher(deps.Cache, cfg, deps.UpstreamClient, m),
+		fetcher: fetch.New(deps.Cache, cfg, deps.UpstreamClient, m),
 		cfg:     cfg,
 		metrics: m,
 	}, nil

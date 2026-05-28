@@ -6,11 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
+	"reservoir/proxy/fetch"
 	"reservoir/proxy/headers"
 	"reservoir/proxy/responder"
 )
 
-func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[CacheMetadata], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
+func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cached *cache.Entry[fetch.CacheMetadata], key cache.CacheKey, clientHd *headers.HeaderDirectives) error {
 	rangeHeader := clientHd.Range.Value()
 	start, end, err := rangeHeader.SliceSize(cached.Metadata.Size)
 	if err != nil {
@@ -29,13 +30,13 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 		slog.Info("Retrying request without Range header due to invalid Range header from client.", "url", req.URL, "key", key, "range_header", rangeHeader)
 
 		clientHd.Range.SyncRemove(req.Header)
-		fetched, err := p.fetch.dedupFetch(req, key, clientHd)
+		fetched, err := p.fetcher.Fetch(req, key, clientHd)
 		if err != nil {
 			slog.Error("Error fetching resource without Range header", "url", req.URL, "key", key, "error", err)
 			return err
 		}
 
-		data, header, status := fetched.getResponse()
+		data, header, status := fetched.Response()
 		defer data.Close()
 
 		r.SetHeaders(header)

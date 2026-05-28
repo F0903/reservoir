@@ -1,4 +1,4 @@
-package proxy
+package fetch
 
 import (
 	"net/http"
@@ -39,7 +39,7 @@ func makeVariantCacheKey(req *http.Request, baseKey cache.CacheKey, vary []strin
 	return cache.FromString(strings.Join(parts, "|"))
 }
 
-func (f *fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cache.CacheKey {
+func (f *Fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cache.CacheKey {
 	if vary, ok := f.variantIndex.Get(baseKey); ok {
 		return makeVariantCacheKey(req, baseKey, vary)
 	}
@@ -53,11 +53,11 @@ func (f *fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cach
 	return baseKey
 }
 
-func (f *fetcher) singleflightKey(req *http.Request, baseKey cache.CacheKey) string {
+func (f *Fetcher) singleflightKey(req *http.Request, baseKey cache.CacheKey) string {
 	return makeVariantCacheKey(req, baseKey, supportedVaryHeaders).Hex
 }
 
-func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
+func (f *Fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
 	if len(vary) == 0 {
 		f.variantIndex.Delete(baseKey)
 		return
@@ -68,7 +68,7 @@ func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
 	f.variantIndex.Set(baseKey, copied)
 }
 
-func (f *fetcher) cacheEntryExists(key cache.CacheKey) bool {
+func (f *Fetcher) cacheEntryExists(key cache.CacheKey) bool {
 	quietCache, ok := f.cache.(quietMetadataCache)
 	if !ok {
 		return false
