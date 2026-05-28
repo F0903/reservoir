@@ -8,14 +8,15 @@ import (
 	"reservoir/config"
 	"reservoir/logging/early"
 	"reservoir/utils/bytesize"
+	"sync"
 )
 
 var fileLog *fileLogger = nil // Current file logger instance if any
 var logLevel slog.LevelVar
+var loggerMu sync.Mutex
 
-// Initializes and appends a log file writer to the provided writers slice if configured and returns it.
-// If file logging is disabled in config, this will return nil.
-func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
+// Initializes a log file writer if file logging is configured.
+func newLogFileWriter(cfg *config.Config) *fileLogger {
 	slog.Info("Initializing log file writer...")
 
 	logFilePath := cfg.Logging.File.Read()
@@ -28,12 +29,10 @@ func appendLogFileWriter(cfg *config.Config, writers *[]io.Writer) io.Writer {
 		return nil
 	}
 
-	fileLog = newFileLogger(logFilePath, logFileMaxSize, logFileMaxBackups, logFileCompress)
-
-	*writers = append(*writers, fileLog)
+	logFile := newFileLogger(logFilePath, logFileMaxSize, logFileMaxBackups, logFileCompress)
 	slog.Info("Added log file writer", "path", logFilePath, "max_size", logFileMaxSize, "max_backups", logFileMaxBackups, "compress", logFileCompress)
 
-	return fileLog
+	return logFile
 }
 
 var initialized bool
@@ -44,7 +43,11 @@ func SetLogLevel(level slog.Level) {
 }
 
 func updateLogger(cfg *config.Config) io.Writer {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+
 	slog.Info("Updating log writers...")
+	oldFileLog := fileLog
 
 	logToStdOut := cfg.Logging.ToStdout.Read()
 
@@ -54,7 +57,10 @@ func updateLogger(cfg *config.Config) io.Writer {
 		slog.Info("Added Stdout writer")
 	}
 
-	appendLogFileWriter(cfg, &writers)
+	fileLog = newLogFileWriter(cfg)
+	if fileLog != nil {
+		writers = append(writers, fileLog)
+	}
 
 	mw := io.MultiWriter(writers...)
 	handler := slog.NewTextHandler(mw, &slog.HandlerOptions{
@@ -62,6 +68,11 @@ func updateLogger(cfg *config.Config) io.Writer {
 	})
 	slog.SetDefault(slog.New(handler))
 	slog.Info("Log writers updated successfully")
+	if oldFileLog != nil && oldFileLog != fileLog {
+		if err := oldFileLog.Close(); err != nil {
+			slog.Warn("Failed to close previous log file writer", "path", oldFileLog.Path(), "error", err)
+		}
+	}
 	return mw
 }
 

@@ -62,15 +62,24 @@ func (e *ChangePasswordEndpoint) Patch(w http.ResponseWriter, r *http.Request, c
 	}
 
 	if err := ctx.Services.Auth.ChangePassword(ctx.Request, req.CurrentPassword, req.NewPassword); err != nil {
-		if errors.Is(err, appservices.ErrCurrentPasswordIncorrect) {
-			slog.Warn("Failed password change attempt")
-			apihttp.BadRequest(w, "Current password is incorrect")
-			return
-		}
-		slog.Error("Error updating user password", "error", err)
-		apihttp.InternalServerError(w)
+		writeChangePasswordError(w, err)
 		return
 	}
 
 	apihttp.NoContent(w)
+}
+
+func writeChangePasswordError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, appservices.ErrCurrentPasswordIncorrect):
+		slog.Warn("Failed password change attempt")
+		apihttp.BadRequest(w, "Current password is incorrect")
+	case errors.Is(err, appservices.ErrPasswordTooShort):
+		apihttp.BadRequest(w, "Password must be at least 12 characters")
+	case errors.Is(err, appservices.ErrPasswordEmpty), errors.Is(err, appservices.ErrEmptyNewPassword):
+		apihttp.BadRequest(w, ErrEmptyNewPassword)
+	default:
+		slog.Error("Error updating user password", "error", err)
+		apihttp.InternalServerError(w)
+	}
 }

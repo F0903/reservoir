@@ -32,10 +32,54 @@ var (
 	ErrFailedToCreateX509Pair = errors.New("failed to create X509 key pair for cert")
 )
 
+const maxGeneratedCerts = 4096
+
 type PrivateCA struct {
 	key   crypto.PrivateKey
 	cert  *x509.Certificate
 	certs *syncmap.SyncMap[string, *tls.Certificate]
+}
+
+func certExpired(cert *tls.Certificate, now time.Time) bool {
+	return cert == nil || cert.Leaf == nil || cert.Leaf.NotAfter.Before(now)
+}
+
+func (ca *PrivateCA) pruneGeneratedCerts(now time.Time) {
+	count := 0
+	for host := range ca.certs.Keys() {
+		cert, ok := ca.certs.Get(host)
+		if !ok {
+			continue
+		}
+		if certExpired(cert, now) {
+			ca.certs.Delete(host)
+			continue
+		}
+		count++
+	}
+
+	for host := range ca.certs.Keys() {
+		if count < maxGeneratedCerts {
+			break
+		}
+		ca.certs.Delete(host)
+		count--
+	}
+}
+
+func (ca *PrivateCA) cachedCertForHost(host string, now time.Time) (*tls.Certificate, bool) {
+	cert, ok := ca.certs.Get(host)
+	if !ok {
+		return nil, false
+	}
+	if certExpired(cert, now) {
+		slog.Warn("Certificate is expired, deleting...", "host", host)
+		ca.certs.Delete(host)
+		return nil, false
+	}
+
+	slog.Debug("Using cached TLS certificate", "host", host, "expires", cert.Leaf.NotAfter)
+	return cert, true
 }
 
 func NewPrivateCA(certFile, keyFile string) (*PrivateCA, error) {
@@ -129,20 +173,27 @@ func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidHostPort, err)
 	}
 
-	if cert, ok := ca.certs.Get(host); ok {
-		expired := cert.Leaf.NotAfter.Before(time.Now())
-		if expired {
-			slog.Warn("Certificate for %v is expired, deleting...", "host", host)
-			ca.certs.Delete(host)
-		} else {
-			slog.Debug("Using cached TLS certificate", "host", host, "expires", cert.Leaf.NotAfter)
-			return cert, nil
-		}
+	now := time.Now()
+	if cert, ok := ca.cachedCertForHost(host, now); ok {
+		return cert, nil
 	}
+	ca.pruneGeneratedCerts(now)
 
 	slog.Debug("Creating new TLS certificate", "host", host)
 
-	// Create a fake TLS certificate for the target host, signed by our CA.
+	tlsCert, err := ca.createHostCert(host)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("Created TLS certificate", "host", host, "expires", tlsCert.Leaf.NotAfter)
+
+	ca.certs.Set(host, tlsCert)
+
+	return tlsCert, nil
+}
+
+func (ca *PrivateCA) createHostCert(host string) (*tls.Certificate, error) {
 	pemCert, pemKey, err := ca.createCert([]string{host}, 240)
 	if err != nil {
 		slog.Error("Failed to create TLS certificate for host", "host", host, "error", err)
@@ -154,10 +205,26 @@ func (ca *PrivateCA) GetCertForHost(host string) (*tls.Certificate, error) {
 		slog.Error("Failed to create X509 key pair for cert", "host", host, "error", err)
 		return nil, fmt.Errorf("%w: %v", ErrFailedToCreateX509Pair, err)
 	}
-
-	slog.Info("Created TLS certificate", "host", host, "expires", tlsCert.Leaf.NotAfter)
-
-	ca.certs.Set(host, &tlsCert)
+	if err := ensureLeafCertificate(&tlsCert); err != nil {
+		slog.Error("Failed to parse generated leaf certificate", "host", host, "error", err)
+		return nil, fmt.Errorf("%w: %v", ErrFailedToCreateX509Pair, err)
+	}
 
 	return &tlsCert, nil
+}
+
+func ensureLeafCertificate(cert *tls.Certificate) error {
+	if cert.Leaf != nil {
+		return nil
+	}
+	if len(cert.Certificate) == 0 {
+		return errors.New("missing leaf certificate data")
+	}
+
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
+	}
+	cert.Leaf = leaf
+	return nil
 }

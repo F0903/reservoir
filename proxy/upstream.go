@@ -5,10 +5,34 @@ import (
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
+	"reservoir/config"
 	"reservoir/proxy/headers"
 	"reservoir/utils/countingreader"
 	"time"
 )
+
+func (f *fetcher) shouldBypassMemoryCache(resp *http.Response) bool {
+	if f.cfg.Cache.Type.Read() != config.CacheTypeMemory {
+		return false
+	}
+	if resp.ContentLength < 0 {
+		return true
+	}
+
+	limit := f.memoryCacheResponseLimit()
+	return limit <= 0 || resp.ContentLength > limit
+}
+
+func (f *fetcher) memoryCacheResponseLimit() int64 {
+	stats := f.cache.Stats()
+	if stats.MaxBytes <= 0 {
+		return stats.MaxBytes
+	}
+	if stats.MemoryCapBytes <= 0 {
+		return stats.MemoryCapBytes
+	}
+	return min(stats.MaxBytes, stats.MemoryCapBytes)
+}
 
 func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, baseKey cache.CacheKey, lookupKey cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Handling 200 response from upstream", "url", req.URL, "key", lookupKey)
@@ -16,6 +40,10 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 	decision := f.policy.Decide(req, resp, upstreamHd)
 	if !decision.Cacheable {
 		slog.Debug("Got response code 200, but result is not cacheable", "status", resp.Status, "url", req.URL, "key", lookupKey, "reason", decision.Reason)
+		return nil, nil
+	}
+	if f.shouldBypassMemoryCache(resp) {
+		slog.Debug("Skipping memory cache for response that cannot be safely buffered", "status", resp.Status, "url", req.URL, "key", lookupKey, "content_length", resp.ContentLength)
 		return nil, nil
 	}
 

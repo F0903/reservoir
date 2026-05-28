@@ -50,6 +50,9 @@ func (c *CacheConfig) verify() error {
 	if c.CleanupInterval.Read().Cast() <= 0 {
 		return fmt.Errorf("cache.cleanup_interval must be greater than 0")
 	}
+	if c.LockShards.Read() <= 0 {
+		return fmt.Errorf("cache.lock_shards must be greater than 0")
+	}
 	if c.Memory.MemoryBudgetPercent.Read() < 0 || c.Memory.MemoryBudgetPercent.Read() > 100 {
 		return fmt.Errorf("cache.memory.memory_budget_percent must be between 0 and 100")
 	}

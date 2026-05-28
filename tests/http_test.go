@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"testing"
+
+	"reservoir/utils/bytesize"
 )
 
 func TestBasicHTTPRequest(t *testing.T) {
@@ -366,6 +369,59 @@ func TestCredentialedRequestsBypassCache(t *testing.T) {
 	expectedFetched := int64(len("response 1") + len("response 2"))
 	if got := env.Metrics.Requests.BytesFetched.Get() - bytesFetchedBefore; got < expectedFetched {
 		t.Fatalf("expected at least %d direct upstream bytes fetched, got %d", expectedFetched, got)
+	}
+}
+
+func TestOversizedMemoryCacheResponseBypassesCache(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Cache.MaxCacheSize.Overwrite(bytesize.ByteSize(4))
+
+	assertRepeatedRequestsBypassCache(t, env, "/oversized-memory-cache", "oversized memory-cache response")
+}
+
+func TestZeroMemoryBudgetBypassesCache(t *testing.T) {
+	env := SetupTestEnv(t)
+	env.Cfg.Cache.Memory.MemoryBudgetPercent.Overwrite(0)
+
+	assertRepeatedRequestsBypassCache(t, env, "/zero-memory-budget", "zero memory budget response")
+}
+
+func assertRepeatedRequestsBypassCache(t testing.TB, env *TestEnv, path string, reason string) {
+	t.Helper()
+
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := upstreamRequests.Add(1)
+		body := fmt.Sprintf("response %d", count)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(body))
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + path
+	bodies := make([]string, 0, 2)
+	for i := 0; i < 2; i++ {
+		resp, err := env.Client.Get(targetURL)
+		if err != nil {
+			t.Fatalf("request %d failed: %v", i, err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			t.Fatalf("failed to read response %d body: %v", i, err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200 for request %d, got %d", i, resp.StatusCode)
+		}
+		bodies = append(bodies, string(body))
+	}
+	if bodies[0] == bodies[1] {
+		t.Fatalf("expected %s to bypass cache, got repeated body %q", reason, bodies[0])
+	}
+	if got := upstreamRequests.Load(); got < 2 {
+		t.Fatalf("expected %s to hit upstream more than once, got %d upstream requests", reason, got)
 	}
 }
 

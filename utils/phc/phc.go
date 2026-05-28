@@ -31,7 +31,9 @@ type PHC struct {
 
 func GenerateArgon2id(password string) *PHC {
 	var salt [16]byte
-	rand.Read(salt[:])
+	if _, err := rand.Read(salt[:]); err != nil {
+		panic(fmt.Sprintf("failed to read random salt: %v", err))
+	}
 
 	time := defaultArgonTime
 	memory := defaultArgonMem
@@ -234,5 +236,5 @@ func (p *PHC) UnmarshalJSON(data []byte) error {
 }
 
 func (p PHC) MarshalJSON() ([]byte, error) {
-	return []byte(p.String()), nil
+	return json.Marshal(p.String())
 }

@@ -74,6 +74,8 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 			break
 		}
 
+		tlsState := tlsConn.ConnectionState()
+		req.TLS = &tlsState
 		req.Close = true
 		if err := p.handleHTTP(responder, req); err != nil {
 			slog.Error("Error processing HTTP request in CONNECT tunnel", "host", proxyReq.Host, "error", err)

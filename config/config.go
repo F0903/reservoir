@@ -86,7 +86,7 @@ func load(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		slog.Error("Failed to open config file", "path", path, "error", err)
-		return nil, fmt.Errorf("%w: failed to open config file '%s'", ErrConfigFileRead, path)
+		return nil, fmt.Errorf("%w: failed to open config file '%s': %w", ErrConfigFileRead, path, err)
 	}
 	defer f.Close()
 
@@ -113,15 +113,21 @@ func load(path string) (*Config, error) {
 
 func LoadOrDefault(path string) (*Config, error) {
 	cfg, err := load(path)
-	if err != nil {
-		slog.Error("Config load failed. Resetting to defaults.", "path", path, "error", err)
-		cfg = NewDefault()
-		cfg.path = path
-		if err := cfg.persist(); err != nil {
-			slog.Error("Failed to persist default config after reset", "error", err)
-			return nil, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)
-		}
-		slog.Warn("Config file has been reset to defaults due to error.")
+	if err == nil {
+		return cfg, nil
+	}
+
+	if !errors.Is(err, os.ErrNotExist) {
+		slog.Error("Config load failed. Existing config will not be overwritten.", "path", path, "error", err)
+		return nil, err
+	}
+
+	slog.Info("Config file does not exist. Creating defaults.", "path", path)
+	cfg = NewDefault()
+	cfg.path = path
+	if err := cfg.persist(); err != nil {
+		slog.Error("Failed to persist default config", "error", err)
+		return nil, fmt.Errorf("%w: failed to persist default config", ErrConfigPersist)
 	}
 	return cfg, nil
 }

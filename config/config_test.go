@@ -285,66 +285,51 @@ func TestPreparePartialUpdate_NilUpdateReturnsValidationError(t *testing.T) {
 	}
 }
 
-func TestLoadOrDefault_StrictPolicy(t *testing.T) {
+func TestLoadOrDefault_InvalidJSONDoesNotResetExistingConfig(t *testing.T) {
 	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "test_config_strict.json"))
 
-	// Write invalid JSON
-	err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644)
-	if err != nil {
+	invalidJSON := []byte("{ invalid json }")
+	if err := os.WriteFile(tmpFile, invalidJSON, 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	cfg, err := LoadOrDefault(tmpFile)
-	if err != nil {
-		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
+	if err == nil {
+		t.Fatal("expected invalid existing config to return an error")
+	}
+	if cfg != nil {
+		t.Fatal("expected invalid existing config to return nil config")
+	}
+	if !errors.Is(err, ErrConfigInvalidFormat) {
+		t.Fatalf("expected invalid format error, got %v", err)
 	}
 
-	if cfg == nil {
-		t.Fatal("Expected non-nil config after reset")
-	}
-
-	// Verify it was reset to defaults
-	if cfg.Proxy.Listen.Read() != ":9999" {
-		t.Errorf("Expected reset to default proxy listen, got %s", cfg.Proxy.Listen.Read())
-	}
-
-	// Verify file was overwritten
 	data, err := os.ReadFile(tmpFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(data[:1], []byte("{")) {
-		t.Error("Expected file to be overwritten with valid JSON")
+	if !reflect.DeepEqual(data, invalidJSON) {
+		t.Fatal("invalid existing config was overwritten")
 	}
 }
 
-func TestLoadOrDefaultPersistsResetToProvidedPath(t *testing.T) {
+func TestLoadOrDefaultPersistsDefaultsToMissingProvidedPath(t *testing.T) {
 	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "nested", "config.json"))
-
-	if err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644); err == nil {
-		t.Fatal("expected initial write to fail before config creates parent directory")
-	}
-	if err := os.MkdirAll(filepath.Dir(tmpFile), 0755); err != nil {
-		t.Fatalf("failed to create temp config directory: %v", err)
-	}
-	if err := os.WriteFile(tmpFile, []byte("{ invalid json }"), 0644); err != nil {
-		t.Fatalf("failed to write invalid config: %v", err)
-	}
 
 	cfg, err := LoadOrDefault(tmpFile)
 	if err != nil {
-		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
+		t.Fatalf("LoadOrDefault should create missing config: %v", err)
 	}
 	if cfg == nil {
-		t.Fatal("expected non-nil config after reset")
+		t.Fatal("expected non-nil config after default creation")
 	}
 
 	reloaded, err := load(tmpFile)
 	if err != nil {
-		t.Fatalf("expected reset config at provided path to be loadable: %v", err)
+		t.Fatalf("expected created config at provided path to be loadable: %v", err)
 	}
 	if got := reloaded.Database.File.Read(); got != "var/database.db" {
-		t.Fatalf("expected default database file in reset config, got %q", got)
+		t.Fatalf("expected default database file in created config, got %q", got)
 	}
 }
 
@@ -358,13 +343,14 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 	}
 
 	cfg, err := LoadOrDefault(tmpFile)
-	if err != nil {
-		t.Fatalf("LoadOrDefault should not return error on reset: %v", err)
+	if err == nil {
+		t.Fatal("expected existing config with missing fields to return an error")
 	}
-
-	// Verify it was reset to defaults (checking a field that was definitely missing)
-	if cfg.Proxy.Listen.Read() != ":9999" {
-		t.Errorf("Expected reset to default proxy listen, got %s", cfg.Proxy.Listen.Read())
+	if cfg != nil {
+		t.Fatal("expected existing config with missing fields to return nil config")
+	}
+	if !strings.Contains(err.Error(), "missing or uninitialized required configuration property") {
+		t.Fatalf("expected missing field error, got %v", err)
 	}
 }
 
@@ -451,6 +437,13 @@ func TestConfig_Verify(t *testing.T) {
 			name: "zero cleanup interval",
 			modify: func(c *Config) {
 				c.Cache.CleanupInterval.Overwrite(0)
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero cache lock shards",
+			modify: func(c *Config) {
+				c.Cache.LockShards.Overwrite(0)
 			},
 			wantErr: true,
 		},

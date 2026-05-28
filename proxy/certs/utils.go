@@ -23,12 +23,18 @@ func loadX509KeyPair(certFile, keyFile string) (cert *x509.Certificate, key any,
 		return nil, nil, fmt.Errorf("failed to read key file %s: %v", keyFile, err)
 	}
 	certBlock, _ := pem.Decode(cf)
+	if certBlock == nil {
+		return nil, nil, fmt.Errorf("failed to decode certificate PEM")
+	}
 	cert, err = x509.ParseCertificate(certBlock.Bytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse certificate: %v", err)
 	}
 
 	keyBlock, _ := pem.Decode(kf)
+	if keyBlock == nil {
+		return nil, nil, fmt.Errorf("failed to decode private key PEM")
+	}
 	key, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse private key: %v", err)

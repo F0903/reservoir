@@ -28,7 +28,9 @@ func FromString(input string) CacheKey {
 
 func MakeFromRequest(r *http.Request) CacheKey {
 	scheme := "http"
-	if r.TLS != nil {
+	if r.URL.Scheme == "http" || r.URL.Scheme == "https" {
+		scheme = r.URL.Scheme
+	} else if r.TLS != nil {
 		scheme = "https"
 	}
 	normHost := strings.ToLower(r.Host)

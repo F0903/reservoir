@@ -118,6 +118,9 @@ func (s *AuthService) ChangePassword(req RequestContext, currentPassword string,
 	if newPassword == "" {
 		return ErrEmptyNewPassword
 	}
+	if err := validateManagedPassword(newPassword); err != nil {
+		return err
+	}
 	if s == nil || s.users == nil || s.sessions == nil {
 		return ErrUserStoreUnavailable
 	}
