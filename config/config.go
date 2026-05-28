@@ -99,13 +99,20 @@ func load(path string) (*Config, error) {
 		return nil, fmt.Errorf("%w: failed to decode config from '%s'", ErrConfigInvalidFormat, path)
 	}
 
+	migrated := cfg.applyMigrations()
+	cfg.path = path
 	if err := cfg.verify(); err != nil {
 		slog.Error("Unable to verify config", "path", path, "error", err)
 		return nil, err
 	}
 
 	cfg.setRestartNeededProps()
-	cfg.path = path
+	if migrated {
+		if err := cfg.persist(); err != nil {
+			slog.Error("Failed to persist migrated config", "path", path, "error", err)
+			return nil, fmt.Errorf("%w: failed to persist migrated config", ErrConfigPersist)
+		}
+	}
 
 	slog.Info("Successfully loaded config", "path", path)
 	return &cfg, nil

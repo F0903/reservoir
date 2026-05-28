@@ -83,6 +83,7 @@ describe("api-helpers", () => {
                 UnauthorizedError,
             );
             expect(goto).not.toHaveBeenCalled();
+            expect(fetchFn).toHaveBeenCalledTimes(1);
         });
     });
 

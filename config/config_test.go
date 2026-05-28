@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -330,6 +331,45 @@ func TestLoadOrDefaultPersistsDefaultsToMissingProvidedPath(t *testing.T) {
 	}
 	if got := reloaded.Database.File.Read(); got != "var/database.db" {
 		t.Fatalf("expected default database file in created config, got %q", got)
+	}
+}
+
+func TestLoadOrDefault_MigratesMissingDatabaseFile(t *testing.T) {
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
+
+	defaultData, err := json.Marshal(NewDefault())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(defaultData, &raw); err != nil {
+		t.Fatal(err)
+	}
+	delete(raw, "database")
+
+	oldConfigData, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadOrDefault(tmpFile)
+	if err != nil {
+		t.Fatalf("expected old config to be migrated: %v", err)
+	}
+	if got := cfg.Database.File.Read(); got != "var/database.db" {
+		t.Fatalf("expected migrated database file, got %q", got)
+	}
+
+	reloaded, err := load(tmpFile)
+	if err != nil {
+		t.Fatalf("expected migrated config to be persisted: %v", err)
+	}
+	if got := reloaded.Database.File.Read(); got != "var/database.db" {
+		t.Fatalf("expected persisted migrated database file, got %q", got)
 	}
 }
 
