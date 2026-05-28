@@ -11,16 +11,30 @@ import (
 	"time"
 )
 
-func (f *fetcher) shouldBypassMemoryCache(resp *http.Response) bool {
-	if f.cfg.Cache.Type.Read() != config.CacheTypeMemory {
-		return false
+func (f *fetcher) shouldBypassCache(resp *http.Response) bool {
+	stats := f.cache.Stats()
+	if stats.MaxBytes <= 0 {
+		return true
 	}
-	if resp.ContentLength < 0 {
+	if resp.ContentLength > stats.MaxBytes {
 		return true
 	}
 
-	limit := f.memoryCacheResponseLimit()
-	return limit <= 0 || resp.ContentLength > limit
+	switch f.cfg.Cache.Type.Read() {
+	case config.CacheTypeMemory:
+		if resp.ContentLength < 0 {
+			return true
+		}
+
+		limit := f.memoryCacheResponseLimit()
+		return limit <= 0 || resp.ContentLength > limit
+	case config.CacheTypeFile, config.CacheTypeHybrid:
+		// Unknown-size file-tier writes cannot be safely replayed to the client if
+		// they exceed the hard cache limit mid-stream, so serve them directly.
+		return resp.ContentLength < 0
+	default:
+		return true
+	}
 }
 
 func (f *fetcher) memoryCacheResponseLimit() int64 {
@@ -42,8 +56,8 @@ func (f *fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 		slog.Debug("Got response code 200, but result is not cacheable", "status", resp.Status, "url", req.URL, "key", lookupKey, "reason", decision.Reason)
 		return nil, nil
 	}
-	if f.shouldBypassMemoryCache(resp) {
-		slog.Debug("Skipping memory cache for response that cannot be safely buffered", "status", resp.Status, "url", req.URL, "key", lookupKey, "content_length", resp.ContentLength)
+	if f.shouldBypassCache(resp) {
+		slog.Debug("Skipping cache for response that cannot be safely stored", "status", resp.Status, "url", req.URL, "key", lookupKey, "content_length", resp.ContentLength)
 		return nil, nil
 	}
 

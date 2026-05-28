@@ -15,6 +15,10 @@ type TestMeta struct {
 	ID string
 }
 
+type noSizeReader struct {
+	io.Reader
+}
+
 func TestFileCache_Basic(t *testing.T) {
 	ctx := t.Context()
 	cfg := config.NewDefault()
@@ -61,6 +65,70 @@ func TestFileCache_Basic(t *testing.T) {
 	_, err = c.Get(key)
 	if err != cache.ErrCacheEntryNotFound {
 		t.Errorf("Expected cache.ErrCacheEntryNotFound, got %v", err)
+	}
+}
+
+func TestFileCache_RejectsOversizedEntryWithoutStoring(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.NewDefault()
+
+	tmpDir := t.TempDir()
+	c := New[TestMeta](cfg, nil, tmpDir, 4, time.Minute, 16, ctx)
+	defer c.Destroy()
+
+	key := cache.FromString("oversized-file-key")
+	_, err := c.Cache(key, noSizeReader{Reader: bytes.NewReader([]byte("too large"))}, time.Now().Add(time.Hour), TestMeta{ID: "oversized"})
+	if !errors.Is(err, cache.ErrCacheMemoryExceeded) {
+		t.Fatalf("expected ErrCacheMemoryExceeded, got %v", err)
+	}
+
+	if stats := c.Stats(); stats.Entries != 0 || stats.Bytes != 0 {
+		t.Fatalf("expected rejected entry not to affect stats, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
+	}
+	if _, err := c.Get(key); !errors.Is(err, cache.ErrCacheEntryNotFound) {
+		t.Fatalf("expected rejected entry to be missing, got %v", err)
+	}
+	if _, err := os.Stat(c.dataPath(key)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected oversized data file to be absent, got %v", err)
+	}
+}
+
+func TestFileCache_OversizedReplacementKeepsExistingEntry(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.NewDefault()
+
+	tmpDir := t.TempDir()
+	c := New[TestMeta](cfg, nil, tmpDir, 4, time.Minute, 16, ctx)
+	defer c.Destroy()
+
+	key := cache.FromString("oversized-replacement-key")
+	firstData := []byte("ok")
+	first, err := c.Cache(key, bytes.NewReader(firstData), time.Now().Add(time.Hour), TestMeta{ID: "first"})
+	if err != nil {
+		t.Fatalf("first cache failed: %v", err)
+	}
+	first.Data.Close()
+
+	_, err = c.Cache(key, noSizeReader{Reader: bytes.NewReader([]byte("too large"))}, time.Now().Add(time.Hour), TestMeta{ID: "oversized"})
+	if !errors.Is(err, cache.ErrCacheMemoryExceeded) {
+		t.Fatalf("expected ErrCacheMemoryExceeded, got %v", err)
+	}
+
+	retrieved, err := c.Get(key)
+	if err != nil {
+		t.Fatalf("expected original entry to remain after oversized replacement: %v", err)
+	}
+	defer retrieved.Data.Close()
+
+	content, err := io.ReadAll(retrieved.Data)
+	if err != nil {
+		t.Fatalf("failed to read original entry: %v", err)
+	}
+	if !bytes.Equal(content, firstData) {
+		t.Fatalf("expected original data %q, got %q", firstData, content)
+	}
+	if retrieved.Metadata.Object.ID != "first" {
+		t.Fatalf("expected original metadata to remain, got %q", retrieved.Metadata.Object.ID)
 	}
 }
 

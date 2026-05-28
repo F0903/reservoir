@@ -80,6 +80,10 @@ The first admin username can be chosen during setup. The bootstrap password must
 
 If the API is disabled, Reservoir cannot create dashboard users or accept dashboard logins.
 
+### Dashboard HTTPS
+
+The embedded dashboard/API webserver listens over HTTP. To serve it over HTTPS, put it behind a TLS-terminating reverse proxy and forward the original scheme with `Forwarded: proto=https` or `X-Forwarded-Proto: https`. Reservoir marks session cookies as `Secure` when the request is received over TLS or those forwarded scheme headers indicate HTTPS.
+
 ### Package Cache Behavior
 
 Reservoir is tuned first as a shared package cache for package-manager traffic. By default the proxy cache policy favors useful package caching over strict upstream cache directives:
@@ -96,9 +100,9 @@ These defaults are intentional for package-cache deployments. If you need strict
 
 Reservoir supports three cache backends:
 
-- `cache.type = "memory"` keeps cached responses in process memory. This is the default and is best for short-lived burst caching where the proxy only needs to coalesce many package-manager requests that happen close together.
+- `cache.type = "memory"` keeps cached responses in process memory. This is best for short-lived burst caching where the proxy only needs to coalesce many package-manager requests that happen close together.
 - `cache.type = "file"` stores cached response bodies under `cache.file.dir`. This is useful when cached package responses may be larger than the memory budget or when short restart continuity is useful.
-- `cache.type = "hybrid"` keeps new and recently accessed responses in memory first, then demotes entries that have not been accessed for `cache.hybrid.demote_after` to the file cache. A later file-cache hit is promoted back into memory when it fits. This keeps bursty package-manager traffic fast while still giving colder entries short restart continuity.
+- `cache.type = "hybrid"` is the default. It keeps new and recently accessed responses in memory first, then demotes entries that have not been accessed for `cache.hybrid.demote_after` to the file cache. A later file-cache hit is promoted back into memory when it fits. This keeps bursty package-manager traffic fast while still giving colder entries short restart continuity.
 
 The file cache writes metadata sidecars next to cached response bodies. On startup, Reservoir loads sidecars only when the matching cached body still exists, the body is non-empty, and the cached response has not expired. Expired, corrupt, or orphaned cache files are discarded. This preserves useful restart continuity without turning the proxy into a long-lived package repository.
 

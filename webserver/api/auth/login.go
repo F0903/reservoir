@@ -51,6 +51,10 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 			apihttp.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 			return
 		}
+		if errors.Is(err, appservices.ErrLoginRateLimited) {
+			apihttp.Error(w, "Too many login attempts", http.StatusTooManyRequests)
+			return
+		}
 		slog.Error("Error during authentication", "error", err)
 		apihttp.InternalServerError(w)
 		return

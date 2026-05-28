@@ -108,6 +108,35 @@ func TestLoginCookieSecureFollowsRequestContext(t *testing.T) {
 	}
 }
 
+func TestLoginRateLimitsRepeatedFailures(t *testing.T) {
+	store := newAuthTestStore(t)
+	createAuthTestUser(t, store)
+	svc := &AuthService{
+		users:        store,
+		sessions:     coreauth.NewSessionManager(),
+		loginLimiter: coreauth.NewLoginAttemptLimiter(),
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "http://reservoir.test/api/auth/login", nil)
+	req.RemoteAddr = "203.0.113.10:54321"
+	reqCtx, authenticated := svc.RequestFromHTTP(req)
+	if authenticated {
+		t.Fatal("expected login request to be unauthenticated")
+	}
+
+	for i := 0; i < 5; i++ {
+		_, _, err := svc.Login(reqCtx, "operator", "wrong-password")
+		if !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("attempt %d: expected ErrInvalidCredentials, got %v", i+1, err)
+		}
+	}
+
+	_, _, err := svc.Login(reqCtx, "operator", "current-password")
+	if !errors.Is(err, ErrLoginRateLimited) {
+		t.Fatalf("expected ErrLoginRateLimited, got %v", err)
+	}
+}
+
 func TestCreateBootstrapAdminSetsSecureCookieForHTTPSRequest(t *testing.T) {
 	store := newAuthTestStore(t)
 	svc := &AuthService{users: store, sessions: coreauth.NewSessionManager()}

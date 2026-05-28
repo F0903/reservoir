@@ -169,27 +169,43 @@ func (c *Cache[MetadataT]) Clear() error {
 	return errors.Join(fileErr, memoryErr)
 }
 
-func (c *Cache[MetadataT]) GetMetadata(key cache.CacheKey) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
+func (c *Cache[MetadataT]) getMetadata(key cache.CacheKey, recordMetrics bool) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
 	if meta, stale, err := c.memory.GetMetadataQuiet(key); err == nil {
-		c.recordCacheHit()
+		if recordMetrics {
+			c.recordCacheHit()
+		}
 		return meta, stale, nil
 	} else if !errors.Is(err, cache.ErrCacheEntryNotFound) {
-		c.recordCacheError()
-		return nil, false, err
-	}
-
-	meta, stale, err = c.file.GetMetadataQuiet(key)
-	if err != nil {
-		if errors.Is(err, cache.ErrCacheEntryNotFound) {
-			c.recordCacheMiss()
-		} else {
+		if recordMetrics {
 			c.recordCacheError()
 		}
 		return nil, false, err
 	}
 
-	c.recordCacheHit()
+	meta, stale, err = c.file.GetMetadataQuiet(key)
+	if err != nil {
+		if recordMetrics {
+			if errors.Is(err, cache.ErrCacheEntryNotFound) {
+				c.recordCacheMiss()
+			} else {
+				c.recordCacheError()
+			}
+		}
+		return nil, false, err
+	}
+
+	if recordMetrics {
+		c.recordCacheHit()
+	}
 	return meta, stale, nil
+}
+
+func (c *Cache[MetadataT]) GetMetadata(key cache.CacheKey) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
+	return c.getMetadata(key, true)
+}
+
+func (c *Cache[MetadataT]) GetMetadataQuiet(key cache.CacheKey) (meta *cache.EntryMetadata[MetadataT], stale bool, err error) {
+	return c.getMetadata(key, false)
 }
 
 func (c *Cache[MetadataT]) UpdateMetadata(key cache.CacheKey, modifier func(*cache.EntryMetadata[MetadataT])) error {

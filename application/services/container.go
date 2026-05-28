@@ -32,7 +32,7 @@ func NewContainerWithMetrics(cfg *config.Config, sessions *coreauth.SessionManag
 	m = metrics.Ensure(m)
 
 	return &Container{
-		Auth:    &AuthService{users: users, sessions: sessions},
+		Auth:    &AuthService{users: users, sessions: sessions, loginLimiter: coreauth.NewLoginAttemptLimiter()},
 		Users:   &UserService{users: users, sessions: sessions},
 		Config:  &ConfigService{cfg: cfg},
 		Cache:   &CacheService{cfg: cfg, controller: cacheController},

@@ -77,8 +77,7 @@ func (f *fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 				return fetchResult{}, err
 			}
 			if res.Type == fetchTypeDirect {
-				res.Direct.Response.Body.Close()
-				return fetchResult{}, ErrNotCacheable
+				return res, nil
 			}
 			return res, nil
 		}

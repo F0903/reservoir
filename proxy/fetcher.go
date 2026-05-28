@@ -132,6 +132,9 @@ func (f *fetcher) dedupFetch(req *http.Request, baseKey cache.CacheKey, clientHd
 
 	case fetchTypeDirect:
 		if shared {
+			if fetched.Direct.Response != nil && fetched.Direct.Response.Body != nil {
+				fetched.Direct.Response.Body.Close()
+			}
 			slog.Debug("Fetched shared direct response, fetching own upstream...", "url", req.URL, "status", fetched.Direct.Status, "upstream_status", fetched.Direct.UpstreamStatus, "coalesced", shared)
 			return f.fetchDirectlyFromUpstream(req) // Followers should fetch their own upstream response
 		}

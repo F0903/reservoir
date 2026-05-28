@@ -386,6 +386,39 @@ func TestZeroMemoryBudgetBypassesCache(t *testing.T) {
 	assertRepeatedRequestsBypassCache(t, env, "/zero-memory-budget", "zero memory budget response")
 }
 
+func TestNonCacheableGetMissUsesSingleUpstreamRequest(t *testing.T) {
+	env := SetupTestEnv(t)
+
+	var upstreamRequests atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=60")
+		w.Header().Set("Set-Cookie", "sid=upstream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "uncached response %d", count)
+	})
+	env.Start()
+
+	resp, err := env.Client.Get(env.Upstream.URL + "/set-cookie")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatalf("failed to read response body: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", resp.StatusCode)
+	}
+	if got := string(body); got != "uncached response 1" {
+		t.Fatalf("expected first upstream response, got %q", got)
+	}
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected one upstream request for non-cacheable miss, got %d", got)
+	}
+}
+
 func assertRepeatedRequestsBypassCache(t testing.TB, env *TestEnv, path string, reason string) {
 	t.Helper()
 

@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+type quietMetadataCache interface {
+	GetMetadataQuiet(key cache.CacheKey) (meta *cache.EntryMetadata[CacheMetadata], stale bool, err error)
+}
+
 func normalizeVaryHeaderValues(values []string) string {
 	normalized := make([]string, 0, len(values))
 	for _, value := range values {
@@ -36,8 +40,17 @@ func makeVariantCacheKey(req *http.Request, baseKey cache.CacheKey, vary []strin
 }
 
 func (f *fetcher) lookupCacheKey(req *http.Request, baseKey cache.CacheKey) cache.CacheKey {
-	vary, _ := f.variantIndex.Get(baseKey)
-	return makeVariantCacheKey(req, baseKey, vary)
+	if vary, ok := f.variantIndex.Get(baseKey); ok {
+		return makeVariantCacheKey(req, baseKey, vary)
+	}
+
+	candidate := makeVariantCacheKey(req, baseKey, supportedVaryHeaders)
+	if candidate != baseKey && f.cacheEntryExists(candidate) {
+		f.setVariantIndex(baseKey, supportedVaryHeaders)
+		return candidate
+	}
+
+	return baseKey
 }
 
 func (f *fetcher) singleflightKey(req *http.Request, baseKey cache.CacheKey) string {
@@ -53,4 +66,14 @@ func (f *fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
 	copied := make([]string, len(vary))
 	copy(copied, vary)
 	f.variantIndex.Set(baseKey, copied)
+}
+
+func (f *fetcher) cacheEntryExists(key cache.CacheKey) bool {
+	quietCache, ok := f.cache.(quietMetadataCache)
+	if !ok {
+		return false
+	}
+
+	_, _, err := quietCache.GetMetadataQuiet(key)
+	return err == nil
 }

@@ -72,6 +72,52 @@ func TestFileCacheSidecarsRestoreProxyResponseAfterRestart(t *testing.T) {
 	}
 }
 
+func TestFileCacheSidecarsRestoreVaryVariantAfterRestart(t *testing.T) {
+	var upstreamRequests atomic.Int64
+	body := "br package payload"
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamRequests.Add(1)
+		w.Header().Set("Cache-Control", "max-age=3600")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.WriteHeader(http.StatusOK)
+		if r.Header.Get("Accept-Encoding") == "br" {
+			_, _ = w.Write([]byte(body))
+			return
+		}
+		_, _ = w.Write([]byte("identity package payload"))
+	}))
+	defer upstream.Close()
+
+	cfg := newFileCacheProxyConfig(t)
+	firstProxy := startRestartableProxy(t, cfg)
+
+	targetURL := upstream.URL + "/pool/main/vary-package.deb"
+	resp := doRestartVariantRequest(t, firstProxy, targetURL, "br")
+	if got := readRestartTestBody(t, resp); got != body {
+		t.Fatalf("unexpected first variant response body: %q", got)
+	}
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected first variant request to hit upstream once, got %d", got)
+	}
+
+	firstProxy.close()
+
+	secondProxy := startRestartableProxy(t, cfg)
+	defer secondProxy.close()
+
+	resp = doRestartVariantRequest(t, secondProxy, targetURL, "br")
+	if got := readRestartTestBody(t, resp); got != body {
+		t.Fatalf("unexpected restored variant response body: %q", got)
+	}
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected restored Vary variant hit without upstream request, got %d upstream requests", got)
+	}
+	if cacheStatus := resp.Header.Get("Cache-Status"); !strings.Contains(cacheStatus, "hit") {
+		t.Fatalf("expected restored variant response to be a cache hit, got Cache-Status %q", cacheStatus)
+	}
+}
+
 func TestFileCacheSidecarsDoNotRestoreExpiredProxyResponse(t *testing.T) {
 	var upstreamRequests atomic.Int64
 
@@ -123,6 +169,22 @@ func TestFileCacheSidecarsDoNotRestoreExpiredProxyResponse(t *testing.T) {
 	if got := resp.Header.Get("ETag"); got != `"fresh-restart-etag"` {
 		t.Fatalf("expected fresh upstream ETag, got %q", got)
 	}
+}
+
+func doRestartVariantRequest(t *testing.T, p *restartableProxy, targetURL string, acceptEncoding string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		t.Fatalf("failed to create restart variant request: %v", err)
+	}
+	req.Header.Set("Accept-Encoding", acceptEncoding)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		t.Fatalf("restart variant request failed: %v", err)
+	}
+	return resp
 }
 
 type restartableProxy struct {

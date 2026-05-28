@@ -13,18 +13,26 @@ import (
 )
 
 type AuthService struct {
-	users    *stores.UserStore
-	sessions *coreauth.SessionManager
+	users        *stores.UserStore
+	sessions     *coreauth.SessionManager
+	loginLimiter *coreauth.LoginAttemptLimiter
 }
 
 type RequestContext struct {
 	session             *coreauth.Session
 	secureSessionCookie bool
+	clientAddress       string
 }
 
 func (s *AuthService) RequestFromHTTP(r *http.Request) (RequestContext, bool) {
-	req := RequestContext{secureSessionCookie: coreauth.RequestUsesHTTPS(r)}
+	req := RequestContext{
+		secureSessionCookie: coreauth.RequestUsesHTTPS(r),
+		clientAddress:       coreauth.ClientAddress(r),
+	}
 	if s == nil || s.sessions == nil {
+		return req, false
+	}
+	if r == nil {
 		return req, false
 	}
 
@@ -58,16 +66,21 @@ func (s *AuthService) Login(req RequestContext, username string, password string
 	if s == nil || s.users == nil || s.sessions == nil {
 		return nil, nil, ErrUserStoreUnavailable
 	}
+	if _, limited := s.loginLimiter.Check(req.clientAddress, username); limited {
+		return nil, nil, ErrLoginRateLimited
+	}
 
 	creds := coreauth.Credentials{Username: username, Password: password}
 	user, err := creds.Authenticate(s.users)
 	if err != nil {
 		if errors.Is(err, coreauth.ErrInvalidCredentials) {
+			s.loginLimiter.RecordFailure(req.clientAddress, username)
 			return nil, nil, ErrInvalidCredentials
 		}
 		return nil, nil, err
 	}
 
+	s.loginLimiter.RecordSuccess(req.clientAddress, username)
 	cookie := s.createSessionCookie(req, user.ID)
 	return user, cookie, nil
 }

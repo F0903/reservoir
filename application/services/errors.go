@@ -11,6 +11,7 @@ var (
 	ErrNoLogFile                = errors.New("no log file configured")
 	ErrAlreadyAuthenticated     = errors.New("already authenticated")
 	ErrInvalidCredentials       = errors.New("invalid credentials")
+	ErrLoginRateLimited         = errors.New("too many login attempts")
 	ErrCurrentPasswordIncorrect = errors.New("current password is incorrect")
 	ErrMissingPasswordFields    = errors.New("both current_password and new_password fields are required")
 	ErrEmptyCurrentPassword     = errors.New("current password must not be empty")
