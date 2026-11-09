@@ -27,10 +27,10 @@ test: generate-csp test-proxy test-frontend
 .PHONY: ci
 ci: check-frontend lint-frontend test-frontend generate-csp vet test-proxy build-proxy
 
-# Fail a release when the tag (TAG=v1.2.3) differs from the version in package.json.
+# Fail a release when the tag (TAG=v1.2.3) differs from the frontend version in package.json.
 # The Go binary takes its version from the tag, so package.json is the only one that can drift.
-.PHONY: check-release-version
-check-release-version:
+.PHONY: assert-frontend-version
+assert-frontend-version:
 	@version="$$(node -p "require('./$(FRONTEND_DIR)/package.json').version")" && \
 	if [ "$$TAG" != "v$$version" ]; then \
 		echo "Tag '$$TAG' does not match version '$$version' in $(FRONTEND_DIR)/package.json (expected tag 'v$$version')." >&2; \

@@ -41,7 +41,7 @@ jobs:
       - name: Check tag matches project version
         env:
           TAG: ${{ github.ref_name }}
-        run: make check-release-version
+        run: make assert-frontend-version
 
       - name: Build and test
         run: make ci
