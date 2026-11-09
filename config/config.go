@@ -64,17 +64,29 @@ func (c *Config) persist() error {
 		return fmt.Errorf("%w: failed to assert config file path '%s'", ErrConfigFileOpen, path)
 	}
 
-	f, err := os.Create(assertedPath.Path)
+	// Write to a temp file and rename it, so a crash can't leave an empty or half-written config.
+	tmpPath := assertedPath.Path + ".tmp"
+	f, err := os.Create(tmpPath)
 	if err != nil {
-		slog.Error("Failed to create config file", "path", assertedPath.Path, "error", err)
-		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, assertedPath.Path)
+		slog.Error("Failed to create config file", "path", tmpPath, "error", err)
+		return fmt.Errorf("%w: failed to open config file for writing '%s'", ErrConfigFileOpen, tmpPath)
 	}
-	defer f.Close()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ") // Pretty print the JSON output
-	if err := enc.Encode(c); err != nil {
-		slog.Error("Failed to encode config to JSON", "path", assertedPath.Path, "error", err)
+	err = enc.Encode(c)
+	if err == nil {
+		err = f.Sync()
+	}
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Rename(tmpPath, assertedPath.Path)
+	}
+	if err != nil {
+		_ = os.Remove(tmpPath)
+		slog.Error("Failed to write config file", "path", assertedPath.Path, "error", err)
 		return fmt.Errorf("%w: failed to write config to file '%s'", ErrConfigFileWrite, assertedPath.Path)
 	}
 
@@ -88,13 +100,14 @@ func load(path string) (*Config, error) {
 		slog.Error("Failed to open config file", "path", path, "error", err)
 		return nil, fmt.Errorf("%w: failed to open config file '%s': %w", ErrConfigFileRead, path, err)
 	}
-	defer f.Close()
 
 	decoder := json.NewDecoder(f)
 	decoder.DisallowUnknownFields()
 
 	var cfg Config
-	if err := decoder.Decode(&cfg); err != nil {
+	err = decoder.Decode(&cfg)
+	f.Close() // Windows can't rename over a file that is still open, and a migration persists below.
+	if err != nil {
 		slog.Error("Failed to decode config JSON", "path", path, "error", err)
 		return nil, fmt.Errorf("%w: failed to decode config from '%s'", ErrConfigInvalidFormat, path)
 	}

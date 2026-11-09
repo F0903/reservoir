@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -82,12 +83,13 @@ func (f *Fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 		Header:       resp.Header,
 		Vary:         decision.Vary,
 	})
+	f.metrics.Requests.BytesFetched.Add(int64(bytesRead))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", errCacheResponseFailed, err)
+		// The cache can't hold this response, but the client can still get it directly.
+		return nil, fmt.Errorf("%w: %v", errNotCacheable, err)
 	}
 	f.setVariantIndex(baseKey, decision.Vary)
 
-	f.metrics.Requests.BytesFetched.Add(int64(bytesRead))
 	slog.Info("Successfully cached response", "status", resp.Status, "url", req.URL, "key", storeKey, "expires", decision.Expires)
 	return cached, nil
 }
@@ -138,14 +140,18 @@ func (f *Fetcher) sendRequestToUpstream(req *http.Request) (*http.Response, time
 	slog.Debug("Sending request to upstream", "url", req.URL)
 	f.metrics.Requests.UpstreamRequests.Increment()
 
+	ctx, cancel := context.WithCancel(req.Context())
+
 	startTime := time.Now()
-	resp, err := sendRequestToTarget(f.client, req, f.cfg.Proxy.UpstreamDefaultHttps.Read())
+	resp, err := sendRequestToTarget(f.client, req.WithContext(ctx), f.cfg.Proxy.UpgradeHttpToHttps.Read())
 	latency := time.Since(startTime)
 
 	f.metrics.Requests.UpstreamRequestLatency.Add(latency.Nanoseconds())
 	if err != nil {
+		cancel()
 		return nil, 0, err
 	}
+	resp.Body = newIdleTimeoutBody(resp.Body, upstreamBodyIdleTimeout, cancel)
 
 	slog.Debug("Received response from upstream", "url", req.URL, "status", resp.Status, "latency_ns", latency.Nanoseconds())
 	return resp, latency, nil

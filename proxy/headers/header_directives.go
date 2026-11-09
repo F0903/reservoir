@@ -133,17 +133,13 @@ func (hd *HeaderDirectives) StripRegularConditionals(header http.Header) {
 }
 
 func (hd *HeaderDirectives) ShouldCache(ignoreCacheControl bool) bool {
-	if !ignoreCacheControl && hd.CacheControl.IsPresent() {
+	if hd.CacheControl.IsPresent() {
 		cc := hd.CacheControl.Value()
-		if cc.noCache {
-			return false // No caching allowed
-		}
 		if cc.private {
-			return false // Shared cache should not store private responses
+			return false // Holds even when ignoring Cache-Control: sharing it would leak one user's data to others
 		}
-
-		if cc.maxAge < 1 {
-			return false // If max-age is less than 1 second, treat it as no-cache
+		if !ignoreCacheControl && cc.noCache {
+			return false // No caching allowed
 		}
 	}
 

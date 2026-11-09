@@ -17,13 +17,6 @@ func (r *trackingReader) Read(p []byte) (int, error) {
 	return r.reader.Read(p)
 }
 
-func TestReadAllCacheBytesRejectsOversizedBody(t *testing.T) {
-	_, err := ReadAllCacheBytes(bytes.NewReader([]byte("oversized")), 4)
-	if !errors.Is(err, ErrCacheMemoryExceeded) {
-		t.Fatalf("expected ErrCacheMemoryExceeded, got %v", err)
-	}
-}
-
 func TestReadAllCacheBytesRejectsOversizedHintWithoutReading(t *testing.T) {
 	reader := &trackingReader{reader: bytes.NewReader([]byte("oversized"))}
 

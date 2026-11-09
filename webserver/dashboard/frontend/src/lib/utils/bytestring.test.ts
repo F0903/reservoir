@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatBytesToLargest, formatBytes, parseByteString } from "./bytestring";
+import { formatBytesToLargest, parseByteString } from "./bytestring";
 
 describe("bytestring utils", () => {
     describe("formatBytesToLargest", () => {
@@ -16,18 +16,6 @@ describe("bytestring utils", () => {
         it("should respect decimals", () => {
             expect(formatBytesToLargest(1500, 1)).toBe("1.5K");
             expect(formatBytesToLargest(1500, 2)).toBe("1.46K");
-        });
-    });
-
-    describe("formatBytes", () => {
-        it("should format 0 bytes with specified unit", () => {
-            expect(formatBytes(0, "K")).toBe("0B"); // Wait, the code says unitLabels[0] which is 'B'
-        });
-
-        it("should format bytes to a fixed unit", () => {
-            expect(formatBytes(1024, "K")).toBe("1K");
-            expect(formatBytes(1024 * 1024, "K")).toBe("1024K");
-            expect(formatBytes(1024, "B")).toBe("1024B");
         });
     });
 

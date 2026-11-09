@@ -124,7 +124,7 @@ func TestLoginRateLimitsRepeatedFailures(t *testing.T) {
 		t.Fatal("expected login request to be unauthenticated")
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		_, _, err := svc.Login(reqCtx, "operator", "wrong-password")
 		if !errors.Is(err, ErrInvalidCredentials) {
 			t.Fatalf("attempt %d: expected ErrInvalidCredentials, got %v", i+1, err)

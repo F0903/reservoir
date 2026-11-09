@@ -32,19 +32,6 @@ func TestIsJSONContentType(t *testing.T) {
 	}
 }
 
-func TestRequireJSONContentType(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPatch, "/api/config", nil)
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	rec := httptest.NewRecorder()
-
-	if !RequireJSONContentType(rec, req) {
-		t.Fatal("expected JSON content type to be accepted")
-	}
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected response recorder to remain unwritten, got status %d", rec.Code)
-	}
-}
-
 func TestRequireJSONContentTypeRejectsInvalidMediaType(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/config", nil)
 	req.Header.Set("Content-Type", "text/plain")
@@ -75,13 +62,14 @@ func TestWriteJSON(t *testing.T) {
 	}
 }
 
-func TestDecodeJSONRejectsInvalidBody(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader("{"))
+func TestDecodeJSONRejectsOversizedBody(t *testing.T) {
+	body := `{"username":"` + strings.Repeat("x", 2*maxJSONBodyBytes) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 
 	var payload map[string]any
 	if DecodeJSON(rec, req, &payload) {
-		t.Fatal("expected invalid JSON to be rejected")
+		t.Fatal("expected oversized JSON to be rejected")
 	}
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)

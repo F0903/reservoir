@@ -73,17 +73,6 @@ func (c *Cache[MetadataT]) OverrideEntryLastAccessForTesting(key cache.CacheKey,
 	return true
 }
 
-func (c *Cache[MetadataT]) DeleteAfter(key cache.CacheKey, fn func() error) error {
-	lock := cache.GetLock(c.locks, key)
-	lock.Lock()
-	defer lock.Unlock()
-
-	if err := fn(); err != nil {
-		return err
-	}
-	return c.deleteInternal(key)
-}
-
 func (c *Cache[MetadataT]) DemotionCandidates(cutoff time.Time) []cache.CacheKey {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

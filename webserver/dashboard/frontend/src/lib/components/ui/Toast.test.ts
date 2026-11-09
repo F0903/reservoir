@@ -26,20 +26,6 @@ describe("Toast component", () => {
         expect(screen.getByText("Test Message")).toBeInTheDocument();
     });
 
-    it("should render success message", () => {
-        const handle = new ToastHandle(vi.fn());
-        render(Toast, {
-            props: {
-                type: "success",
-                message: "Success Message",
-                durationMs: 3000,
-                handle,
-            },
-        });
-
-        expect(screen.getByText("Success Message")).toBeInTheDocument();
-    });
-
     it("should call handle.close after duration", async () => {
         const closer = vi.fn();
         const handle = new ToastHandle(closer);

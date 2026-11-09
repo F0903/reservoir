@@ -14,7 +14,7 @@ import (
 )
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
-	r := responder.NewHTTPResponder(w)
+	r := responder.NewHTTPResponder(w, p.clientWriteTimeout)
 	if proxyReq.Method == http.MethodConnect {
 		if err := p.handleCONNECT(r, proxyReq); err != nil {
 			slog.Error("Error handling CONNECT request", "error", err)
@@ -42,7 +42,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 
 	if err != nil {
 		slog.Error("Error fetching resource", "url", req.URL, "key", key, "error", err)
-		r.WriteError("Error fetching resource", http.StatusBadGateway)
+		p.writeError(r, "Error fetching resource", http.StatusBadGateway)
 		return err
 	}
 
@@ -77,7 +77,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 	case fetch.TypeCached:
 		if fetched.Cached.Entry == nil || fetched.Cached.Entry.Data == nil {
 			slog.Error("fetch.TypeCached: entry or data is nil", "url", req.URL)
-			r.WriteError("internal error: cache entry data is nil", http.StatusInternalServerError)
+			p.writeError(r, "internal error: cache entry data is nil", http.StatusInternalServerError)
 			return fmt.Errorf("cache entry data is nil")
 		}
 		defer fetched.Cached.Entry.Data.Close()
@@ -90,7 +90,7 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 				} else if errors.Is(err, ErrRangeNotSatisfiable) {
 					return err
 				} else {
-					r.WriteError("error handling Range request", http.StatusInternalServerError)
+					p.writeError(r, "error handling Range request", http.StatusInternalServerError)
 					return err
 				}
 			} else {
@@ -100,7 +100,6 @@ func (p *Proxy) processRequest(r responder.Responder, req *http.Request, key cac
 
 		r.SetHeaders(fetched.Cached.Entry.Metadata.Object.Header)
 		r.SetHeader("Accept-Ranges", "bytes")
-		r.SetHeader("ETag", fetched.Cached.Entry.Metadata.Object.ETag)
 		r.SetHeader("Last-Modified", fetched.Cached.Entry.Metadata.Object.LastModified.Format(http.TimeFormat))
 		addCacheHeaders(r, req, typeutils.Some(fetched.Cached.Entry), fetchResultToCacheStatus(fetched))
 

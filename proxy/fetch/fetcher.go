@@ -1,6 +1,7 @@
 package fetch
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -46,6 +47,15 @@ func (f *Fetcher) CloseIdleConnections() {
 	f.client.CloseIdleConnections()
 }
 
+// countRequest records whether the result was shared with other requests in-flight.
+func (f *Fetcher) countRequest(shared bool) {
+	if shared {
+		f.metrics.Requests.CoalescedRequests.Increment()
+	} else {
+		f.metrics.Requests.NonCoalescedRequests.Increment()
+	}
+}
+
 // Fetch deduplicates cacheable requests and otherwise returns the bypassed upstream response.
 // IMPORTANT: Remember to close data streams!
 func (f *Fetcher) Fetch(req *http.Request, baseKey cache.CacheKey, clientHd *headers.HeaderDirectives) (fetched Result, err error) {
@@ -60,15 +70,28 @@ func (f *Fetcher) Fetch(req *http.Request, baseKey cache.CacheKey, clientHd *hea
 
 	shouldCoalesce := !clientHd.Range.IsPresent() && req.Method == http.MethodGet
 	if !shouldCoalesce {
-		// These requests also aren't cacheable, so they go straight to upstream.
-		slog.Debug("Request can't be coalesced, fetching upstream...")
 		f.metrics.Requests.NonCoalescedRequests.Increment()
 
-		return f.fetchUpstream(req, baseKey, lookupKey, clientHd)
+		if req.Method == http.MethodGet {
+			if cached := f.getFreshEntry(lookupKey); cached != nil {
+				slog.Debug("Range request found a fresh cache entry", "url", req.URL, "key", lookupKey)
+				return newCachedResult(cached, StatusHit, 0, 0), nil
+			}
+		}
+
+		// These requests also aren't cacheable, so they go straight to upstream.
+		slog.Debug("Request can't be coalesced, fetching upstream...")
+		fetched, err := f.fetchUpstream(req, baseKey, lookupKey, clientHd)
+		if errors.Is(err, errNotCacheable) {
+			return f.fetchDirectlyFromUpstream(req)
+		}
+		return fetched, err
 	}
 
 	fetchedObj, err, shared := f.group.Do(f.singleflightKey(req, baseKey), func() (any, error) {
-		return f.getFromCacheOrFetch(req, baseKey, lookupKey, clientHd)
+		// Others may be waiting on this download, so the first client leaving must not cancel it.
+		detached := req.WithContext(context.WithoutCancel(req.Context()))
+		return f.getFromCacheOrFetch(detached, baseKey, lookupKey, clientHd)
 	})
 	if err != nil {
 		if errors.Is(err, errNotCacheable) {
@@ -76,18 +99,12 @@ func (f *Fetcher) Fetch(req *http.Request, baseKey cache.CacheKey, clientHd *hea
 			f.metrics.Requests.NonCoalescedRequests.Increment()
 			return f.fetchDirectlyFromUpstream(req)
 		}
+		f.countRequest(shared)
 		return Result{}, err
 	}
 	fetched = fetchedObj.(Result)
 
-	// If shared is true, this means the request was coalesced.
-	// Meaning that the result is being shared with other requests in-flight.
-
-	if shared {
-		f.metrics.Requests.CoalescedRequests.Increment()
-	} else {
-		f.metrics.Requests.NonCoalescedRequests.Increment()
-	}
+	f.countRequest(shared)
 
 	switch fetched.Type {
 	case TypeCached:
@@ -118,6 +135,8 @@ func (f *Fetcher) Fetch(req *http.Request, baseKey cache.CacheKey, clientHd *hea
 				f.metrics.Requests.CoalescedCacheRevalidations.Increment()
 			case StatusMiss:
 				f.metrics.Requests.CoalescedCacheMisses.Increment()
+			case StatusStale:
+				f.metrics.Requests.CoalescedCacheStales.Increment()
 			}
 		}
 

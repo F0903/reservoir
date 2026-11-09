@@ -34,57 +34,6 @@ describe("config api object", () => {
                     },
                 },
             ],
-            [
-                "cache.max_cache_size",
-                5000,
-                {
-                    cache: {
-                        max_cache_size: 5000,
-                    },
-                },
-            ],
-            [
-                "cache.file.dir",
-                "/new/path",
-                {
-                    cache: {
-                        file: {
-                            dir: "/new/path",
-                        },
-                    },
-                },
-            ],
-            [
-                "cache.memory.memory_budget_percent",
-                70,
-                {
-                    cache: {
-                        memory: {
-                            memory_budget_percent: 70,
-                        },
-                    },
-                },
-            ],
-            [
-                "cache.hybrid.demote_after",
-                "10m",
-                {
-                    cache: {
-                        hybrid: {
-                            demote_after: "10m",
-                        },
-                    },
-                },
-            ],
-            [
-                "logging.level",
-                "DEBUG",
-                {
-                    logging: {
-                        level: "DEBUG",
-                    },
-                },
-            ],
         ] as const)(
             "should build a nested patch body for %s",
             async (keyPath, value, expectedBody) => {

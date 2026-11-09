@@ -3,18 +3,21 @@ package fetch
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 )
 
 var (
-	ErrInvalidTargetHost = errors.New("invalid target host")
-	ErrURLParseFailed    = errors.New("URL parse failed")
-	ErrSendRequestFailed = errors.New("error sending request to target")
+	ErrInvalidTargetHost  = errors.New("invalid target host")
+	ErrSendRequestFailed  = errors.New("error sending request to target")
+	ErrBlockedDestination = errors.New("destination address is not allowed")
 )
 
 const (
@@ -22,9 +25,25 @@ const (
 	upstreamKeepAlive             = 30 * time.Second
 	upstreamTLSHandshakeTimeout   = 10 * time.Second
 	upstreamResponseHeaderTimeout = 30 * time.Second
+	upstreamBodyIdleTimeout       = 60 * time.Second
 	upstreamIdleConnTimeout       = 90 * time.Second
 	upstreamExpectContinueTimeout = 1 * time.Second
 )
+
+// refuseInternalAddress stops proxy clients reaching this host or cloud metadata services.
+// It checks the resolved IP at connect time, so a DNS name pointing at loopback is refused too.
+func refuseInternalAddress(_, address string, _ syscall.RawConn) error {
+	addrPort, err := netip.ParseAddrPort(address)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrBlockedDestination, err)
+	}
+
+	ip := addrPort.Addr().Unmap()
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return fmt.Errorf("%w: %s", ErrBlockedDestination, ip)
+	}
+	return nil
+}
 
 func newUpstreamClient() *http.Client {
 	return &http.Client{
@@ -32,6 +51,7 @@ func newUpstreamClient() *http.Client {
 			DialContext: (&net.Dialer{
 				Timeout:   upstreamDialTimeout,
 				KeepAlive: upstreamKeepAlive,
+				Control:   refuseInternalAddress,
 			}).DialContext,
 			DisableCompression:    true,
 			ForceAttemptHTTP2:     true,
@@ -43,6 +63,35 @@ func newUpstreamClient() *http.Client {
 			ExpectContinueTimeout: upstreamExpectContinueTimeout,
 		},
 	}
+}
+
+// idleTimeoutBody cancels the upstream request when one read stalls, so a silent
+// upstream can't hold a download and everyone waiting on it forever. Only time
+// inside Read counts, so a slow client doesn't trip it.
+type idleTimeoutBody struct {
+	io.ReadCloser
+	timeout time.Duration
+	timer   *time.Timer
+	cancel  func()
+}
+
+func newIdleTimeoutBody(body io.ReadCloser, timeout time.Duration, cancel func()) *idleTimeoutBody {
+	timer := time.AfterFunc(timeout, cancel)
+	timer.Stop()
+	return &idleTimeoutBody{ReadCloser: body, timeout: timeout, timer: timer, cancel: cancel}
+}
+
+func (b *idleTimeoutBody) Read(p []byte) (int, error) {
+	b.timer.Reset(b.timeout)
+	defer b.timer.Stop()
+	return b.ReadCloser.Read(p)
+}
+
+func (b *idleTimeoutBody) Close() error {
+	b.timer.Stop()
+	err := b.ReadCloser.Close()
+	b.cancel()
+	return err
 }
 
 func removeHopByHopHeaders(header http.Header) {
@@ -67,31 +116,25 @@ func removeHopByHopHeaders(header http.Header) {
 	}
 }
 
-func addrToUrl(addr string, httpsDefault bool) (*url.URL, error) {
-	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
-		if httpsDefault {
-			addr = "https://" + addr
-		} else {
-			addr = "http://" + addr
-		}
+func upstreamScheme(req *http.Request, upgradeHTTP bool) string {
+	if req.TLS != nil || upgradeHTTP {
+		return "https"
 	}
-	u, err := url.Parse(addr)
-	if err != nil {
-		slog.Error("Failed to parse URL", "addr", addr, "error", err)
-		return nil, fmt.Errorf("%w: %v", ErrURLParseFailed, err)
+	if req.URL.Scheme != "" {
+		return req.URL.Scheme
 	}
-	return u, nil
+	return "http"
 }
 
-func changeRequestToTarget(req *http.Request, httpsDefault bool) error {
-	targetHost := req.Host
-	targetUrl, err := addrToUrl(targetHost, httpsDefault)
+func changeRequestToTarget(req *http.Request, upgradeHTTP bool) error {
+	targetUrl, err := url.Parse(upstreamScheme(req, upgradeHTTP) + "://" + req.Host)
 	if err != nil {
-		slog.Error("Invalid target host", "host", targetHost, "error", err)
+		slog.Error("Invalid target host", "host", req.Host, "error", err)
 		return fmt.Errorf("%w: %v", ErrInvalidTargetHost, err)
 	}
 
 	targetUrl.Path = req.URL.Path
+	targetUrl.RawPath = req.URL.RawPath
 	targetUrl.RawQuery = req.URL.RawQuery
 	targetUrl.Fragment = req.URL.Fragment
 	req.URL = targetUrl
@@ -101,9 +144,9 @@ func changeRequestToTarget(req *http.Request, httpsDefault bool) error {
 	return nil
 }
 
-func sendRequestToTarget(client *http.Client, req *http.Request, httpsDefault bool) (*http.Response, error) {
+func sendRequestToTarget(client *http.Client, req *http.Request, upgradeHTTP bool) (*http.Response, error) {
 	// Change request URL to point to the target server.
-	if err := changeRequestToTarget(req, httpsDefault); err != nil {
+	if err := changeRequestToTarget(req, upgradeHTTP); err != nil {
 		return nil, err
 	}
 	// Remove hop-by-hop headers in the request that should not be forwarded to the target server.

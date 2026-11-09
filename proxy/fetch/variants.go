@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+// The index is only a shortcut that lookupCacheKey rebuilds from the cache, so it is safe to clear when full.
+const maxVariantIndexEntries = 1 << 16
+
 type quietMetadataCache interface {
 	GetMetadataQuiet(key cache.CacheKey) (meta *cache.EntryMetadata[CacheMetadata], stale bool, err error)
 }
@@ -61,6 +64,10 @@ func (f *Fetcher) setVariantIndex(baseKey cache.CacheKey, vary []string) {
 	if len(vary) == 0 {
 		f.variantIndex.Delete(baseKey)
 		return
+	}
+
+	if f.variantIndex.Len() >= maxVariantIndexEntries {
+		f.variantIndex.Clear()
 	}
 
 	copied := make([]string, len(vary))

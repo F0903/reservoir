@@ -37,10 +37,7 @@ func (c *Cache[MetadataT]) enforceMaxCacheSize() {
 		return
 	}
 
-	allowedFileBytes := maxCacheSize - memoryStats.Bytes
-	if allowedFileBytes < 0 {
-		allowedFileBytes = 0
-	}
+	allowedFileBytes := max(maxCacheSize-memoryStats.Bytes, 0)
 	c.file.EvictTo(allowedFileBytes)
 }
 
@@ -72,41 +69,22 @@ func (c *Cache[MetadataT]) makeMemoryRoom(key cache.CacheKey, size int64) bool {
 	return false
 }
 
-func (c *Cache[MetadataT]) shouldStreamToFile(key cache.CacheKey, size int64) bool {
+// reserveMemory claims room to read size bytes into memory, counting other downloads already being read.
+// On true the caller must release it with bufferedBytes.Sub; on false the data belongs on disk.
+func (c *Cache[MetadataT]) reserveMemory(key cache.CacheKey, size int64) bool {
 	if size <= 0 {
-		return false
-	}
-	if size > c.memoryLimit() {
 		return true
 	}
-
-	c.placementMu.Lock()
-	defer c.placementMu.Unlock()
-	return !c.makeMemoryRoom(key, size)
-}
-
-func (c *Cache[MetadataT]) memoryBufferLimitForUnknownSize(key cache.CacheKey) int64 {
-	limit := c.memoryLimit()
-	if limit <= 0 {
-		return 0
+	if size > c.memoryLimit() {
+		return false
 	}
 
 	c.placementMu.Lock()
 	defer c.placementMu.Unlock()
 
-	demoteAfter := time.Duration(c.demoteAfter.Get())
-	if demoteAfter > 0 {
-		c.demoteEntriesOlderThan(time.Now().Add(-demoteAfter))
+	if !c.makeMemoryRoom(key, size+c.bufferedBytes.Get()) {
+		return false
 	}
-
-	if c.memory.StoredBytes() >= limit {
-		c.memory.EvictTo(limit)
-	}
-
-	oldSize := c.memory.EntrySize(key)
-	available := limit - (c.memory.StoredBytes() - oldSize)
-	if available < 0 {
-		return 0
-	}
-	return available
+	c.bufferedBytes.Add(size)
+	return true
 }

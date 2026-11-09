@@ -30,8 +30,8 @@ func forwardedProtoIsHTTPS(header http.Header) bool {
 }
 
 func firstForwardedProto(value string) string {
-	for _, group := range strings.Split(value, ",") {
-		for _, part := range strings.Split(group, ";") {
+	for group := range strings.SplitSeq(value, ",") {
+		for part := range strings.SplitSeq(group, ";") {
 			key, val, ok := strings.Cut(strings.TrimSpace(part), "=")
 			if !ok || !strings.EqualFold(strings.TrimSpace(key), "proto") {
 				continue
@@ -43,7 +43,7 @@ func firstForwardedProto(value string) string {
 }
 
 func firstHeaderToken(value string) string {
-	for _, token := range strings.Split(value, ",") {
+	for token := range strings.SplitSeq(value, ",") {
 		token = strings.TrimSpace(token)
 		if token != "" {
 			return strings.ToLower(token)

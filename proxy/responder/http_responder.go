@@ -15,11 +15,13 @@ import (
 // as we can use the provided http.ResponseWriter directly
 type HTTPResponder struct {
 	writer http.ResponseWriter
+	body   *StallWriter
 }
 
-func NewHTTPResponder(w http.ResponseWriter) *HTTPResponder {
+func NewHTTPResponder(w http.ResponseWriter, stallTimeout time.Duration) *HTTPResponder {
 	return &HTTPResponder{
 		writer: w,
+		body:   NewStallWriter(w, http.NewResponseController(w).SetWriteDeadline, stallTimeout),
 	}
 }
 
@@ -56,8 +58,10 @@ func (c *HTTPResponder) writeStatusHeader(status int) time.Duration {
 
 func (c *HTTPResponder) Write(status int, body io.Reader) (written int64, writeDuration time.Duration, err error) {
 	writeDuration = c.writeStatusHeader(status)
-	timed := &timedWriter{writer: c.writer}
+	timed := &timedWriter{writer: c.body}
 	written, err = io.Copy(timed, body)
+	// net/http flushes its buffer after the handler returns, and the last write's deadline may have expired waiting on upstream.
+	c.body.Rearm()
 	return written, writeDuration + timed.duration, err
 }
 

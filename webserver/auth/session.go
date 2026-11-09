@@ -109,7 +109,7 @@ func (m *SessionManager) Get(sid string) (*Session, bool) {
 	}
 
 	if sess.ExpiresAt.Sub(now) <= m.extendThreshold {
-		slog.Debug("Session close to expiring, extending expiration", "session_id", sid, "expires_at", sess.ExpiresAt)
+		slog.Debug("Session close to expiring, extending expiration", "user_id", sess.UserID, "expires_at", sess.ExpiresAt)
 		sess.ExpiresAt = now.Add(m.lifetime)
 	}
 
@@ -133,7 +133,7 @@ func (m *SessionManager) Create(userID int64) *Session {
 	}
 
 	m.store[sid] = sess
-	slog.Debug("Created new session", "session_id", sid, "expires_at", sess.ExpiresAt)
+	slog.Debug("Created new session", "user_id", userID, "expires_at", sess.ExpiresAt)
 
 	sessCopy := *sess
 	return &sessCopy
@@ -166,12 +166,12 @@ func (m *SessionManager) SessionFromRequest(r *http.Request) (sess *Session, ok 
 		return nil, false
 	}
 
-	slog.Debug("Getting session from cookie...", "session_id", sid.Value)
+	slog.Debug("Getting session from cookie...")
 	sess, ok = m.Get(sid.Value)
 	if !ok {
 		return nil, false
 	}
-	slog.Debug("Got session from cookie", "session_id", sid.Value, "expires_at", sess.ExpiresAt)
+	slog.Debug("Got session from cookie", "user_id", sess.UserID, "expires_at", sess.ExpiresAt)
 
 	return sess, true
 }
@@ -185,7 +185,7 @@ func (m *SessionManager) Destroy(sess *Session) {
 	defer m.mu.Unlock()
 
 	delete(m.store, sess.ID)
-	slog.Debug("Destroyed session", "session_id", sess.ID)
+	slog.Debug("Destroyed session", "user_id", sess.UserID)
 }
 
 func (m *SessionManager) deleteExpired(now time.Time) {
@@ -195,37 +195,9 @@ func (m *SessionManager) deleteExpired(now time.Time) {
 	for _, item := range m.store {
 		if item.ExpiresAt.Before(now) {
 			delete(m.store, item.ID)
-			slog.Debug("Deleted expired session", "session_id", item.ID)
+			slog.Debug("Deleted expired session", "user_id", item.UserID)
 		}
 	}
-}
-
-func RunSessionGC(ctx context.Context) error {
-	return defaultSessionManager.RunGC(ctx)
-}
-
-func StartSessionGC(ctx context.Context) {
-	defaultSessionManager.StartGC(ctx)
-}
-
-func GetSession(sid string) (*Session, bool) {
-	return defaultSessionManager.Get(sid)
-}
-
-func CreateSession(userID int64) *Session {
-	return defaultSessionManager.Create(userID)
-}
-
-func DestroySessionsForUserExcept(userID int64, keepSessionID string) int {
-	return defaultSessionManager.DestroySessionsForUserExcept(userID, keepSessionID)
-}
-
-func SessionFromRequest(r *http.Request) (sess *Session, ok bool) {
-	return defaultSessionManager.SessionFromRequest(r)
-}
-
-func (s *Session) BuildSessionCookie() *http.Cookie {
-	return s.BuildSessionCookieWithSecure(false)
 }
 
 func (s *Session) BuildSessionCookieWithSecure(secure bool) *http.Cookie {

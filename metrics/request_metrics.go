@@ -17,6 +17,7 @@ type requestMetrics struct {
 	CoalescedCacheHits          atomics.Int64 `json:"coalesced_cache_hits"`
 	CoalescedCacheRevalidations atomics.Int64 `json:"coalesced_cache_revalidations"`
 	CoalescedCacheMisses        atomics.Int64 `json:"coalesced_cache_misses"`
+	CoalescedCacheStales        atomics.Int64 `json:"coalesced_cache_stales"`
 	StatusOKResponses           atomics.Int64 `json:"status_ok_responses"`
 	StatusClientErrorResponses  atomics.Int64 `json:"status_client_error_responses"`
 	StatusServerErrorResponses  atomics.Int64 `json:"status_server_error_responses"`
@@ -38,6 +39,7 @@ func NewRequestMetrics() requestMetrics {
 		CoalescedCacheHits:          atomics.NewInt64(0),
 		CoalescedCacheRevalidations: atomics.NewInt64(0),
 		CoalescedCacheMisses:        atomics.NewInt64(0),
+		CoalescedCacheStales:        atomics.NewInt64(0),
 		StatusOKResponses:           atomics.NewInt64(0),
 		StatusClientErrorResponses:  atomics.NewInt64(0),
 		StatusServerErrorResponses:  atomics.NewInt64(0),

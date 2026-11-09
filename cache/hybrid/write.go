@@ -59,18 +59,13 @@ func (c *Cache[MetadataT]) cacheBufferedInFileReplacingMemory(key cache.CacheKey
 }
 
 func (c *Cache[MetadataT]) cacheStreamInFileReplacingMemory(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	var fileEntry *cache.Entry[MetadataT]
-	err := c.memory.DeleteAfter(key, func() error {
-		var cacheErr error
-		fileEntry, cacheErr = c.file.Cache(key, data, expires, metadata)
-		return cacheErr
-	})
-	if err != nil && !errors.Is(err, cache.ErrCacheEntryNotFound) {
+	fileEntry, err := c.file.Cache(key, data, expires, metadata)
+	if err != nil {
 		return nil, err
 	}
 
-	if fileEntry == nil {
-		return nil, cache.ErrCacheEntryNotFound
+	if err := c.memory.Delete(key); err != nil && !errors.Is(err, cache.ErrCacheEntryNotFound) {
+		slog.Debug("Failed to remove memory cache entry after file placement", "key", key.Hex, "error", err)
 	}
 	if fileEntry.Data != nil {
 		fileEntry.Data = &closeHookEntryData{
@@ -111,50 +106,4 @@ func (c *Cache[MetadataT]) cacheBuffered(key cache.CacheKey, data []byte, expire
 		entry:     entry,
 		placement: placementFileReplacingMemory,
 	}, nil
-}
-
-func (c *Cache[MetadataT]) cacheUnknownSize(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	dataBytes, spillReader, spilled, err := readUntilSpillThreshold(data, c.memoryBufferLimitForUnknownSize(key))
-	if err != nil {
-		c.recordCacheError()
-		return nil, err
-	}
-
-	if spilled {
-		entry, err := c.cacheStreamInFileReplacingMemory(key, spillReader, expires, metadata)
-		if err != nil {
-			c.recordCacheError()
-			return nil, err
-		}
-		return entry, nil
-	}
-
-	result, err := c.cacheBuffered(key, dataBytes, expires, metadata)
-	if err != nil {
-		return nil, err
-	}
-	return result.entryForCaller(), nil
-}
-
-func (c *Cache[MetadataT]) cacheKnownSize(key cache.CacheKey, data io.Reader, size int64, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	if c.shouldStreamToFile(key, size) {
-		entry, err := c.cacheStreamInFileReplacingMemory(key, data, expires, metadata)
-		if err != nil {
-			c.recordCacheError()
-			return nil, err
-		}
-		return entry, nil
-	}
-
-	dataBytes, err := cache.ReadAllCacheBytes(data, c.memoryLimit())
-	if err != nil {
-		c.recordCacheError()
-		return nil, err
-	}
-
-	result, err := c.cacheBuffered(key, dataBytes, expires, metadata)
-	if err != nil {
-		return nil, err
-	}
-	return result.entryForCaller(), nil
 }

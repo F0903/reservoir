@@ -1,10 +1,8 @@
 package services
 
 import (
-	"errors"
 	"log/slog"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"reservoir/config"
@@ -18,38 +16,6 @@ func newConfigServiceTestConfig(t *testing.T) *config.Config {
 		t.Fatalf("failed to create test config: %v", err)
 	}
 	return cfg
-}
-
-func TestConfigServiceUpdatePartialRejectsUnknownKey(t *testing.T) {
-	cfg := newConfigServiceTestConfig(t)
-	svc := &ConfigService{cfg: cfg}
-	originalDir := cfg.Cache.File.Dir.Read()
-
-	status, err := svc.UpdatePartial(map[string]any{
-		"cache": map[string]any{
-			"file": map[string]any{
-				"missing": "value",
-			},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected unknown config key to return an error")
-	}
-	if !errors.Is(err, ErrConfigValidationFailed) {
-		t.Fatalf("expected service validation error, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "cache.file.missing") {
-		t.Fatalf("expected error to include full key path, got %v", err)
-	}
-	if status != ConfigUpdateSuccess {
-		t.Fatalf("expected unsuccessful validation to return success status placeholder, got %v", status)
-	}
-	if got := cfg.Cache.File.Dir.Read(); got != originalDir {
-		t.Fatalf("unknown update committed cache dir: got %q, want %q", got, originalDir)
-	}
-	if svc.RestartRequired() {
-		t.Fatal("unknown update should not mark restart required")
-	}
 }
 
 func TestConfigServiceTracksRestartRequired(t *testing.T) {

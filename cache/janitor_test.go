@@ -2,6 +2,7 @@ package cache
 
 import (
 	"reservoir/config"
+	"reservoir/metrics"
 	"sync"
 	"testing"
 	"time"
@@ -106,7 +107,7 @@ func (b *janitorTestBackend) janitorFunctions() JanitorFunctions[janitorTestMeta
 func newTestJanitor(t *testing.T, backend *janitorTestBackend) *Janitor[janitorTestMeta] {
 	t.Helper()
 
-	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, nil)
+	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, false, nil)
 	t.Cleanup(j.subs.UnsubscribeAll)
 	return j
 }
@@ -119,7 +120,12 @@ func TestJanitor_CleansExpiredEntries(t *testing.T) {
 	backend.put(expiredKey, 400, now.Add(-time.Second), now)
 	backend.put(freshKey, 600, now.Add(time.Hour), now)
 
-	newTestJanitor(t, backend).cleanExpiredEntries()
+	m := metrics.NewMetrics()
+	m.Cache.BytesCached.Set(5000) // The total across both hybrid tiers.
+	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, false, m)
+	t.Cleanup(j.subs.UnsubscribeAll)
+
+	j.cleanExpiredEntries()
 
 	if backend.has(expiredKey) {
 		t.Fatal("expected expired entry to be removed")
@@ -129,6 +135,12 @@ func TestJanitor_CleansExpiredEntries(t *testing.T) {
 	}
 	if got := backend.cachedBytes(); got != 600 {
 		t.Fatalf("expected cached bytes to be 600 after cleanup, got %d", got)
+	}
+	if got := m.Cache.BytesCleaned.Get(); got != 400 {
+		t.Fatalf("expected 400 bytes cleaned, got %d", got)
+	}
+	if got := m.Cache.BytesCached.Get(); got != 5000 {
+		t.Fatalf("expected the hybrid total to be untouched, got %d", got)
 	}
 }
 

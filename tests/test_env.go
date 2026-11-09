@@ -64,6 +64,11 @@ func (e *TestEnv) Start() {
 	}
 }
 
+// newTestUpstreamClient reaches loopback test servers, which the proxy's default client refuses.
+func newTestUpstreamClient() *http.Client {
+	return &http.Client{Transport: &http.Transport{DisableCompression: true}}
+}
+
 func SetupTestEnv(t testing.TB) *TestEnv {
 	cacheDir := t.TempDir()
 
@@ -77,7 +82,7 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 
 	// Setup Config Defaults for Tests
 	cfg := config.NewDefault()
-	cfg.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	cfg.Proxy.UpgradeHttpToHttps.Overwrite(false)
 	cfg.Cache.File.Dir.Overwrite(cacheDir)
 	cfg.Proxy.RetryOnRange416.Overwrite(false)
 	cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
@@ -100,8 +105,9 @@ func SetupTestEnv(t testing.TB) *TestEnv {
 		t.Fatalf("Failed to create proxy cache: %v", err)
 	}
 	p, err := proxy.NewProxy(cfg, &FakeCA{}, proxy.Dependencies{
-		Cache:   cacheStore,
-		Metrics: runtimeMetrics,
+		Cache:          cacheStore,
+		Metrics:        runtimeMetrics,
+		UpstreamClient: newTestUpstreamClient(),
 	})
 	if err != nil {
 		cacheStore.Destroy()
@@ -219,7 +225,7 @@ func SetupHttpsTestEnv(t testing.TB) *TestEnv {
 	upstreamClient := &http.Client{Transport: upstreamTransport}
 
 	cfg := config.NewDefault()
-	cfg.Proxy.UpstreamDefaultHttps.Overwrite(true)
+	cfg.Proxy.UpgradeHttpToHttps.Overwrite(true)
 	cfg.Cache.File.Dir.Overwrite(cacheDir)
 	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
 	cfg.Cache.LockShards.Overwrite(32)

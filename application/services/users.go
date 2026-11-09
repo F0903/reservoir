@@ -57,45 +57,30 @@ func (s *UserService) UpdateManagedUser(req RequestContext, id int64, update Use
 		return nil, ErrUserStoreUnavailable
 	}
 
-	user, err := s.users.GetByID(id)
-	if err != nil {
-		return nil, err
+	changes := stores.UserChanges{
+		Username:               update.Username,
+		IsAdmin:                update.IsAdmin,
+		PasswordChangeRequired: update.PasswordChangeRequired,
 	}
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-
-	if update.Username != nil {
-		user, err = s.users.UpdateUsername(id, *update.Username)
-		if err != nil {
-			return nil, mapUserStoreError(err)
-		}
-	}
-
-	if update.IsAdmin != nil {
-		user, err = s.users.UpdateAdmin(id, *update.IsAdmin)
-		if err != nil {
-			return nil, mapUserStoreError(err)
-		}
-	}
-
 	if update.Password != nil {
 		if err := validateManagedPassword(*update.Password); err != nil {
 			return nil, err
 		}
 
-		user, err = s.users.UpdatePassword(
-			id,
-			*phc.GenerateArgon2id(*update.Password),
-			boolOrDefault(update.PasswordChangeRequired, true),
-		)
-		if err != nil {
-			return nil, mapUserStoreError(err)
-		}
-
-		s.destroySessionsForUser(req, id, true)
+		// Hashed here so the slow work stays outside the database transaction.
+		changes.PasswordHash = phc.GenerateArgon2id(*update.Password)
+		required := boolOrDefault(update.PasswordChangeRequired, true)
+		changes.PasswordChangeRequired = &required
 	}
 
+	user, err := s.users.Update(id, changes)
+	if err != nil {
+		return nil, mapUserStoreError(err)
+	}
+
+	if update.Password != nil {
+		s.destroySessionsForUser(req, id, true)
+	}
 	return user, nil
 }
 

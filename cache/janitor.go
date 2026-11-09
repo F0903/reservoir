@@ -30,18 +30,20 @@ type Janitor[MetadataT any] struct {
 
 	functions             JanitorFunctions[MetadataT]
 	trackAggregateMetrics bool
+	countCleanupRuns      bool
 	metrics               *metrics.Metrics
 	subs                  config.ConfigSubscriber
 	cfg                   *config.Config
 }
 
-func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions JanitorFunctions[MetadataT], trackAggregateMetrics bool, m *metrics.Metrics) *Janitor[MetadataT] {
+func NewJanitor[MetadataT any](cfg *config.Config, interval time.Duration, functions JanitorFunctions[MetadataT], trackAggregateMetrics bool, countCleanupRuns bool, m *metrics.Metrics) *Janitor[MetadataT] {
 	j := &Janitor[MetadataT]{
 		stopChan:              make(chan struct{}),
 		intervalChanged:       make(chan time.Duration, 1),
 		interval:              interval,
 		functions:             functions,
 		trackAggregateMetrics: trackAggregateMetrics,
+		countCleanupRuns:      countCleanupRuns,
 		metrics:               metrics.Ensure(m),
 		cfg:                   cfg,
 	}
@@ -89,7 +91,7 @@ func (j *Janitor[MetadataT]) Start(ctx context.Context) {
 				slog.Info("Running cache cleanup cycle...")
 				j.cleanExpiredEntries()
 				j.ensureCacheSize()
-				if j.trackAggregateMetrics {
+				if j.countCleanupRuns {
 					j.metrics.Cache.CleanupRuns.Increment()
 				}
 				slog.Info("Cache cleanup cycle complete")
@@ -158,10 +160,7 @@ func (j *Janitor[MetadataT]) cleanExpiredEntries() {
 	}
 
 	endCacheSize := j.functions.Size()
-	if j.trackAggregateMetrics {
-		j.metrics.Cache.BytesCached.Set(endCacheSize)
-		j.metrics.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
-	}
+	j.recordBytesCleaned(startCacheSize, endCacheSize)
 
 	slog.Info("Cache cleanup complete", "new_size", endCacheSize)
 }
@@ -227,12 +226,18 @@ func (j *Janitor[MetadataT]) Evict(maxCacheBytes int64) {
 	}
 
 	endCacheSize := j.functions.Size()
-	if j.trackAggregateMetrics {
-		j.metrics.Cache.BytesCached.Set(endCacheSize)
-		j.metrics.Cache.BytesCleaned.Add(startCacheSize - endCacheSize)
-	}
+	j.recordBytesCleaned(startCacheSize, endCacheSize)
 
 	slog.Info("Cache eviction complete", "evicted_entries", evictions, "new_size", endCacheSize)
+}
+
+func (j *Janitor[MetadataT]) recordBytesCleaned(startCacheSize int64, endCacheSize int64) {
+	// A tier only knows its own size, so setting this would overwrite the hybrid total.
+	if j.trackAggregateMetrics {
+		j.metrics.Cache.BytesCached.Set(endCacheSize)
+	}
+	// Writes landing during the cleanup can make the size grow, and a running total must not shrink.
+	j.metrics.Cache.BytesCleaned.Add(max(startCacheSize-endCacheSize, 0))
 }
 
 func (j *Janitor[MetadataT]) ensureCacheSize() {

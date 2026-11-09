@@ -31,6 +31,10 @@ func newTestUserStore(t *testing.T) *UserStore {
 	return store
 }
 
+func adminChange(isAdmin bool) UserChanges {
+	return UserChanges{IsAdmin: &isAdmin}
+}
+
 func testUser(username string) *models.User {
 	return &models.User{
 		Username:               username,
@@ -137,19 +141,6 @@ func TestListUsersOrdersByUsername(t *testing.T) {
 	}
 }
 
-func TestUpdateAdminRejectsDemotingLastAdmin(t *testing.T) {
-	store := newTestUserStore(t)
-	admin, err := store.Create(testUser("admin"))
-	if err != nil {
-		t.Fatalf("failed to create admin: %v", err)
-	}
-
-	_, err = store.UpdateAdmin(admin.ID, false)
-	if !errors.Is(err, ErrLastAdmin) {
-		t.Fatalf("expected ErrLastAdmin, got %v", err)
-	}
-}
-
 func TestUpdateAdminConcurrentDemotionsKeepOneAdmin(t *testing.T) {
 	store := newTestUserStore(t)
 	first, err := store.Create(testUser("first"))
@@ -163,48 +154,17 @@ func TestUpdateAdminConcurrentDemotionsKeepOneAdmin(t *testing.T) {
 
 	errs := runConcurrently(
 		func() error {
-			_, err := store.UpdateAdmin(first.ID, false)
+			_, err := store.Update(first.ID, adminChange(false))
 			return err
 		},
 		func() error {
-			_, err := store.UpdateAdmin(second.ID, false)
+			_, err := store.Update(second.ID, adminChange(false))
 			return err
 		},
 	)
 
 	assertOneSuccessOneLastAdmin(t, errs)
 	assertAdminCount(t, store, 1)
-}
-
-func TestUpdateAdminAllowsMultipleAdmins(t *testing.T) {
-	store := newTestUserStore(t)
-	admin, err := store.Create(testUser("admin"))
-	if err != nil {
-		t.Fatalf("failed to create admin: %v", err)
-	}
-	secondAdmin, err := store.Create(testUser("second"))
-	if err != nil {
-		t.Fatalf("failed to create second admin: %v", err)
-	}
-
-	updated, err := store.UpdateAdmin(secondAdmin.ID, false)
-	if err != nil {
-		t.Fatalf("failed to demote second admin: %v", err)
-	}
-	if updated.IsAdmin {
-		t.Fatal("expected second user to be demoted")
-	}
-
-	admins, err := store.CountAdmins()
-	if err != nil {
-		t.Fatalf("failed to count admins: %v", err)
-	}
-	if admins != 1 {
-		t.Fatalf("expected one admin after demotion, got %d", admins)
-	}
-	if _, err := store.GetByID(admin.ID); err != nil {
-		t.Fatalf("expected first admin to remain: %v", err)
-	}
 }
 
 func TestSaveRejectsDemotingLastAdmin(t *testing.T) {
@@ -220,19 +180,6 @@ func TestSaveRejectsDemotingLastAdmin(t *testing.T) {
 		t.Fatalf("expected ErrLastAdmin, got %v", err)
 	}
 	assertAdminCount(t, store, 1)
-}
-
-func TestDeleteRejectsDeletingLastAdmin(t *testing.T) {
-	store := newTestUserStore(t)
-	admin, err := store.Create(testUser("admin"))
-	if err != nil {
-		t.Fatalf("failed to create admin: %v", err)
-	}
-
-	err = store.Delete(admin.ID)
-	if !errors.Is(err, ErrLastAdmin) {
-		t.Fatalf("expected ErrLastAdmin, got %v", err)
-	}
 }
 
 func TestDeleteConcurrentAdminsKeepsOneAdmin(t *testing.T) {
@@ -266,23 +213,43 @@ func TestDeleteConcurrentAdminsKeepsOneAdmin(t *testing.T) {
 	}
 }
 
-func TestUpdatePasswordSetsPasswordAndRequirement(t *testing.T) {
+func TestUpdateLeavesOtherFieldsAlone(t *testing.T) {
 	store := newTestUserStore(t)
 	user, err := store.Create(testUser("admin"))
 	if err != nil {
 		t.Fatalf("failed to create admin: %v", err)
 	}
 
-	hash := *phc.GenerateArgon2id("new-password")
-	updated, err := store.UpdatePassword(user.ID, hash, true)
+	required := true
+	updated, err := store.Update(user.ID, UserChanges{PasswordChangeRequired: &required})
 	if err != nil {
-		t.Fatalf("failed to update password: %v", err)
+		t.Fatalf("update failed: %v", err)
 	}
+
 	if !updated.PasswordChangeRequired {
-		t.Fatal("expected password change to be required")
+		t.Fatal("expected the flag to be set")
 	}
-	if !updated.PasswordHash.VerifyArgon2id("new-password") {
-		t.Fatal("expected updated password hash to verify")
+	if updated.Username != "admin" || !updated.IsAdmin || !updated.PasswordHash.VerifyArgon2id("test-password") {
+		t.Fatalf("other fields changed: username=%q admin=%v", updated.Username, updated.IsAdmin)
+	}
+}
+
+func TestUpdateWithNoChangesDoesNotWrite(t *testing.T) {
+	store := newTestUserStore(t)
+	user, err := store.Create(testUser("admin"))
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+	if _, err := store.db.ExecResult("UPDATE users SET updated_at = '2000-01-01 00:00:00' WHERE id = ?", user.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := store.Update(user.ID, UserChanges{})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	if updated.UpdatedAt.Year() != 2000 {
+		t.Fatalf("an empty update changed updated_at to %v", updated.UpdatedAt)
 	}
 }
 

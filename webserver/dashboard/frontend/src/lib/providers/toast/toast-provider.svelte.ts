@@ -81,18 +81,6 @@ export class ToastProvider {
         } as ToastProps);
     };
 
-    // Show a new action toast and return a handle to close it
-    action = (
-        message: string,
-        options: Omit<ToastProps & { type: "action" }, "type" | "message">,
-    ): ToastHandle => {
-        return this.show({
-            type: "action",
-            message,
-            ...options,
-        } as ToastProps);
-    };
-
     private closeToast = (id: string) => {
         const index = this.toasts.findIndex((t) => t.id === id);
         if (index !== -1) {

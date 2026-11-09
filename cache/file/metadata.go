@@ -25,6 +25,7 @@ func (c *Cache[MetadataT]) loadMetadataSidecars() {
 	files, err := os.ReadDir(c.rootDir.Path)
 	if err != nil {
 		slog.Error("Failed to read file cache directory", "path", c.rootDir.Path, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 		return
 	}
 
@@ -48,7 +49,17 @@ func (c *Cache[MetadataT]) loadMetadataSidecars() {
 	}
 
 	for _, file := range files {
-		if file.IsDir() || !isCacheDataFileName(file.Name()) {
+		if file.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(file.Name(), ".tmp") {
+			if err := removeIfExists(filepath.Join(c.rootDir.Path, file.Name())); err != nil {
+				slog.Error("Failed to remove leftover temporary cache file", "file", file.Name(), "error", err)
+				c.metrics.Cache.CacheErrors.Increment()
+			}
+			continue
+		}
+		if !isCacheDataFileName(file.Name()) {
 			continue
 		}
 		if _, ok := loaded[file.Name()]; ok {
@@ -56,6 +67,7 @@ func (c *Cache[MetadataT]) loadMetadataSidecars() {
 		}
 		if err := removeIfExists(filepath.Join(c.rootDir.Path, file.Name())); err != nil {
 			slog.Error("Failed to remove orphaned cache data file", "file", file.Name(), "error", err)
+			c.metrics.Cache.CacheErrors.Increment()
 		}
 	}
 }
@@ -67,6 +79,7 @@ func (c *Cache[MetadataT]) loadMetadataSidecar(key cache.CacheKey, now time.Time
 	metaBytes, err := os.ReadFile(metaPath)
 	if err != nil {
 		slog.Error("Failed to read cache metadata sidecar", "key", key.Hex, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 		_ = removeIfExists(dataPath)
 		_ = removeIfExists(metaPath)
 		return false
@@ -75,19 +88,20 @@ func (c *Cache[MetadataT]) loadMetadataSidecar(key cache.CacheKey, now time.Time
 	var meta cache.EntryMetadata[MetadataT]
 	if err := json.Unmarshal(metaBytes, &meta); err != nil {
 		slog.Error("Failed to decode cache metadata sidecar", "key", key.Hex, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 		_ = removeIfExists(dataPath)
 		_ = removeIfExists(metaPath)
 		return false
 	}
 
 	dataStat, err := os.Stat(dataPath)
-	if err != nil || dataStat.Size() == 0 || meta.Expires.Before(now) {
+	// A size mismatch means a crash separated the body from its metadata.
+	if err != nil || dataStat.Size() == 0 || dataStat.Size() != meta.Size || meta.Expires.Before(now) {
 		_ = removeIfExists(dataPath)
 		_ = removeIfExists(metaPath)
 		return false
 	}
 
-	meta.Size = dataStat.Size()
 	c.entriesMetadata[key] = &meta
 	cache.AddCacheSize(c.metrics, &c.byteSize, meta.Size)
 	cache.IncrementCacheEntries(c.metrics)
@@ -98,12 +112,14 @@ func (c *Cache[MetadataT]) writeMetadataSidecar(key cache.CacheKey, meta *cache.
 	metaFile, err := os.Create(c.metadataPath(key))
 	if err != nil {
 		slog.Error("Failed to create cache metadata sidecar", "key", key.Hex, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 		return
 	}
 	defer metaFile.Close()
 
 	if err := json.NewEncoder(metaFile).Encode(meta); err != nil {
 		slog.Error("Failed to write cache metadata sidecar", "key", key.Hex, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 	}
 }
 

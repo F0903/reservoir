@@ -20,11 +20,6 @@ func (ws *WebServer) Register(s Servable) error {
 	return s.RegisterHandlers(ws.mux)
 }
 
-func (ws *WebServer) Listen(address string, errChan chan error, ctx context.Context) {
-	listener := httplistener.New(address, middleware.Harden(ws.mux))
-	listener.ListenWithCancel(errChan, ctx)
-}
-
 func (ws *WebServer) Run(address string, ctx context.Context) error {
 	listener := httplistener.New(address, middleware.Harden(ws.mux))
 	return listener.Run(ctx)

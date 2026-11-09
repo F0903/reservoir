@@ -161,6 +161,17 @@ export function createSettingsSections(
             [
                 {
                     InputComponent: TextInput,
+                    get: () => webserverConfig().trusted_proxies,
+                    commit: commit("webserver.trusted_proxies"),
+                    label: "Trusted Proxies",
+                    pattern: optionalStringPattern,
+                    tooltip:
+                        "Comma-separated IPs or CIDR ranges of reverse proxies in front of the web server.",
+                },
+            ],
+            [
+                {
+                    InputComponent: TextInput,
                     get: () => proxyConfig().ca_cert,
                     commit: commit("proxy.ca_cert"),
                     label: "CA Certificate Path",
@@ -177,9 +188,9 @@ export function createSettingsSections(
             [
                 {
                     InputComponent: Toggle,
-                    get: () => proxyConfig().upstream_default_https,
-                    commit: commit("proxy.upstream_default_https"),
-                    label: "Upstream Default HTTPS",
+                    get: () => proxyConfig().upgrade_http_to_https,
+                    commit: commit("proxy.upgrade_http_to_https"),
+                    label: "Upgrade HTTP to HTTPS",
                 },
                 {
                     InputComponent: Toggle,

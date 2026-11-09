@@ -40,6 +40,8 @@ func TestParseRange(t *testing.T) {
 		{name: "open-ended", rangeStr: "bytes=500-", size: size, start: 500, end: size - 1, wantErr: nil},
 		{name: "suffix", rangeStr: "bytes=-500", size: size, start: size - 500, end: size - 1, wantErr: nil},
 		{name: "last-byte", rangeStr: "bytes=999-999", size: size, start: 999, end: 999, wantErr: nil},
+		{name: "end-eq-size-trimmed", rangeStr: "bytes=0-1000", size: size, start: 0, end: size - 1, wantErr: nil},
+		{name: "suffix-too-large-is-whole-file", rangeStr: "bytes=-2000", size: size, start: 0, end: size - 1, wantErr: nil},
 		{name: "spaced-numbers", rangeStr: "bytes= 999 - 999 ", size: size, start: 999, end: 999, wantErr: nil},
 
 		// Invalid unit/format/value
@@ -59,9 +61,17 @@ func TestParseRange(t *testing.T) {
 		// Out of bounds
 		{name: "start-gt-end", rangeStr: "bytes=10-5", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "start-eq-size", rangeStr: "bytes=1000-1000", size: size, wantErr: ErrRangeValueOutOfBounds},
-		{name: "end-eq-size", rangeStr: "bytes=0-1000", size: size, wantErr: ErrRangeValueOutOfBounds},
-		{name: "suffix-too-large", rangeStr: "bytes=-2000", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "empty-file", rangeStr: "bytes=0-0", size: 0, wantErr: ErrRangeValueOutOfBounds},
+
+		// Trimming against a 36-byte file
+		{name: "inside-the-file", rangeStr: "bytes=2-5", size: 36, start: 2, end: 5, wantErr: nil},
+		{name: "end-past-the-file", rangeStr: "bytes=30-100", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "open-ended-near-the-end", rangeStr: "bytes=30-", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "suffix-longer-than-the-file", rangeStr: "bytes=-100", size: 36, start: 0, end: 35, wantErr: nil},
+		{name: "suffix-inside-the-file", rangeStr: "bytes=-6", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "start-past-the-file", rangeStr: "bytes=36-40", size: 36, wantErr: ErrRangeValueOutOfBounds},
+		{name: "empty-suffix", rangeStr: "bytes=-0", size: 36, wantErr: ErrRangeValueOutOfBounds},
+		{name: "reversed", rangeStr: "bytes=5-2", size: 36, wantErr: ErrRangeValueOutOfBounds},
 	}
 
 	for _, tt := range tests {

@@ -24,14 +24,6 @@ export function formatBytesToLargest(bytes: number, decimals = 2): string {
     return parseFloat((bytes / Math.pow(base, i)).toFixed(dm)) + unitLabels[i];
 }
 
-// Format bytes into human-readable string using a fixed unit
-export function formatBytes(bytes: number, unit: keyof typeof ByteUnits, decimals = 2): string {
-    if (bytes === 0) return "0" + unitLabels[0];
-
-    const dm = decimals < 0 ? 0 : decimals;
-    return parseFloat((bytes / ByteUnits[unit]).toFixed(dm)) + unit;
-}
-
 export function parseByteString(s: string): number {
     const unitRe = /^(\d+)([BKMGT])$/i;
 

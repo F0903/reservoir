@@ -15,6 +15,7 @@ export type RequestMetrics = {
     coalesced_cache_hits: number;
     coalesced_cache_revalidations: number;
     coalesced_cache_misses: number;
+    coalesced_cache_stales: number;
     status_ok_responses: number;
     status_client_error_responses: number;
     status_server_error_responses: number;

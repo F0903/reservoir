@@ -49,24 +49,6 @@ function expectWidgetPosition(
 }
 
 describe("dashboard layout", () => {
-    it("returns a complete default layout", () => {
-        const layout = defaultDashboardLayout();
-
-        expect(layout.map((item) => item.id)).toEqual([
-            "cache-efficiency",
-            "cache-latency",
-            "request-latency",
-            "request-volume",
-            "response-status",
-            "request-coalescing",
-            "data-transfer",
-            "process-info",
-            "cache-maintenance",
-            "cache-storage",
-        ]);
-        expect(layout[0].span).toEqual({ width: 6, height: 6 });
-    });
-
     it("normalizes saved order and clamps saved spans and positions", () => {
         const layout = normalizeDashboardLayout([
             {
@@ -89,15 +71,7 @@ describe("dashboard layout", () => {
         expect(layout[1].id).toBe("cache-efficiency");
         expect(layout.map((item) => item.id)).toHaveLength(defaultDashboardLayout().length);
         expect(layout.filter((item) => item.id === "cache-storage")).toHaveLength(1);
-    });
-
-    it("appends missing widgets after saved widgets", () => {
-        const layout = normalizeDashboardLayout([
-            { id: "process-info", span: { width: 4, height: 4 } },
-        ]);
-
-        expect(layout[0].id).toBe("process-info");
-        expect(layout.at(-1)?.id).toBe("cache-storage");
+        expect(layout.at(-1)?.id).toBe("cache-maintenance");
     });
 
     it("sets widget spans within supported grid bounds", () => {

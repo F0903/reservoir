@@ -83,3 +83,17 @@ func (sm *SyncMap[K, V]) Set(key K, value V) {
 
 	sm.ma[key] = value
 }
+
+func (sm *SyncMap[K, V]) Len() int {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	return len(sm.ma)
+}
+
+func (sm *SyncMap[K, V]) Clear() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	clear(sm.ma)
+}

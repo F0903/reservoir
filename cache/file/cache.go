@@ -77,7 +77,7 @@ func newWithAggregateMetrics[MetadataT any](cfg *config.Config, m *metrics.Metri
 		Lock: func(key cache.CacheKey) *sync.RWMutex {
 			return cache.GetLock(c.locks, key)
 		},
-	}, trackAggregateMetrics, m)
+	}, trackAggregateMetrics, true, m) // Always counts runs: in a hybrid cache this is the tier that does, so each cycle counts once.
 	if c.byteSize.Get() >= c.maxCacheSize.Get() {
 		c.janitor.Evict(c.maxCacheSize.Get())
 	}

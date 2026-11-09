@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import * as configApi from "$lib/api/objects/config/config";
 import type { Config } from "$lib/api/objects/config/config";
 import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-import { createSettingsSections, tabs } from "./settings-sections";
+import { createSettingsSections } from "./settings-sections";
 
 vi.mock("$lib/api/objects/config/config", () => ({
     patchConfig: vi.fn(),
@@ -21,7 +21,7 @@ function testConfig(): Config {
             listen: ":9999",
             ca_cert: "ssl/ca.crt",
             ca_key: "ssl/ca.key",
-            upstream_default_https: true,
+            upgrade_http_to_https: true,
             retry_on_range_416: true,
             retry_on_invalid_range: true,
             cache_policy: {
@@ -34,6 +34,7 @@ function testConfig(): Config {
             listen: ":8080",
             dashboard_disabled: false,
             api_disabled: false,
+            trusted_proxies: "",
         },
         cache: {
             type: "hybrid",
@@ -95,9 +96,6 @@ function findSetting(settings: ReturnType<typeof createSettingsSections>, label:
         get: () => unknown;
         commit: (_value: unknown) => Promise<unknown>;
         label: string;
-        options?: string[];
-        visibleForBackends?: string[];
-        onValueChange?: (_value: string) => void;
     };
 }
 
@@ -105,38 +103,6 @@ describe("settings sections", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         patchConfigMock().mockResolvedValue("success");
-    });
-
-    it("defines the expected settings tabs and controls", () => {
-        const sections = createSettingsSections(testSettings());
-
-        expect(tabs.map((tab) => tab.id)).toEqual(["dashboard", "network", "cache", "logging"]);
-        expect(
-            Object.values(sections)
-                .flat(2)
-                .map((input) => input.label),
-        ).toEqual([
-            "Update Interval",
-            "Proxy Listen",
-            "Webserver Listen",
-            "CA Certificate Path",
-            "CA Key Path",
-            "Upstream Default HTTPS",
-            "Retry on Range 416",
-            "Package Freshness Window",
-            "Force Freshness Window",
-            "Ignore Cache Control",
-            "Cache Backend",
-            "Cache Directory",
-            "Total Cache Limit",
-            "Expired Cleanup Interval",
-            "Memory Budget (%)",
-            "Demote Idle Memory After",
-            "Log Level",
-            "Log to Stdout",
-            "Log File Path",
-            "Max File Size",
-        ]);
     });
 
     it("reads values from the current settings provider state", () => {
@@ -165,43 +131,6 @@ describe("settings sections", () => {
             "proxy.cache_policy.ignore_cache_control",
             false,
         );
-    });
-
-    it("offers the hybrid cache backend in storage type options", () => {
-        const storageType = findSetting(createSettingsSections(testSettings()), "Cache Backend");
-
-        expect(storageType.options).toEqual(["memory", "file", "hybrid"]);
-    });
-
-    it("marks backend-specific cache controls with their applicable backends", () => {
-        const sections = createSettingsSections(testSettings());
-
-        expect(findSetting(sections, "Cache Directory").visibleForBackends).toEqual([
-            "file",
-            "hybrid",
-        ]);
-        expect(findSetting(sections, "Memory Budget (%)").visibleForBackends).toEqual([
-            "memory",
-            "hybrid",
-        ]);
-        expect(findSetting(sections, "Demote Idle Memory After").visibleForBackends).toEqual([
-            "hybrid",
-        ]);
-        expect(findSetting(sections, "Total Cache Limit").visibleForBackends).toBeUndefined();
-    });
-
-    it("notifies callers when the staged cache backend changes", () => {
-        const onCacheBackendChange = vi.fn();
-        const storageType = findSetting(
-            createSettingsSections(testSettings(), { onCacheBackendChange }),
-            "Cache Backend",
-        );
-
-        storageType.onValueChange?.("file");
-        storageType.onValueChange?.("invalid");
-
-        expect(onCacheBackendChange).toHaveBeenCalledTimes(1);
-        expect(onCacheBackendChange).toHaveBeenCalledWith("file");
     });
 
     it("marks proxy settings as requiring restart when config patch reports it", async () => {

@@ -22,25 +22,14 @@ describe("DashboardLayoutToolbar", () => {
         expect(onRefresh).toHaveBeenCalledOnce();
     });
 
-    it("disables dashboard refresh while metrics are loading", () => {
+    it.each([
+        { reason: "metrics are loading", editing: false, refreshing: true },
+        { reason: "editing the layout", editing: true, refreshing: false },
+    ])("disables dashboard refresh while $reason", ({ editing, refreshing }) => {
         render(DashboardLayoutToolbar, {
             props: {
-                editing: false,
-                refreshing: true,
-                onEdit: noop,
-                onRefresh: noop,
-                onReset: noop,
-                onSave: noop,
-            },
-        });
-
-        expect(screen.getByRole("button", { name: "Refresh dashboard metrics" })).toBeDisabled();
-    });
-
-    it("disables dashboard refresh while editing the layout", () => {
-        render(DashboardLayoutToolbar, {
-            props: {
-                editing: true,
+                editing,
+                refreshing,
                 onEdit: noop,
                 onRefresh: noop,
                 onReset: noop,

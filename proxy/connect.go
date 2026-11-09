@@ -8,7 +8,15 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"reservoir/proxy/responder"
+	"time"
+)
+
+const (
+	defaultTunnelHandshakeTimeout = 10 * time.Second
+	defaultTunnelIdleTimeout      = 2 * time.Minute
+	defaultClientWriteTimeout     = 60 * time.Second // How long a client may accept no data before it is dropped.
 )
 
 func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) error {
@@ -18,7 +26,7 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 
 	clientConn, _, err := r.Hijack()
 	if err != nil {
-		r.WriteError("Unable to take over socket.", http.StatusInternalServerError)
+		p.writeError(r, "Unable to take over socket.", http.StatusInternalServerError)
 		return err
 	}
 	defer clientConn.Close() // Ensure we always close the hijacked connection
@@ -29,7 +37,7 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 	if err != nil {
 		// can't use http.Error after hijacking, so we write directly
 		slog.Error("Error getting TLS certificate", "host", proxyReq.Host, "error", err)
-		intermediateResponder.WriteError("Error getting TLS certificate", http.StatusInternalServerError)
+		p.writeError(intermediateResponder, "Error getting TLS certificate", http.StatusInternalServerError)
 		return fmt.Errorf("%w: %v", ErrTLSCertFailed, err)
 	}
 
@@ -51,6 +59,7 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 	tlsConn := tls.Server(clientConn, tlsConfig)
 	defer tlsConn.Close()
 
+	tlsConn.SetDeadline(time.Now().Add(p.tunnelHandshakeTimeout))
 	if err := tlsConn.Handshake(); err != nil {
 		slog.Error("TLS handshake failed in CONNECT tunnel", "host", proxyReq.Host, "error", err)
 		return err
@@ -59,26 +68,31 @@ func (p *Proxy) handleCONNECT(r responder.Responder, proxyReq *http.Request) err
 	// Create a buffered reader for the client connection. This is required to
 	// use http package functions with this connection.
 	connReader := bufio.NewReader(tlsConn)
-	responder := responder.NewRawHTTPResponder(tlsConn)
+	responder := responder.NewRawHTTPResponder(responder.NewStallWriter(tlsConn, tlsConn.SetWriteDeadline, p.clientWriteTimeout))
 
 	slog.Debug("Entering request loop for CONNECT tunnel", "host", proxyReq.Host)
 	for {
 		// Read next HTTP request from client.
+		tlsConn.SetDeadline(time.Now().Add(p.tunnelIdleTimeout))
 		req, err := http.ReadRequest(connReader)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				slog.Debug("Client closed connection in CONNECT tunnel", "host", proxyReq.Host)
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrDeadlineExceeded) {
+				slog.Debug("Client closed or abandoned connection in CONNECT tunnel", "host", proxyReq.Host)
 			} else {
 				slog.Error("Error reading request from client in CONNECT tunnel", "host", proxyReq.Host, "error", err)
 			}
 			break
 		}
+		// The deadline only covers waiting for a request; a download may take much longer.
+		tlsConn.SetDeadline(time.Time{})
 
 		tlsState := tlsConn.ConnectionState()
 		req.TLS = &tlsState
-		req.Close = true
+		responder.SetRequest(req)
 		if err := p.handleHTTP(responder, req); err != nil {
 			slog.Error("Error processing HTTP request in CONNECT tunnel", "host", proxyReq.Host, "error", err)
+			// The response may be incomplete, so the client can only recover on a new connection.
+			break
 		}
 	}
 

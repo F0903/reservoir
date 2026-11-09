@@ -2,18 +2,20 @@ package httplistener
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
 const (
-	readHeaderTimeout = 10 * time.Second
-	idleTimeout       = 2 * time.Minute
-	shutdownTimeout   = 30 * time.Second
+	readHeaderTimeout      = 10 * time.Second
+	idleTimeout            = 2 * time.Minute
+	defaultShutdownTimeout = 30 * time.Second
 )
 
 type HTTPListener struct {
-	server *http.Server
+	server          *http.Server
+	shutdownTimeout time.Duration
 }
 
 func New(address string, handler http.Handler) *HTTPListener {
@@ -24,11 +26,8 @@ func New(address string, handler http.Handler) *HTTPListener {
 			ReadHeaderTimeout: readHeaderTimeout,
 			IdleTimeout:       idleTimeout,
 		},
+		shutdownTimeout: defaultShutdownTimeout,
 	}
-}
-
-func (hl *HTTPListener) ListenBlocking() error {
-	return hl.server.ListenAndServe()
 }
 
 func (hl *HTTPListener) Run(ctx context.Context) error {
@@ -45,33 +44,15 @@ func (hl *HTTPListener) Run(ctx context.Context) error {
 	case err := <-errChan:
 		return err
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), hl.shutdownTimeout)
 		defer cancel()
 
 		if err := hl.server.Shutdown(shutdownCtx); err != nil {
-			return err
+			slog.Warn("Graceful shutdown timed out, closing remaining connections", "address", hl.server.Addr, "error", err)
+			if err := hl.server.Close(); err != nil {
+				return err
+			}
 		}
 		return <-errChan
 	}
-}
-
-func (hl *HTTPListener) Listen(errChan chan error) {
-	go func() {
-		if err := hl.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errChan <- err
-		}
-	}()
-}
-
-func (hl *HTTPListener) ListenWithCancel(errChan chan error, ctx context.Context) {
-	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
-
-		if err := hl.server.Shutdown(shutdownCtx); err != nil {
-			errChan <- err
-		}
-	}()
-	hl.Listen(errChan)
 }

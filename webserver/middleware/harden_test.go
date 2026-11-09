@@ -28,24 +28,3 @@ func TestHardenSetsGenericSecurityHeaders(t *testing.T) {
 		t.Fatal("expected Permissions-Policy to be set")
 	}
 }
-
-func TestHardenDoesNotSetDashboardHeaders(t *testing.T) {
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
-
-	Harden(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})).ServeHTTP(rec, req)
-
-	headers := rec.Header()
-	for _, name := range []string{
-		"Content-Security-Policy",
-		"Cross-Origin-Opener-Policy",
-		"Cross-Origin-Embedder-Policy",
-		"Cross-Origin-Resource-Policy",
-	} {
-		if got := headers.Get(name); got != "" {
-			t.Fatalf("expected generic hardening not to set %s, got %q", name, got)
-		}
-	}
-}

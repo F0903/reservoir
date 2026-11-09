@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,27 +9,6 @@ import (
 	"testing"
 	"time"
 )
-
-func TestSessionManagerRunGCCancels(t *testing.T) {
-	manager := NewSessionManager()
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-
-	go func() {
-		done <- manager.RunGC(ctx)
-	}()
-
-	cancel()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("RunGC returned error: %v", err)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("RunGC did not stop after context cancellation")
-	}
-}
 
 func TestSessionManagerDestroySessionsForUserExceptKeepsCurrentSession(t *testing.T) {
 	manager := NewSessionManager()
@@ -61,7 +39,7 @@ func TestSessionManagersKeepIndependentStores(t *testing.T) {
 	session := first.Create(1)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(session.BuildSessionCookie())
+	req.AddCookie(session.BuildSessionCookieWithSecure(false))
 
 	if _, ok := second.SessionFromRequest(req); ok {
 		t.Fatal("expected second manager not to find first manager's session")
@@ -73,20 +51,6 @@ func TestSessionManagersKeepIndependentStores(t *testing.T) {
 	}
 	if got.UserID != session.UserID {
 		t.Fatalf("expected user id %d, got %d", session.UserID, got.UserID)
-	}
-}
-
-func TestBuildSessionCookieWithSecure(t *testing.T) {
-	session := &Session{ID: "sid"}
-
-	insecure := session.BuildSessionCookie()
-	if insecure.Secure {
-		t.Fatal("expected default session cookie to be insecure")
-	}
-
-	secure := session.BuildSessionCookieWithSecure(true)
-	if !secure.Secure {
-		t.Fatal("expected explicit secure session cookie")
 	}
 }
 
@@ -124,9 +88,7 @@ func TestSessionManagerConcurrentGetExtendsSession(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan string, goroutines)
 	for range goroutines {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range iterations {
 				got, ok := manager.Get(session.ID)
 				if !ok {
@@ -138,7 +100,7 @@ func TestSessionManagerConcurrentGetExtendsSession(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

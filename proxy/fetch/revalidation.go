@@ -45,6 +45,19 @@ func (f *Fetcher) serveStaleCachedResponse(req *http.Request, lookupKey cache.Ca
 	return newCachedResult(cached, StatusStale, upstreamStatus, 0), nil
 }
 
+// getFreshEntry returns the cached entry for key, or nil if it is missing, stale or unreadable.
+func (f *Fetcher) getFreshEntry(key cache.CacheKey) *cache.Entry[CacheMetadata] {
+	cached, err := f.cache.Get(key)
+	if err != nil {
+		return nil
+	}
+	if cached.Stale {
+		cached.Data.Close()
+		return nil
+	}
+	return cached
+}
+
 // Fetches the requested resource either from cache or upstream.
 func (f *Fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey, lookupKey cache.CacheKey, clientHd *headers.HeaderDirectives) (Result, error) {
 	slog.Debug("Trying to get request from cache...")
@@ -60,8 +73,7 @@ func (f *Fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 			return res, nil
 		}
 
-		f.metrics.Cache.CacheErrors.Increment()
-		// We just return errNotCacheable to trigger direct fetch in caller
+		// The cache has already counted this error. We just return errNotCacheable to trigger direct fetch in caller
 		return Result{}, errNotCacheable
 	}
 

@@ -21,25 +21,10 @@ function isPlain(o: unknown): o is Record<string, unknown> {
     return o != null && Object.getPrototypeOf(o) === Object.prototype;
 }
 
-function arraysEqual(
-    a: unknown[],
-    b: unknown[],
-    compare: (_a: unknown, _b: unknown) => boolean = Object.is,
-): boolean {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-        if (!compare(a[i], b[i])) return false;
-    }
-    return true;
-}
-
 type Comparator = (_a: unknown, _b: unknown) => boolean;
-type KeyTransform = (_key: string) => string;
 
 export type MergeOptions = {
-    keyTransform?: KeyTransform; // map source key -> target key
     recurse?: boolean; // default true
-    replaceArrays?: boolean; // default true (otherwise shallow index-wise patch)
     allowNull?: boolean; // default true; if false, treat null like undefined (skip)
     compare?: Comparator; // default Object.is
 };
@@ -49,21 +34,15 @@ export type MergeOptions = {
 export function patch<T extends Record<string, unknown>>(
     to: T,
     from: DeepPartial<T>,
-    keyTransformOrOptions?: KeyTransform | MergeOptions,
+    mergeOptions?: MergeOptions,
     recurseFlag?: boolean,
 ): boolean {
     const defaults: MergeOptions = {
         recurse: true,
-        replaceArrays: false,
         allowNull: true,
         compare: Object.is,
     };
-    const options: MergeOptions = { ...defaults };
-    if (typeof keyTransformOrOptions === "function") {
-        options.keyTransform = keyTransformOrOptions;
-    } else if (keyTransformOrOptions && typeof keyTransformOrOptions === "object") {
-        Object.assign(options, keyTransformOrOptions);
-    }
+    const options: MergeOptions = { ...defaults, ...mergeOptions };
     if (typeof recurseFlag === "boolean") options.recurse = recurseFlag;
 
     const compare = options.compare ?? Object.is;
@@ -74,69 +53,59 @@ export function patch<T extends Record<string, unknown>>(
         // guard against prototype pollution
         if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
 
-        const fromKey = key; // original key in 'from'
-        const toKey = options.keyTransform ? options.keyTransform(fromKey) : fromKey;
         const toRec = to as Record<string, unknown>;
 
-        const bValue = (from as Record<string, unknown>)[fromKey];
+        const bValue = (from as Record<string, unknown>)[key];
         if (bValue === undefined) continue;
         if (bValue === null && !options.allowNull) continue;
         const bRec = bValue as Record<string, unknown>;
 
-        const aValue = (to as Record<string, unknown>)[toKey];
+        const aValue = (to as Record<string, unknown>)[key];
         const aRec = aValue as Record<string, unknown>;
 
         // Recurse into plain objects when both sides are plain and recurse enabled
         if (options.recurse && isPlain(bValue) && isPlain(aValue)) {
             if (patch(aRec, bRec, options)) {
                 changed = true;
-                log.debug(`(patch) Recursed patch returned changes at key ${toKey}`);
+                log.debug(`(patch) Recursed patch returned changes at key ${key}`);
             }
             continue;
         }
 
         // Arrays handling
         if (Array.isArray(bValue) && Array.isArray(aValue)) {
-            if (options.replaceArrays) {
-                if (!arraysEqual(aValue, bValue, compare)) {
-                    toRec[toKey] = bValue;
-                    changed = true;
-                    log.debug(`(patch) Replaced array at key ${toKey}`);
+            // index-wise shallow patch up to min length; replace if length differs
+            const minLen = Math.min(aValue.length, bValue.length);
+            let localChanged = aValue.length !== bValue.length;
+            for (let i = 0; i < minLen; i++) {
+                if (!compare(aValue[i], bValue[i])) {
+                    aValue[i] = bValue[i];
+                    localChanged = true;
+                    log.debug(`(patch) Patched array item at key ${key}[${i}]`);
                 }
-            } else {
-                // index-wise shallow patch up to min length; replace if length differs
-                const minLen = Math.min(aValue.length, bValue.length);
-                let localChanged = aValue.length !== bValue.length;
-                for (let i = 0; i < minLen; i++) {
-                    if (!compare(aValue[i], bValue[i])) {
-                        aValue[i] = bValue[i];
-                        localChanged = true;
-                        log.debug(`(patch) Patched array item at key ${toKey}[${i}]`);
-                    }
+            }
+            if (aValue.length > bValue.length) {
+                aValue.length = bValue.length; // truncate if longer
+            } else if (aValue.length < bValue.length) {
+                // push remaining items from other if shorter
+                const diff = bValue.length - aValue.length;
+                for (let i = 0; i < diff; i++) {
+                    aValue.push(bValue[minLen + i]);
+                    log.debug(`(patch) Pushed array item at key ${key}[${minLen + i}]`);
                 }
-                if (aValue.length > bValue.length) {
-                    aValue.length = bValue.length; // truncate if longer
-                } else if (aValue.length < bValue.length) {
-                    // push remaining items from other if shorter
-                    const diff = bValue.length - aValue.length;
-                    for (let i = 0; i < diff; i++) {
-                        aValue.push(bValue[minLen + i]);
-                        log.debug(`(patch) Pushed array item at key ${toKey}[${minLen + i}]`);
-                    }
-                }
+            }
 
-                if (localChanged) {
-                    changed = true;
-                    log.debug(`(patch) Making array as changed...`);
-                }
+            if (localChanged) {
+                changed = true;
+                log.debug(`(patch) Making array as changed...`);
             }
             continue;
         }
 
         if (!compare(aValue, bValue)) {
-            toRec[toKey] = bValue;
+            toRec[key] = bValue;
             changed = true;
-            log.debug(`(patch) Updated key ${toKey}`);
+            log.debug(`(patch) Updated key ${key}`);
         }
     }
 

@@ -66,10 +66,6 @@ func (c *Cache[MetadataT]) GetQuiet(key cache.CacheKey) (*cache.Entry[MetadataT]
 }
 
 func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	lock := cache.GetLock(c.locks, key)
-	lock.Lock()
-	defer lock.Unlock()
-
 	maxCacheSize := c.maxCacheSize.Get()
 	if maxCacheSize <= 0 {
 		c.metrics.Cache.CacheErrors.Increment()
@@ -80,14 +76,6 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 		slog.Debug("Skipping file cache write because response exceeds cache max size", "key", key.Hex, "size_hint", sizeHint, "max_cache_size", maxCacheSize)
 		return nil, fmt.Errorf("%w: response size %d exceeds cache max size %d", cache.ErrCacheMemoryExceeded, sizeHint, maxCacheSize)
 	}
-
-	c.mu.RLock()
-	oldMeta, replacing := c.entriesMetadata[key]
-	oldSize := int64(0)
-	if replacing {
-		oldSize = oldMeta.Size
-	}
-	c.mu.RUnlock()
 
 	fileName := c.dataPath(key)
 	tmpFile, err := os.CreateTemp(c.rootDir.Path, key.Hex+".*.tmp")
@@ -135,6 +123,19 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 		Size:        fileSize,
 		Object:      metadata,
 	}
+
+	// Only lock once the body is on disk, so a slow download can't hold up other keys on this shard.
+	lock := cache.GetLock(c.locks, key)
+	lock.Lock()
+	defer lock.Unlock()
+
+	c.mu.RLock()
+	oldMeta, replacing := c.entriesMetadata[key]
+	oldSize := int64(0)
+	if replacing {
+		oldSize = oldMeta.Size
+	}
+	c.mu.RUnlock()
 
 	if c.byteSize.Get()-oldSize+fileSize > maxCacheSize {
 		c.janitor.Evict(maxCacheSize)
@@ -228,6 +229,7 @@ func (c *Cache[MetadataT]) removeDataFile(key cache.CacheKey) error {
 			return nil
 		}
 		slog.Error("Failed to remove cache file", "path", path, "error", err)
+		c.metrics.Cache.CacheErrors.Increment()
 		return fmt.Errorf("%w: failed to remove file '%s'", ErrRemove, path)
 	}
 
@@ -247,6 +249,7 @@ func (c *Cache[MetadataT]) ensureRemove(key cache.CacheKey) error {
 	}
 	if metaErr := c.removeMetadataSidecar(key); metaErr != nil {
 		slog.Error("Failed to remove cache metadata sidecar", "key", key.Hex, "error", metaErr)
+		c.metrics.Cache.CacheErrors.Increment()
 		return fmt.Errorf("%w: failed to remove cache metadata sidecar for key '%s'", ErrRemove, key.Hex)
 	}
 	if !exists {

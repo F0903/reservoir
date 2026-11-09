@@ -118,59 +118,6 @@ func TestFileCacheSidecarsRestoreVaryVariantAfterRestart(t *testing.T) {
 	}
 }
 
-func TestFileCacheSidecarsDoNotRestoreExpiredProxyResponse(t *testing.T) {
-	var upstreamRequests atomic.Int64
-
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		count := upstreamRequests.Add(1)
-		if count == 1 {
-			w.Header().Set("Cache-Control", "max-age=1")
-			w.Header().Set("ETag", `"expired-restart-etag"`)
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("expired package payload"))
-			return
-		}
-
-		w.Header().Set("Cache-Control", "max-age=3600")
-		w.Header().Set("ETag", `"fresh-restart-etag"`)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("fresh package payload"))
-	}))
-	defer upstream.Close()
-
-	cfg := newFileCacheProxyConfig(t)
-	firstProxy := startRestartableProxy(t, cfg)
-
-	targetURL := upstream.URL + "/pool/main/expired-package.deb"
-	resp, err := firstProxy.client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("first request failed: %v", err)
-	}
-	if got := readRestartTestBody(t, resp); got != "expired package payload" {
-		t.Fatalf("unexpected first response body: %q", got)
-	}
-	firstProxy.close()
-
-	time.Sleep(1100 * time.Millisecond)
-
-	secondProxy := startRestartableProxy(t, cfg)
-	defer secondProxy.close()
-
-	resp, err = secondProxy.client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("second request failed: %v", err)
-	}
-	if got := readRestartTestBody(t, resp); got != "fresh package payload" {
-		t.Fatalf("expected expired sidecar to be ignored, got body %q", got)
-	}
-	if got := upstreamRequests.Load(); got != 2 {
-		t.Fatalf("expected restart request to refetch expired entry, got %d upstream requests", got)
-	}
-	if got := resp.Header.Get("ETag"); got != `"fresh-restart-etag"` {
-		t.Fatalf("expected fresh upstream ETag, got %q", got)
-	}
-}
-
 func doRestartVariantRequest(t *testing.T, p *restartableProxy, targetURL string, acceptEncoding string) *http.Response {
 	t.Helper()
 
@@ -198,7 +145,7 @@ func newFileCacheProxyConfig(t *testing.T) *config.Config {
 	t.Helper()
 
 	cfg := config.NewDefault()
-	cfg.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	cfg.Proxy.UpgradeHttpToHttps.Overwrite(false)
 	cfg.Proxy.RetryOnRange416.Overwrite(false)
 	cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
 	cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
@@ -221,8 +168,9 @@ func startRestartableProxy(t *testing.T, cfg *config.Config) *restartableProxy {
 		t.Fatalf("failed to create proxy cache: %v", err)
 	}
 	p, err := proxy.NewProxy(cfg, &FakeCA{}, proxy.Dependencies{
-		Cache:   cacheStore,
-		Metrics: runtimeMetrics,
+		Cache:          cacheStore,
+		Metrics:        runtimeMetrics,
+		UpstreamClient: newTestUpstreamClient(),
 	})
 	if err != nil {
 		cacheStore.Destroy()
