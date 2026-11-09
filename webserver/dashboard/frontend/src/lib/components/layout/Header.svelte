@@ -1,11 +1,11 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import { version } from "$lib/api/objects/version/version";
-    import { userIsAdmin } from "$lib/auth/permissions";
-    import Tooltip from "$lib/components/ui/Tooltip.svelte";
+    import { version } from "#lib/api/objects/version/version.ts";
+    import { userIsAdmin } from "#lib/auth/permissions.ts";
+    import Tooltip from "#lib/components/ui/Tooltip.svelte";
     import { onMount } from "svelte";
-    import { getAuthProvider } from "$lib/context";
+    import { getAuthProvider } from "#lib/context.ts";
     import { LogOut, Menu, ShieldCheck, User } from "@lucide/svelte";
 
     let {

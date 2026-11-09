@@ -2,8 +2,8 @@
     import Chart from "chart.js/auto";
     import { onMount } from "svelte";
     import type { ChartConfiguration, ChartData, ChartType } from "chart.js";
-    import { log } from "$lib/utils/logger";
-    import { patch } from "$lib/utils/patch";
+    import { log } from "#lib/utils/logger.ts";
+    import { patch } from "#lib/utils/patch.ts";
 
     let {
         type,

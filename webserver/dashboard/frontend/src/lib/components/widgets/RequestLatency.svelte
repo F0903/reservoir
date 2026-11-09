@@ -1,9 +1,9 @@
 <script lang="ts">
-    import Chart from "$lib/components/ui/Chart.svelte";
-    import Loadable from "$lib/components/ui/Loadable.svelte";
+    import Chart from "#lib/components/ui/Chart.svelte";
+    import Loadable from "#lib/components/ui/Loadable.svelte";
     import Widget from "./base/Widget.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
-    import { getMetricsProvider } from "$lib/context";
+    import { getMetricsProvider } from "#lib/context.ts";
 
     const metrics = getMetricsProvider();
 

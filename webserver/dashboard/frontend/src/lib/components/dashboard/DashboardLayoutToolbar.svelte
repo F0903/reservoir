@@ -1,5 +1,5 @@
 <script lang="ts">
-    import Tooltip from "$lib/components/ui/Tooltip.svelte";
+    import Tooltip from "#lib/components/ui/Tooltip.svelte";
     import { Check, Pencil, RefreshCw, RotateCcw } from "@lucide/svelte";
 
     let {

@@ -1,15 +1,15 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
-    import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
-    import { log } from "$lib/utils/logger";
+    import ErrorBox from "#lib/components/ui/ErrorBox.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import TextInput from "#lib/components/ui/input/TextInput.svelte";
+    import VerticalSpacer from "#lib/components/ui/VerticalSpacer.svelte";
+    import { log } from "#lib/utils/logger.ts";
     import type { PageProps } from "./$types";
-    import Form from "$lib/components/ui/input/Form.svelte";
+    import Form from "#lib/components/ui/input/Form.svelte";
     import { resolve } from "$app/paths";
-    import { getAuthProvider, getToastProvider } from "$lib/context";
-    import UnauthorizedError from "$lib/api/unauthorized-error";
+    import { getAuthProvider, getToastProvider } from "#lib/context.ts";
+    import UnauthorizedError from "#lib/api/unauthorized-error.ts";
 
     let { data }: PageProps = $props();
 
@@ -40,7 +40,7 @@
             log.debug("Password reset successful, redirecting...");
             let returnToBase = resolve("/");
             returnToBase += returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
-            await goto(returnToBase, { replaceState: true, invalidateAll: true });
+            await goto(returnToBase, { replace: true, refreshAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {
             if (err instanceof UnauthorizedError) {

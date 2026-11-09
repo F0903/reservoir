@@ -17,7 +17,7 @@ const contextMocks = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("$lib/context", () => ({
+vi.mock("#lib/context.ts", () => ({
     getAuthProvider: () => contextMocks.auth,
 }));
 
@@ -29,7 +29,7 @@ vi.mock("$app/paths", () => ({
     resolve: (path: string) => path,
 }));
 
-vi.mock("$lib/api/objects/version/version", () => ({
+vi.mock("#lib/api/objects/version/version.ts", () => ({
     version: vi.fn().mockResolvedValue({ version: "test-version" }),
 }));
 

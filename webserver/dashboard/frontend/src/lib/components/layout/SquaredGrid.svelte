@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, type Component, type Snippet } from "svelte";
-    import type { IntRange } from "$lib/utils/type-utils";
-    import { viewport } from "$lib/utils/viewport.svelte";
+    import type { IntRange } from "#lib/utils/type-utils.ts";
+    import { viewport } from "#lib/utils/viewport.svelte.ts";
 
     type CellSpan = IntRange<1, 9>;
 

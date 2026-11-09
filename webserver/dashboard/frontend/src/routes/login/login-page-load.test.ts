@@ -2,7 +2,7 @@ import { isRedirect } from "@sveltejs/kit";
 import { describe, expect, it, vi } from "vitest";
 import { load } from "./+page";
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 

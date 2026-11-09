@@ -1,7 +1,7 @@
 <script lang="ts">
     import { flip } from "svelte/animate";
     import Toast from "./Toast.svelte";
-    import { getToastProvider } from "$lib/context";
+    import { getToastProvider } from "#lib/context.ts";
 
     const toastProvider = getToastProvider();
 </script>

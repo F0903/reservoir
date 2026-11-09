@@ -1,10 +1,10 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import {
     defaultDashboardLayout,
     normalizeDashboardLayout,
     type DashboardWidgetLayout,
-} from "$lib/dashboard/dashboard-layout";
-import { log } from "$lib/utils/logger";
+} from "#lib/dashboard/dashboard-layout.ts";
+import { log } from "#lib/utils/logger.ts";
 import type { Settings } from "./settings-provider.svelte";
 
 type DashboardSettingsFields = {

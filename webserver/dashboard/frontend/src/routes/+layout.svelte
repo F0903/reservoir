@@ -2,18 +2,18 @@
     import "../global.css";
     import "@fontsource-variable/open-sans";
     import "@fontsource-variable/chivo-mono";
-    import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-    import { MetricsProvider } from "$lib/providers/metrics/metrics-provider.svelte";
-    import { ToastProvider } from "$lib/providers/toast/toast-provider.svelte";
-    import { log } from "$lib/utils/logger";
+    import { SettingsProvider } from "#lib/providers/settings/settings-provider.svelte.ts";
+    import { MetricsProvider } from "#lib/providers/metrics/metrics-provider.svelte.ts";
+    import { ToastProvider } from "#lib/providers/toast/toast-provider.svelte.ts";
+    import { log } from "#lib/utils/logger.ts";
     import {
         setSettingsProvider,
         setMetricsProvider,
         setToastProvider,
         setAuthProvider,
-    } from "$lib/context";
-    import ToastContainer from "$lib/components/ui/ToastContainer.svelte";
-    import { AuthProvider } from "$lib/providers/auth/auth-provider.svelte";
+    } from "#lib/context.ts";
+    import ToastContainer from "#lib/components/ui/ToastContainer.svelte";
+    import { AuthProvider } from "#lib/providers/auth/auth-provider.svelte.ts";
 
     let { children } = $props();
 

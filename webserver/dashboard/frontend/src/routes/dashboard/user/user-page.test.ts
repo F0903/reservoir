@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { UserInfo } from "$lib/api/auth/auth";
+import type { UserInfo } from "#lib/api/auth/auth.ts";
 import UserPage from "./+page.svelte";
 
 const contextMocks = vi.hoisted(() => ({
@@ -16,12 +16,12 @@ const contextMocks = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("$lib/context", () => ({
+vi.mock("#lib/context.ts", () => ({
     getAuthProvider: () => contextMocks.auth,
     getToastProvider: () => contextMocks.toast,
 }));
 
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),

@@ -5,7 +5,6 @@ import svelte from "eslint-plugin-svelte";
 import globals from "globals";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "eslint/config";
-import svelteConfig from "./svelte.config.js";
 import ts from "typescript-eslint";
 
 const gitignorePath = fileURLToPath(new URL("./.gitignore", import.meta.url));
@@ -26,14 +25,14 @@ export default defineConfig(
                 {
                     paths: [
                         {
-                            name: "$lib/api/api-helpers",
+                            name: "#lib/api/api-helpers.ts",
                             message:
                                 "Please use specialized API objects or Providers. Raw helpers are only allowed in the API/Provider layer.",
                         },
                     ],
                     patterns: [
                         {
-                            group: ["$lib/api/auth/*"],
+                            regex: "^#lib/api/auth/", // A "group" pattern would read the # as a comment.
                             message: "Please use AuthProvider instead unless absolutely necessary.",
                         },
                     ],
@@ -73,7 +72,6 @@ export default defineConfig(
                 projectService: true,
                 extraFileExtensions: [".svelte"],
                 parser: ts.parser,
-                svelteConfig,
             },
         },
     },

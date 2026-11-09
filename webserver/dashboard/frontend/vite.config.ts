@@ -1,3 +1,5 @@
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import devtoolsJson from "vite-plugin-devtools-json";
 import { sveltekit } from "@sveltejs/kit/vite";
 import { defineConfig } from "vitest/config";
@@ -18,7 +20,17 @@ export default defineConfig(({ mode }) => {
                 ignored: ["/var/", "/ssl/", "/build/", "/.svelte-kit/"],
             },
         },
-        plugins: [sveltekit(), devtoolsJson()],
+        plugins: [
+            sveltekit({
+                preprocess: [vitePreprocess()],
+                adapter: adapter({
+                    fallback: "index.html",
+                    precompress: false,
+                    strict: true,
+                }),
+            }),
+            devtoolsJson(),
+        ],
         build: {
             sourcemap: mode === "development",
         },

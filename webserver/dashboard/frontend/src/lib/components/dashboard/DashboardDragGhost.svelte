@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { DashboardDragGhostState } from "$lib/dashboard/dashboard-editor";
+    import type { DashboardDragGhostState } from "#lib/dashboard/dashboard-editor.ts";
 
     let {
         ghost,

@@ -1,4 +1,4 @@
-import type { DashboardGridPosition } from "$lib/dashboard/dashboard-layout";
+import type { DashboardGridPosition } from "#lib/dashboard/dashboard-layout.ts";
 
 export type DashboardResizeMode = "width" | "height" | "both";
 

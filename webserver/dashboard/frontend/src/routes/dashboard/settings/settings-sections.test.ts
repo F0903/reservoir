@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import * as configApi from "$lib/api/objects/config/config";
-import type { Config } from "$lib/api/objects/config/config";
-import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
+import * as configApi from "#lib/api/objects/config/config.ts";
+import type { Config } from "#lib/api/objects/config/config.ts";
+import type { SettingsProvider } from "#lib/providers/settings/settings-provider.svelte.ts";
 import { createSettingsSections } from "./settings-sections";
 
-vi.mock("$lib/api/objects/config/config", () => ({
+vi.mock("#lib/api/objects/config/config.ts", () => ({
     patchConfig: vi.fn(),
 }));
 
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),

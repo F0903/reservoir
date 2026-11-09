@@ -1,9 +1,9 @@
 <script lang="ts">
-    import Tooltip from "$lib/components/ui/Tooltip.svelte";
+    import Tooltip from "#lib/components/ui/Tooltip.svelte";
     import type {
         DashboardEditableGridElement,
         DashboardResizeMode,
-    } from "$lib/dashboard/dashboard-editor";
+    } from "#lib/dashboard/dashboard-editor.ts";
 
     let {
         element,

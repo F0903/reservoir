@@ -1,14 +1,14 @@
 <script lang="ts">
-    import PageTitle from "$lib/components/ui/PageTitle.svelte";
-    import SettingInput from "$lib/components/ui/settings/SettingInput.svelte";
-    import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
-    import { log } from "$lib/utils/logger";
+    import PageTitle from "#lib/components/ui/PageTitle.svelte";
+    import SettingInput from "#lib/components/ui/settings/SettingInput.svelte";
+    import VerticalSpacer from "#lib/components/ui/VerticalSpacer.svelte";
+    import { log } from "#lib/utils/logger.ts";
     import { onMount, type Component } from "svelte";
-    import { getSettingsProvider, getToastProvider } from "$lib/context";
+    import { getSettingsProvider, getToastProvider } from "#lib/context.ts";
     import { Save, RotateCcw, RefreshCw, TriangleAlert } from "@lucide/svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
     import { fade, slide } from "svelte/transition";
-    import Tabs from "$lib/components/ui/Tabs.svelte";
+    import Tabs from "#lib/components/ui/Tabs.svelte";
     import {
         createInputInstances,
         createSettingsSections,
@@ -96,8 +96,7 @@
 
     function cacheBackendSetting() {
         return sections.cache.flat().find((input) => input.label === "Cache Backend") as
-            | { commit: (_backend: CacheBackend) => Promise<unknown> }
-            | undefined;
+            { commit: (_backend: CacheBackend) => Promise<unknown> } | undefined;
     }
 
     function updateHasChanges() {

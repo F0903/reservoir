@@ -1,8 +1,8 @@
 <script lang="ts">
-    import DashboardLayoutEditor from "$lib/components/dashboard/DashboardLayoutEditor.svelte";
-    import { createDashboardGridElements } from "$lib/dashboard/dashboard-widgets";
-    import type { DashboardWidgetLayout } from "$lib/dashboard/dashboard-layout";
-    import { getMetricsProvider, getSettingsProvider } from "$lib/context";
+    import DashboardLayoutEditor from "#lib/components/dashboard/DashboardLayoutEditor.svelte";
+    import { createDashboardGridElements } from "#lib/dashboard/dashboard-widgets.ts";
+    import type { DashboardWidgetLayout } from "#lib/dashboard/dashboard-layout.ts";
+    import { getMetricsProvider, getSettingsProvider } from "#lib/context.ts";
     import { onMount } from "svelte";
 
     const metrics = getMetricsProvider();

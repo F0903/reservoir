@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-helpers";
+import { apiGet, type FetchFn } from "#lib/api/api-helpers.ts";
 import type { CacheMetrics } from "./cache-metrics";
 import type { RequestMetrics } from "./request-metrics";
 import type { SystemMetrics } from "./system-metrics";

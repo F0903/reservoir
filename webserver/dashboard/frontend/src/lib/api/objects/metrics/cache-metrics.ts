@@ -1,4 +1,4 @@
-import { apiGet, type FetchFn } from "$lib/api/api-helpers";
+import { apiGet, type FetchFn } from "#lib/api/api-helpers.ts";
 
 export type CacheStorageMetrics = {
     type: "memory" | "file" | "hybrid";

@@ -1,8 +1,8 @@
 <script lang="ts">
-    import Chart from "$lib/components/ui/Chart.svelte";
+    import Chart from "#lib/components/ui/Chart.svelte";
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
-    import { getMetricsProvider } from "$lib/context";
+    import { getMetricsProvider } from "#lib/context.ts";
 
     const metrics = getMetricsProvider();
 </script>

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { patchConfig } from "./config";
-import * as apiHelpers from "$lib/api/api-helpers";
+import * as apiHelpers from "#lib/api/api-helpers.ts";
 
-vi.mock("$lib/api/api-helpers", () => ({
+vi.mock("#lib/api/api-helpers.ts", () => ({
     apiPatch: vi.fn(),
     apiGet: vi.fn(),
 }));

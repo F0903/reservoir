@@ -1,15 +1,15 @@
 <script lang="ts">
-    import DashboardDragGhost from "$lib/components/dashboard/DashboardDragGhost.svelte";
-    import DashboardLayoutToolbar from "$lib/components/dashboard/DashboardLayoutToolbar.svelte";
-    import DashboardWidgetEditorControls from "$lib/components/dashboard/DashboardWidgetEditorControls.svelte";
-    import SquaredGrid from "$lib/components/layout/SquaredGrid.svelte";
+    import DashboardDragGhost from "#lib/components/dashboard/DashboardDragGhost.svelte";
+    import DashboardLayoutToolbar from "#lib/components/dashboard/DashboardLayoutToolbar.svelte";
+    import DashboardWidgetEditorControls from "#lib/components/dashboard/DashboardWidgetEditorControls.svelte";
+    import SquaredGrid from "#lib/components/layout/SquaredGrid.svelte";
     import type {
         DashboardDragGhostState,
         DashboardEditableGridElement,
         DashboardGridMetrics,
         DashboardResizeMode,
-    } from "$lib/dashboard/dashboard-editor";
-    import { dashboardGridPositionFromPoint } from "$lib/dashboard/dashboard-editor";
+    } from "#lib/dashboard/dashboard-editor.ts";
+    import { dashboardGridPositionFromPoint } from "#lib/dashboard/dashboard-editor.ts";
     import {
         defaultDashboardLayout,
         packDashboardLayout,
@@ -18,8 +18,8 @@
         setDashboardWidgetSpan,
         type DashboardWidgetId,
         type DashboardWidgetLayout,
-    } from "$lib/dashboard/dashboard-layout";
-    import type { DashboardGridElement } from "$lib/dashboard/dashboard-widgets";
+    } from "#lib/dashboard/dashboard-layout.ts";
+    import type { DashboardGridElement } from "#lib/dashboard/dashboard-widgets.ts";
     import { onDestroy } from "svelte";
 
     type ResizeState = {

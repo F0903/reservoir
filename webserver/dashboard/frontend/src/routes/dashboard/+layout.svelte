@@ -1,14 +1,14 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
+    import { browser } from "$app/env";
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
-    import Header from "$lib/components/layout/Header.svelte";
-    import SideNav from "$lib/components/layout/SideNav.svelte";
-    import SideNavButton from "$lib/components/layout/SideNavButton.svelte";
-    import BackdropBox from "$lib/components/ui/BackdropBox.svelte";
-    import { userIsAdmin } from "$lib/auth/permissions";
-    import { getAuthProvider } from "$lib/context";
+    import Header from "#lib/components/layout/Header.svelte";
+    import SideNav from "#lib/components/layout/SideNav.svelte";
+    import SideNavButton from "#lib/components/layout/SideNavButton.svelte";
+    import BackdropBox from "#lib/components/ui/BackdropBox.svelte";
+    import { userIsAdmin } from "#lib/auth/permissions.ts";
+    import { getAuthProvider } from "#lib/context.ts";
     import { LayoutDashboard, Logs, Settings, UsersRound } from "@lucide/svelte";
 
     let { children } = $props();
@@ -24,7 +24,7 @@
 
         const dashboardPath = resolve("/dashboard");
         if (isAdminRoute(page.url.pathname)) {
-            void goto(dashboardPath, { replaceState: true });
+            void goto(dashboardPath, { replace: true });
         }
     });
 

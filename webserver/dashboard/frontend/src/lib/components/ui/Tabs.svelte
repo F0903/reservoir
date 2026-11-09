@@ -1,6 +1,6 @@
 <script lang="ts" generics="T extends string">
-    import type { IconProps } from "@lucide/svelte";
-    import type { Component, Snippet } from "svelte";
+    import type { LucideIcon } from "@lucide/svelte";
+    import type { Snippet } from "svelte";
     import { fade } from "svelte/transition";
 
     let {
@@ -8,7 +8,7 @@
         activeTab = $bindable(),
         ...rest
     }: {
-        tabs: ReadonlyArray<{ id: T; label: string; icon: Component<IconProps> }>;
+        tabs: ReadonlyArray<{ id: T; label: string; icon: LucideIcon }>;
         activeTab: T;
         [key: string]: unknown;
     } = $props();

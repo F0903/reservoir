@@ -1,6 +1,6 @@
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
-import { log } from "$lib/utils/logger";
+import { log } from "#lib/utils/logger.ts";
 import UnauthorizedError from "./unauthorized-error";
 
 export type FetchFn = (_input: RequestInfo | URL, _init?: RequestInit) => Promise<Response>;
@@ -35,7 +35,7 @@ async function redirectToLogin(redirect: LoginRedirectOptions): Promise<void> {
     }
 
     await goto(loginUrl, {
-        replaceState: true,
+        replace: true,
     });
 }
 

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { AuthProvider } from "./auth-provider.svelte";
-import * as authApi from "$lib/api/auth/auth";
-import UnauthorizedError from "$lib/api/unauthorized-error";
+import * as authApi from "#lib/api/auth/auth.ts";
+import UnauthorizedError from "#lib/api/unauthorized-error.ts";
 import { goto } from "$app/navigation";
 
 // Mock Svelte/Kit environment
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 
@@ -20,7 +20,7 @@ vi.mock("$app/paths", () => ({
 }));
 
 // Mock the API
-vi.mock("$lib/api/auth/auth", () => ({
+vi.mock("#lib/api/auth/auth.ts", () => ({
     bootstrapAdmin: vi.fn(),
     bootstrapStatus: vi.fn(),
     login: vi.fn(),
@@ -35,7 +35,7 @@ vi.mock("$lib/api/auth/auth", () => ({
 }));
 
 // Mock logger
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),
@@ -83,7 +83,7 @@ describe("AuthProvider", () => {
             expect(provider.user).toBeNull();
             if (bootstrapRequired) {
                 expect(authApi.bootstrapStatus).toHaveBeenCalled();
-                expect(goto).toHaveBeenCalledWith("/bootstrap", { replaceState: true });
+                expect(goto).toHaveBeenCalledWith("/bootstrap", { replace: true });
             }
         },
     );

@@ -2,8 +2,8 @@
     import { fly } from "svelte/transition";
     import Button from "./input/Button.svelte";
     import { onMount } from "svelte";
-    import { ToastHandle } from "$lib/providers/toast/toast-provider.svelte";
-    import { log } from "$lib/utils/logger";
+    import { ToastHandle } from "#lib/providers/toast/toast-provider.svelte.ts";
+    import { log } from "#lib/utils/logger.ts";
     import { Info, CircleCheckBig, CircleAlert } from "@lucide/svelte";
 
     type BaseProps = {
@@ -29,9 +29,7 @@
     } & BaseTextProps;
 
     export type ToastProps =
-        | (BaseProps & InfoProps)
-        | (BaseProps & SuccessProps)
-        | (BaseProps & ErrorProps);
+        (BaseProps & InfoProps) | (BaseProps & SuccessProps) | (BaseProps & ErrorProps);
     export type ToastType = ToastProps["type"];
 
     let props: ToastProps & { handle: ToastHandle } = $props();
