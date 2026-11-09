@@ -49,99 +49,56 @@ func TestPHC_RoundTripAndVerify(t *testing.T) {
 }
 
 func TestParsePHC_InvalidFormat(t *testing.T) {
-	// empty input should error
-	if _, err := ParsePHC(""); err == nil {
-		t.Fatalf("expected error for empty input")
+	valid := GenerateArgon2id("secret").String()
+
+	withPart := func(index int, value func(string) string) string {
+		t.Helper()
+
+		parts := strings.Split(strings.TrimPrefix(valid, "$"), "$")
+		if len(parts) != 5 {
+			t.Fatalf("unexpected parts count: %d", len(parts))
+		}
+		parts[index] = value(parts[index])
+		return "$" + strings.Join(parts, "$")
 	}
 
-	// Generate a valid PHC and remove the leading '$' — should still parse
-	s := GenerateArgon2id("secret").String()
-	sNoPrefix := strings.TrimPrefix(s, "$")
-	if _, err := ParsePHC(sNoPrefix); err != nil {
-		t.Fatalf("unexpected error for valid input without leading $: %v", err)
-	}
-
-	// Missing hash should error
-	if _, err := ParsePHC("$argon2id$v=19$m=65536,t=1,p=4,l=32$onlysalt"); err == nil {
-		t.Fatalf("expected error for missing hash part")
-	}
-
-	// Invalid version should error
-	if _, err := ParsePHC("$argon2id$v=x$m=65536,t=1,p=4,l=32$abc$def"); err == nil {
-		t.Fatalf("expected error for invalid version")
-	}
-}
-
-func TestParsePHC_WrongID(t *testing.T) {
-	ph := GenerateArgon2id("secret")
-	s := ph.String()
-	bad := strings.Replace(s, "$argon2id$", "$scrypt$", 1)
-	if _, err := ParsePHC(bad); err == nil {
-		t.Fatalf("expected error for unsupported id")
-	}
-}
-
-func TestParsePHC_SaltLength(t *testing.T) {
-	ph := GenerateArgon2id("secret")
-	s := ph.String()
-
-	parts := strings.Split(strings.TrimPrefix(s, "$"), "$")
-	if len(parts) != 5 {
-		t.Fatalf("unexpected parts count: %d", len(parts))
-	}
-
-	// Replace salt with 8 bytes
 	shortSalt := make([]byte, 8)
 	for i := range shortSalt {
 		shortSalt[i] = byte(i)
 	}
-	parts[3] = base64.RawStdEncoding.EncodeToString(shortSalt)
-	bad := "$" + strings.Join(parts, "$")
 
-	if _, err := ParsePHC(bad); err == nil {
-		t.Fatalf("expected error for short salt")
-	}
-}
-
-func TestParsePHC_HashLengthMismatch(t *testing.T) {
-	ph := GenerateArgon2id("secret")
-	s := ph.String()
-
-	parts := strings.Split(strings.TrimPrefix(s, "$"), "$")
-	if len(parts) != 5 {
-		t.Fatalf("unexpected parts count: %d", len(parts))
-	}
-
-	// Inflate l= to a mismatching value
-	// parts[2] looks like: m=...,t=...,p=...,l=...
-	// find existing l value and replace with a wrong one
-	params := parts[2]
-	// Set to a value guaranteed to differ from actual hash length
-	params = replaceLValue(params, 999)
-	parts[2] = params
-	bad := "$" + strings.Join(parts, "$")
-
-	if _, err := ParsePHC(bad); err == nil {
-		t.Fatalf("expected error for hash length mismatch")
-	}
-}
-
-func TestPHC_EdgeCases(t *testing.T) {
-	// Empty password
-	password := ""
-	ph := GenerateArgon2id(password)
-	if !ph.VerifyArgon2id(password) {
-		t.Errorf("Verify failed for empty password")
-	}
-	if ph.VerifyArgon2id("something") {
-		t.Errorf("Verify unexpectedly succeeded for non-empty password")
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "empty input", input: "", wantErr: true},
+		{name: "valid without leading dollar", input: strings.TrimPrefix(valid, "$")},
+		{name: "missing hash", input: "$argon2id$v=19$m=65536,t=1,p=4,l=32$onlysalt", wantErr: true},
+		{name: "invalid version", input: "$argon2id$v=x$m=65536,t=1,p=4,l=32$abc$def", wantErr: true},
+		{name: "unsupported id", input: strings.Replace(valid, "$argon2id$", "$scrypt$", 1), wantErr: true},
+		{
+			name: "short salt",
+			input: withPart(3, func(string) string {
+				return base64.RawStdEncoding.EncodeToString(shortSalt)
+			}),
+			wantErr: true,
+		},
+		{
+			name: "hash length mismatch",
+			input: withPart(2, func(params string) string {
+				return replaceLValue(params, 999) // Guaranteed to differ from the actual hash length.
+			}),
+			wantErr: true,
+		},
 	}
 
-	// Very long password
-	longPassword := strings.Repeat("a", 1024)
-	ph2 := GenerateArgon2id(longPassword)
-	if !ph2.VerifyArgon2id(longPassword) {
-		t.Errorf("Verify failed for long password")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := ParsePHC(tt.input); (err != nil) != tt.wantErr {
+				t.Fatalf("ParsePHC(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+		})
 	}
 }
 

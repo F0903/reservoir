@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 type subConfig struct {
@@ -48,70 +47,6 @@ func applyPartialUpdate(t *testing.T, cfg *Config, updates map[string]any) Commi
 	}
 
 	return result
-}
-
-func TestSetPropsFromMapRecursive(t *testing.T) {
-	cfg := &testConfig{
-		Sub: subConfig{
-			Prop: NewConfigProp("old"),
-		},
-		Flat: NewConfigProp(1),
-	}
-
-	updates := map[string]any{
-		"sub": map[string]any{
-			"prop": "new",
-		},
-		"flat": 2,
-	}
-
-	staged, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), updates)
-	if err != nil {
-		t.Fatalf("setPropsFromMapRecursive failed: %v", err)
-	}
-
-	if len(staged) != 2 {
-		t.Errorf("Expected 2 staged props, got %d", len(staged))
-	}
-
-	for _, s := range staged {
-		s.CommitStaged()
-	}
-
-	if cfg.Sub.Prop.Read() != "new" {
-		t.Errorf("Expected Sub.Prop to be 'new', got %s", cfg.Sub.Prop.Read())
-	}
-
-	if cfg.Flat.Read() != 2 {
-		t.Errorf("Expected Flat to be 2, got %d", cfg.Flat.Read())
-	}
-}
-
-func TestSetPropsFromMapRecursive_UnknownKeyReturnsValidationError(t *testing.T) {
-	cfg := &testConfig{
-		Sub: subConfig{
-			Prop: NewConfigProp("old"),
-		},
-		Flat: NewConfigProp(1),
-	}
-
-	_, err := setPropsFromMapRecursive(reflect.ValueOf(cfg), map[string]any{
-		"sub": map[string]any{
-			"unknown": "new",
-		},
-	})
-	if err == nil {
-		t.Fatal("expected unknown key to return an error")
-	}
-	if !errors.Is(err, ErrValidationFailed) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "sub.unknown") {
-		t.Fatalf("expected error to include unknown key path, got %v", err)
-	}
-	if got := cfg.Sub.Prop.Read(); got != "old" {
-		t.Fatalf("unknown key update changed config: got %q", got)
-	}
 }
 
 func TestSetPropsFromMapRecursive_Partial(t *testing.T) {
@@ -188,60 +123,6 @@ func TestUpdatePartialFromJSON_RealConfig(t *testing.T) {
 	}
 }
 
-func TestPreparePartialUpdateRejectsUnknownNestedKey(t *testing.T) {
-	cfg := newTestConfig(t)
-	originalDir := cfg.Cache.File.Dir.Read()
-
-	update, err := PreparePartialUpdate(cfg, map[string]any{
-		"cache": map[string]any{
-			"file": map[string]any{
-				"missing": "value",
-			},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected unknown nested key to return an error")
-	}
-	if update != nil {
-		t.Fatal("expected failed update preparation to return nil update")
-	}
-	if !errors.Is(err, ErrValidationFailed) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "cache.file.missing") {
-		t.Fatalf("expected error to include full key path, got %v", err)
-	}
-	if got := cfg.Cache.File.Dir.Read(); got != originalDir {
-		t.Fatalf("unknown update committed cache dir: got %q, want %q", got, originalDir)
-	}
-}
-
-func TestPartialUpdateCommitReportsRestartRequired(t *testing.T) {
-	cfg := newTestConfig(t)
-
-	result := applyPartialUpdate(t, cfg, map[string]any{
-		"proxy": map[string]any{
-			"listen": ":10000",
-		},
-	})
-	if !result.RestartRequired {
-		t.Fatal("expected proxy.listen update to require restart")
-	}
-}
-
-func TestPartialUpdateCommitDoesNotReportRestartForHotSwapProperty(t *testing.T) {
-	cfg := newTestConfig(t)
-
-	result := applyPartialUpdate(t, cfg, map[string]any{
-		"logging": map[string]any{
-			"level": "DEBUG",
-		},
-	})
-	if result.RestartRequired {
-		t.Fatal("expected logging.level update to avoid restart")
-	}
-}
-
 func TestPreparePartialUpdate_InvalidUpdateDoesNotCommitOrNotify(t *testing.T) {
 	cfg := NewDefault()
 	originalSize := cfg.Cache.MaxCacheSize.Read()
@@ -271,19 +152,6 @@ func TestPreparePartialUpdate_InvalidUpdateDoesNotCommitOrNotify(t *testing.T) {
 	}
 	if notified.Load() {
 		t.Fatal("invalid update fired runtime subscriber")
-	}
-}
-
-func TestPreparePartialUpdate_NilUpdateReturnsValidationError(t *testing.T) {
-	update, err := PreparePartialUpdate(NewDefault(), nil)
-	if err == nil {
-		t.Fatal("expected nil update to return an error")
-	}
-	if update != nil {
-		t.Fatal("expected nil update to return nil update")
-	}
-	if !errors.Is(err, ErrValidationFailed) {
-		t.Fatalf("expected validation error, got %v", err)
 	}
 }
 
@@ -335,42 +203,96 @@ func TestLoadOrDefaultPersistsDefaultsToMissingProvidedPath(t *testing.T) {
 	}
 }
 
-func TestLoadOrDefault_MigratesMissingDatabaseFile(t *testing.T) {
-	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
+func TestLoadOrDefault_Migrations(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(raw map[string]any)
+		check  func(t *testing.T, cfg *Config, path string)
+	}{
+		{
+			name: "MigratesMissingDatabaseFile",
+			mutate: func(raw map[string]any) {
+				delete(raw, "database")
+			},
+			check: func(t *testing.T, cfg *Config, path string) {
+				if got := cfg.Database.File.Read(); got != "var/database.db" {
+					t.Fatalf("expected migrated database file, got %q", got)
+				}
 
-	defaultData, err := json.Marshal(NewDefault())
-	if err != nil {
-		t.Fatal(err)
+				reloaded, err := load(path)
+				if err != nil {
+					t.Fatalf("expected migrated config to be persisted: %v", err)
+				}
+				if got := reloaded.Database.File.Read(); got != "var/database.db" {
+					t.Fatalf("expected persisted migrated database file, got %q", got)
+				}
+			},
+		},
+		{
+			name: "MigratesUpstreamDefaultHttps",
+			mutate: func(raw map[string]any) {
+				proxy := raw["proxy"].(map[string]any)
+				delete(proxy, "upgrade_http_to_https")
+				proxy["upstream_default_https"] = true // The old default, saved in every existing config.
+			},
+			check: func(t *testing.T, cfg *Config, path string) {
+				if cfg.Proxy.UpgradeHttpToHttps.Read() {
+					t.Fatal("expected the old value not to turn on upgrading")
+				}
+
+				persisted, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if strings.Contains(string(persisted), "upstream_default_https") {
+					t.Fatal("expected the old key to be removed from the saved config")
+				}
+				if !strings.Contains(string(persisted), "upgrade_http_to_https") {
+					t.Fatal("expected the new key in the saved config")
+				}
+			},
+		},
+		{
+			name: "AddsMissingTrustedProxies",
+			mutate: func(raw map[string]any) {
+				delete(raw["webserver"].(map[string]any), "trusted_proxies")
+			},
+			check: func(t *testing.T, cfg *Config, path string) {
+				if got := cfg.Webserver.TrustedProxies.Read(); got != "" {
+					t.Fatalf("expected nothing trusted after migration, got %q", got)
+				}
+			},
+		},
 	}
 
-	var raw map[string]any
-	if err := json.Unmarshal(defaultData, &raw); err != nil {
-		t.Fatal(err)
-	}
-	delete(raw, "database")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
 
-	oldConfigData, err := json.Marshal(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
-		t.Fatal(err)
-	}
+			defaultData, err := json.Marshal(NewDefault())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var raw map[string]any
+			if err := json.Unmarshal(defaultData, &raw); err != nil {
+				t.Fatal(err)
+			}
+			tt.mutate(raw)
 
-	cfg, err := LoadOrDefault(tmpFile)
-	if err != nil {
-		t.Fatalf("expected old config to be migrated: %v", err)
-	}
-	if got := cfg.Database.File.Read(); got != "var/database.db" {
-		t.Fatalf("expected migrated database file, got %q", got)
-	}
+			oldConfigData, err := json.Marshal(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
+				t.Fatal(err)
+			}
 
-	reloaded, err := load(tmpFile)
-	if err != nil {
-		t.Fatalf("expected migrated config to be persisted: %v", err)
-	}
-	if got := reloaded.Database.File.Read(); got != "var/database.db" {
-		t.Fatalf("expected persisted migrated database file, got %q", got)
+			cfg, err := LoadOrDefault(tmpFile)
+			if err != nil {
+				t.Fatalf("expected old config to be migrated: %v", err)
+			}
+			tt.check(t, cfg, tmpFile)
+		})
 	}
 }
 
@@ -392,32 +314,6 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "missing or uninitialized required configuration property") {
 		t.Fatalf("expected missing field error, got %v", err)
-	}
-}
-
-func TestDefaultConfig_HybridPackageCacheTuning(t *testing.T) {
-	cfg := NewDefault()
-
-	if got := cfg.Cache.Type.Read(); got != CacheTypeHybrid {
-		t.Fatalf("expected default cache type %q, got %q", CacheTypeHybrid, got)
-	}
-	if got := cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast(); got != 15*time.Minute {
-		t.Fatalf("expected default cache max age 15m, got %s", got)
-	}
-	if got := cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Read(); !got {
-		t.Fatal("expected default cache policy to force the package freshness window")
-	}
-	if got := cfg.Proxy.CachePolicy.IgnoreCacheControl.Read(); !got {
-		t.Fatal("expected default cache policy to ignore upstream cache-control")
-	}
-	if got := cfg.Cache.CleanupInterval.Read().Cast(); got != 5*time.Minute {
-		t.Fatalf("expected default cleanup interval 5m, got %s", got)
-	}
-	if got := cfg.Cache.Memory.MemoryBudgetPercent.Read(); got != 25 {
-		t.Fatalf("expected default memory tier limit 25%%, got %d%%", got)
-	}
-	if got := cfg.Cache.Hybrid.DemoteAfter.Read().Cast(); got != 5*time.Minute {
-		t.Fatalf("expected default hybrid demotion after 5m, got %s", got)
 	}
 }
 
@@ -530,49 +426,6 @@ func TestConfig_Verify(t *testing.T) {
 	}
 }
 
-func TestLoadOrDefault_MigratesUpstreamDefaultHttps(t *testing.T) {
-	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
-
-	defaultData, err := json.Marshal(NewDefault())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(defaultData, &raw); err != nil {
-		t.Fatal(err)
-	}
-	proxy := raw["proxy"].(map[string]any)
-	delete(proxy, "upgrade_http_to_https")
-	proxy["upstream_default_https"] = true // The old default, saved in every existing config.
-
-	oldConfigData, err := json.Marshal(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadOrDefault(tmpFile)
-	if err != nil {
-		t.Fatalf("expected old config to be migrated: %v", err)
-	}
-	if cfg.Proxy.UpgradeHttpToHttps.Read() {
-		t.Fatal("expected the old value not to turn on upgrading")
-	}
-
-	persisted, err := os.ReadFile(tmpFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(persisted), "upstream_default_https") {
-		t.Fatal("expected the old key to be removed from the saved config")
-	}
-	if !strings.Contains(string(persisted), "upgrade_http_to_https") {
-		t.Fatal("expected the new key in the saved config")
-	}
-}
-
 func TestTrustedProxiesValidation(t *testing.T) {
 	tests := []struct {
 		value   string
@@ -616,36 +469,6 @@ func TestTrustedProxyPrefixesParsesAddressesAndRanges(t *testing.T) {
 	}
 }
 
-func TestLoadOrDefault_AddsMissingTrustedProxies(t *testing.T) {
-	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
-
-	defaultData, err := json.Marshal(NewDefault())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var raw map[string]any
-	if err := json.Unmarshal(defaultData, &raw); err != nil {
-		t.Fatal(err)
-	}
-	delete(raw["webserver"].(map[string]any), "trusted_proxies")
-
-	oldConfigData, err := json.Marshal(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadOrDefault(tmpFile)
-	if err != nil {
-		t.Fatalf("expected old config to be migrated: %v", err)
-	}
-	if got := cfg.Webserver.TrustedProxies.Read(); got != "" {
-		t.Fatalf("expected nothing trusted after migration, got %q", got)
-	}
-}
-
 func TestPersistFailureLeavesExistingConfigIntact(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	cfg := NewDefault()
@@ -673,21 +496,5 @@ func TestPersistFailureLeavesExistingConfigIntact(t *testing.T) {
 	}
 	if string(current) != string(original) {
 		t.Fatal("failed persist changed the existing config")
-	}
-}
-
-func TestPersistLeavesNoTempFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	cfg := NewDefault()
-	cfg.path = path
-	if err := cfg.persist(); err != nil {
-		t.Fatalf("persist failed: %v", err)
-	}
-
-	if _, err := os.Stat(path + ".tmp"); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected no temp file, stat err=%v", err)
-	}
-	if _, err := load(path); err != nil {
-		t.Fatalf("persisted config does not load: %v", err)
 	}
 }

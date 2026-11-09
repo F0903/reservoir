@@ -62,6 +62,16 @@ func TestParseRange(t *testing.T) {
 		{name: "start-gt-end", rangeStr: "bytes=10-5", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "start-eq-size", rangeStr: "bytes=1000-1000", size: size, wantErr: ErrRangeValueOutOfBounds},
 		{name: "empty-file", rangeStr: "bytes=0-0", size: 0, wantErr: ErrRangeValueOutOfBounds},
+
+		// Trimming against a 36-byte file
+		{name: "inside-the-file", rangeStr: "bytes=2-5", size: 36, start: 2, end: 5, wantErr: nil},
+		{name: "end-past-the-file", rangeStr: "bytes=30-100", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "open-ended-near-the-end", rangeStr: "bytes=30-", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "suffix-longer-than-the-file", rangeStr: "bytes=-100", size: 36, start: 0, end: 35, wantErr: nil},
+		{name: "suffix-inside-the-file", rangeStr: "bytes=-6", size: 36, start: 30, end: 35, wantErr: nil},
+		{name: "start-past-the-file", rangeStr: "bytes=36-40", size: 36, wantErr: ErrRangeValueOutOfBounds},
+		{name: "empty-suffix", rangeStr: "bytes=-0", size: 36, wantErr: ErrRangeValueOutOfBounds},
+		{name: "reversed", rangeStr: "bytes=5-2", size: 36, wantErr: ErrRangeValueOutOfBounds},
 	}
 
 	for _, tt := range tests {

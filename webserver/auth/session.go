@@ -200,10 +200,6 @@ func (m *SessionManager) deleteExpired(now time.Time) {
 	}
 }
 
-func (s *Session) BuildSessionCookie() *http.Cookie {
-	return s.BuildSessionCookieWithSecure(false)
-}
-
 func (s *Session) BuildSessionCookieWithSecure(secure bool) *http.Cookie {
 	return &http.Cookie{
 		Path:     "/",

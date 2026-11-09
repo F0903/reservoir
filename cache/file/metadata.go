@@ -68,7 +68,6 @@ func (c *Cache[MetadataT]) loadMetadataSidecars() {
 		if err := removeIfExists(filepath.Join(c.rootDir.Path, file.Name())); err != nil {
 			slog.Error("Failed to remove orphaned cache data file", "file", file.Name(), "error", err)
 			c.metrics.Cache.CacheErrors.Increment()
-			c.metrics.Cache.CacheErrors.Increment()
 		}
 	}
 }

@@ -38,47 +38,52 @@ func newTestBootstrapUserStore(t *testing.T, users ...*models.User) *stores.User
 	return store
 }
 
-func TestEnsureBootstrapAdminReportsRequiredForEmptyStore(t *testing.T) {
-	store := newTestBootstrapUserStore(t)
-
-	result, err := ensureBootstrapAdmin(store)
-	if err != nil {
-		t.Fatalf("ensureBootstrapAdmin returned error: %v", err)
+func TestEnsureBootstrapAdmin(t *testing.T) {
+	tests := []struct {
+		name         string
+		users        []*models.User
+		wantRequired bool
+		wantCount    int
+	}{
+		{
+			name:         "ReportsRequiredForEmptyStore",
+			wantRequired: true,
+			wantCount:    0,
+		},
+		{
+			name: "DoesNothingWhenUsersExist",
+			users: []*models.User{{
+				Username:     DefaultAdminUsername,
+				PasswordHash: *phc.GenerateArgon2id("existing-password"),
+				IsAdmin:      true,
+			}},
+			wantCount: 1,
+		},
 	}
 
-	if result == nil || !result.Required {
-		t.Fatalf("expected bootstrap required result, got %#v", result)
-	}
-	count, err := store.Count()
-	if err != nil {
-		t.Fatalf("failed to count users: %v", err)
-	}
-	if count != 0 {
-		t.Fatalf("expected empty store bootstrap check not to create users, found %d", count)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newTestBootstrapUserStore(t, tt.users...)
 
-func TestEnsureBootstrapAdminDoesNothingWhenUsersExist(t *testing.T) {
-	store := newTestBootstrapUserStore(t, &models.User{
-		Username:     DefaultAdminUsername,
-		PasswordHash: *phc.GenerateArgon2id("existing-password"),
-		IsAdmin:      true,
-	})
+			result, err := ensureBootstrapAdmin(store)
+			if err != nil {
+				t.Fatalf("ensureBootstrapAdmin returned error: %v", err)
+			}
 
-	result, err := ensureBootstrapAdmin(store)
-	if err != nil {
-		t.Fatalf("ensureBootstrapAdmin returned error: %v", err)
-	}
-
-	if result != nil {
-		t.Fatalf("expected no bootstrap result, got %#v", result)
-	}
-	count, err := store.Count()
-	if err != nil {
-		t.Fatalf("failed to count users: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected configured admin to remain unchanged, found %d users", count)
+			if tt.wantRequired && (result == nil || !result.Required) {
+				t.Fatalf("expected bootstrap required result, got %#v", result)
+			}
+			if !tt.wantRequired && result != nil {
+				t.Fatalf("expected no bootstrap result, got %#v", result)
+			}
+			count, err := store.Count()
+			if err != nil {
+				t.Fatalf("failed to count users: %v", err)
+			}
+			if count != tt.wantCount {
+				t.Fatalf("expected %d users after the bootstrap check, found %d", tt.wantCount, count)
+			}
+		})
 	}
 }
 

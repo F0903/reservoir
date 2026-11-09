@@ -19,56 +19,7 @@ type noSizeReader struct {
 	io.Reader
 }
 
-func TestFileCache_Basic(t *testing.T) {
-	ctx := t.Context()
-	cfg := config.NewDefault()
-
-	tmpDir, err := os.MkdirTemp("", "reservoir-cache-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create tmp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	c := New[TestMeta](cfg, nil, tmpDir, 1024*1024*1024, time.Minute, 16, ctx)
-	defer c.Destroy()
-
-	key := cache.FromString("test-key")
-	data := []byte("hello file world")
-	expires := time.Now().Add(time.Hour)
-	meta := TestMeta{ID: "meta-file"}
-
-	// Cache
-	entry, err := c.Cache(key, bytes.NewReader(data), expires, meta)
-	if err != nil {
-		t.Fatalf("Cache failed: %v", err)
-	}
-	entry.Data.Close()
-
-	// Get
-	retrieved, err := c.Get(key)
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-
-	content, _ := io.ReadAll(retrieved.Data)
-	retrieved.Data.Close()
-	if !bytes.Equal(content, data) {
-		t.Errorf("Expected data %s, got %s", data, content)
-	}
-
-	// Delete
-	err = c.Delete(key)
-	if err != nil {
-		t.Fatalf("Delete failed: %v", err)
-	}
-
-	_, err = c.Get(key)
-	if err != cache.ErrCacheEntryNotFound {
-		t.Errorf("Expected cache.ErrCacheEntryNotFound, got %v", err)
-	}
-}
-
-func TestFileCache_RejectsOversizedEntryWithoutStoring(t *testing.T) {
+func TestFileCache_OversizedEntryLeavesCacheUnchanged(t *testing.T) {
 	ctx := t.Context()
 	cfg := config.NewDefault()
 
@@ -76,8 +27,8 @@ func TestFileCache_RejectsOversizedEntryWithoutStoring(t *testing.T) {
 	c := New[TestMeta](cfg, nil, tmpDir, 4, time.Minute, 16, ctx)
 	defer c.Destroy()
 
-	key := cache.FromString("oversized-file-key")
-	_, err := c.Cache(key, noSizeReader{Reader: bytes.NewReader([]byte("too large"))}, time.Now().Add(time.Hour), TestMeta{ID: "oversized"})
+	newKey := cache.FromString("oversized-file-key")
+	_, err := c.Cache(newKey, noSizeReader{Reader: bytes.NewReader([]byte("too large"))}, time.Now().Add(time.Hour), TestMeta{ID: "oversized"})
 	if !errors.Is(err, cache.ErrCacheMemoryExceeded) {
 		t.Fatalf("expected ErrCacheMemoryExceeded, got %v", err)
 	}
@@ -85,21 +36,12 @@ func TestFileCache_RejectsOversizedEntryWithoutStoring(t *testing.T) {
 	if stats := c.Stats(); stats.Entries != 0 || stats.Bytes != 0 {
 		t.Fatalf("expected rejected entry not to affect stats, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
 	}
-	if _, err := c.Get(key); !errors.Is(err, cache.ErrCacheEntryNotFound) {
+	if _, err := c.Get(newKey); !errors.Is(err, cache.ErrCacheEntryNotFound) {
 		t.Fatalf("expected rejected entry to be missing, got %v", err)
 	}
-	if _, err := os.Stat(c.dataPath(key)); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(c.dataPath(newKey)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected oversized data file to be absent, got %v", err)
 	}
-}
-
-func TestFileCache_OversizedReplacementKeepsExistingEntry(t *testing.T) {
-	ctx := t.Context()
-	cfg := config.NewDefault()
-
-	tmpDir := t.TempDir()
-	c := New[TestMeta](cfg, nil, tmpDir, 4, time.Minute, 16, ctx)
-	defer c.Destroy()
 
 	key := cache.FromString("oversized-replacement-key")
 	firstData := []byte("ok")

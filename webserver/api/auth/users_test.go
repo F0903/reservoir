@@ -96,7 +96,7 @@ func TestUserEndpointPasswordResetDestroysOtherSessions(t *testing.T) {
 		"password_change_required": false
 	}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(current.BuildSessionCookie())
+	req.AddCookie(current.BuildSessionCookieWithSecure(false))
 	req.SetPathValue("id", strconv.FormatInt(user.ID, 10))
 	rec := httptest.NewRecorder()
 	ctx, err := apitypes.CreateContext(req, services)

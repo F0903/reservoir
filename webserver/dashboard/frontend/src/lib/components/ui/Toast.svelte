@@ -4,18 +4,10 @@
     import { onMount } from "svelte";
     import { ToastHandle } from "$lib/providers/toast/toast-provider.svelte";
     import { log } from "$lib/utils/logger";
-    import { Info, CircleCheckBig, CircleAlert, CircleQuestionMark } from "@lucide/svelte";
+    import { Info, CircleCheckBig, CircleAlert } from "@lucide/svelte";
 
     type BaseProps = {
         message: string;
-    };
-
-    type ActionProps = {
-        type: "action";
-        positiveText?: string;
-        negativeText?: string;
-        onPositive?: () => Promise<void>;
-        onNegative?: () => Promise<void>;
     };
 
     type BaseTextProps = {
@@ -37,7 +29,6 @@
     } & BaseTextProps;
 
     export type ToastProps =
-        | (BaseProps & ActionProps)
         | (BaseProps & InfoProps)
         | (BaseProps & SuccessProps)
         | (BaseProps & ErrorProps);
@@ -48,12 +39,10 @@
     let disabled = $state(false);
 
     onMount(() => {
-        if (props.type === "info" || props.type === "error" || props.type === "success") {
-            const timeout = setTimeout(async () => {
-                await disableAndDo(props.onDismiss)();
-            }, props.durationMs);
-            return () => clearTimeout(timeout);
-        }
+        const timeout = setTimeout(async () => {
+            await disableAndDo(props.onDismiss)();
+        }, props.durationMs);
+        return () => clearTimeout(timeout);
     });
 
     function disableAndDo(fn?: () => Promise<void>): () => Promise<void> {
@@ -88,8 +77,6 @@
                 <CircleCheckBig size={24} />
             {:else if props.type === "error"}
                 <CircleAlert size={24} />
-            {:else if props.type === "action"}
-                <CircleQuestionMark size={24} />
             {:else}
                 <Info size={24} />
             {/if}
@@ -98,44 +85,20 @@
         <div class="text-and-actions">
             <h1 class="toast-message">{props.message}</h1>
 
-            {#if props.type === "action"}
-                <div class="action-buttons">
-                    <Button
-                        onClick={disableAndDo(props.onPositive)}
-                        {disabled}
-                        --btn-font-weight="600"
-                        --btn-border-radius="8px"
-                        --btn-background-color="var(--tertiary-500)"
-                    >
-                        {props.positiveText || "Yes"}
-                    </Button>
-                    <Button
-                        onClick={disableAndDo(props.onNegative)}
-                        {disabled}
-                        --btn-font-weight="600"
-                        --btn-border-radius="8px"
-                        --btn-background-color="var(--primary-300)"
-                        --btn-text-color="var(--text-400)"
-                    >
-                        {props.negativeText || "No"}
-                    </Button>
-                </div>
-            {:else}
-                <div class="action-buttons single">
-                    <Button
-                        onClick={disableAndDo(props.onDismiss)}
-                        {disabled}
-                        --btn-font-weight="600"
-                        --btn-border-radius="8px"
-                        --btn-padding="0.3rem 0.6rem"
-                        --btn-font-size="0.85rem"
-                        --btn-background-color="rgba(255, 255, 255, 0.1)"
-                        --btn-text-color="var(--text-400)"
-                    >
-                        {props.dismissText || (props.type === "error" ? "Dismiss" : "OK")}
-                    </Button>
-                </div>
-            {/if}
+            <div class="action-buttons single">
+                <Button
+                    onClick={disableAndDo(props.onDismiss)}
+                    {disabled}
+                    --btn-font-weight="600"
+                    --btn-border-radius="8px"
+                    --btn-padding="0.3rem 0.6rem"
+                    --btn-font-size="0.85rem"
+                    --btn-background-color="rgba(255, 255, 255, 0.1)"
+                    --btn-text-color="var(--text-400)"
+                >
+                    {props.dismissText || (props.type === "error" ? "Dismiss" : "OK")}
+                </Button>
+            </div>
         </div>
     </div>
 </div>
@@ -167,10 +130,6 @@
 
     .toast.error {
         --toast-accent-color: var(--error-color);
-    }
-
-    .toast.action {
-        --toast-accent-color: var(--tertiary-500);
     }
 
     .accent-bar {

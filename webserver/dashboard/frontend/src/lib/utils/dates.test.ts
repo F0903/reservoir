@@ -11,28 +11,16 @@ describe("dates utils", () => {
     });
 
     describe("formatTimeSinceDate", () => {
-        it("should format seconds", () => {
+        it.each([
+            ["30s", 30 * 1000],
+            ["5m 30s", 5 * 60 * 1000 + 30 * 1000],
+            ["2h 5m 30s", 2 * 3600 * 1000 + 5 * 60 * 1000 + 30 * 1000],
+        ] as const)("should format elapsed time as %s", (expected, elapsedMs) => {
             const now = new Date("2024-01-01T12:00:00Z");
             vi.setSystemTime(now);
 
-            const start = new Date(now.getTime() - 30 * 1000);
-            expect(formatTimeSinceDate(start)).toBe("30s");
-        });
-
-        it("should format minutes and seconds", () => {
-            const now = new Date("2024-01-01T12:00:00Z");
-            vi.setSystemTime(now);
-
-            const start = new Date(now.getTime() - (5 * 60 * 1000 + 30 * 1000));
-            expect(formatTimeSinceDate(start)).toBe("5m 30s");
-        });
-
-        it("should format hours, minutes and seconds", () => {
-            const now = new Date("2024-01-01T12:00:00Z");
-            vi.setSystemTime(now);
-
-            const start = new Date(now.getTime() - (2 * 3600 * 1000 + 5 * 60 * 1000 + 30 * 1000));
-            expect(formatTimeSinceDate(start)).toBe("2h 5m 30s");
+            const start = new Date(now.getTime() - elapsedMs);
+            expect(formatTimeSinceDate(start)).toBe(expected);
         });
 
         it("should limit to 3 parts", () => {

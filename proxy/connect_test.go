@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"bufio"
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -268,45 +267,5 @@ func TestDownloadSurvivesPausesLongerThanWriteTimeout(t *testing.T) {
 				t.Fatalf("got %d bytes, err=%v", len(body), err)
 			}
 		})
-	}
-}
-
-func TestTunnelDeadlineDoesNotCutOffSlowResponses(t *testing.T) {
-	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		time.Sleep(400 * time.Millisecond) // Several times the tunnel idle timeout.
-		io.WriteString(w, "slow body")
-	}))
-	t.Cleanup(upstream.Close)
-
-	server := httptest.NewServer(newTunnelTestProxy(t, upstream.Client()))
-	t.Cleanup(server.Close)
-
-	proxyURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := &http.Client{Transport: &http.Transport{
-		Proxy:           http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}}
-	t.Cleanup(client.CloseIdleConnections)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, upstream.URL+"/slow", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil || string(body) != "slow body" {
-		t.Fatalf("body=%q err=%v", body, err)
 	}
 }

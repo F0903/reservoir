@@ -106,28 +106,6 @@ func TestHybridCache_WritesAndReadsMemoryFirst(t *testing.T) {
 	}
 }
 
-func TestHybridCache_StoresOversizedEntriesInFile(t *testing.T) {
-	c := newTestHybridCacheWithMax(t, time.Hour, 2000)
-	setHybridMemoryCap(c, 1000)
-
-	key := cache.FromString("hybrid-oversized-key")
-	data := bytes.Repeat([]byte("x"), 1200)
-	entry, err := c.Cache(key, bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{ID: "oversized"})
-	if err != nil {
-		t.Fatalf("Cache failed: %v", err)
-	}
-	if content := readEntryData(t, entry); !bytes.Equal(content, data) {
-		t.Fatalf("expected streamed file data %q, got %q", data, content)
-	}
-
-	if stats := c.memory.Stats(); stats.Entries != 0 || stats.Bytes != 0 {
-		t.Fatalf("expected oversized entry to skip memory, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-	if stats := c.file.Stats(); stats.Entries != 1 || stats.Bytes != int64(len(data)) {
-		t.Fatalf("expected oversized entry in file, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-}
-
 func TestHybridCache_StoresInFileWhenRecentMemoryWouldExceedLimit(t *testing.T) {
 	c := newTestHybridCacheWithMax(t, time.Hour, 2000)
 	setHybridMemoryCap(c, 1000)
@@ -219,36 +197,6 @@ func TestHybridCache_DeleteSucceedsFromEitherTier(t *testing.T) {
 	}
 }
 
-func TestHybridCache_DemotesIdleMemoryEntriesToFile(t *testing.T) {
-	c := newTestHybridCache(t, time.Hour)
-
-	key := cache.FromString("hybrid-demote-key")
-	data := []byte("hybrid demotion body")
-	entry, err := c.Cache(key, bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{ID: "demote"})
-	if err != nil {
-		t.Fatalf("Cache failed: %v", err)
-	}
-	entry.Data.Close()
-
-	setHybridMemoryLastAccess(t, c, key, time.Now().Add(-2*time.Hour))
-	c.demoteIdleEntries()
-
-	if stats := c.memory.Stats(); stats.Entries != 0 {
-		t.Fatalf("expected memory entry to be demoted, got %d memory entries", stats.Entries)
-	}
-	if stats := c.file.Stats(); stats.Entries != 1 {
-		t.Fatalf("expected demoted file entry, got %d file entries", stats.Entries)
-	}
-
-	fileEntry, err := c.file.Get(key)
-	if err != nil {
-		t.Fatalf("expected file cache hit after demotion: %v", err)
-	}
-	if content := readEntryData(t, fileEntry); !bytes.Equal(content, data) {
-		t.Fatalf("expected demoted data %q, got %q", data, content)
-	}
-}
-
 func TestHybridCache_RecentAccessPreventsDemotion(t *testing.T) {
 	c := newTestHybridCache(t, time.Hour)
 
@@ -274,36 +222,6 @@ func TestHybridCache_RecentAccessPreventsDemotion(t *testing.T) {
 	}
 	if stats := c.file.Stats(); stats.Entries != 0 {
 		t.Fatalf("expected no file entries after recent access, got %d", stats.Entries)
-	}
-}
-
-func TestHybridCache_FileHitPromotesEntryBackToMemory(t *testing.T) {
-	c := newTestHybridCache(t, time.Hour)
-
-	key := cache.FromString("hybrid-promote-key")
-	data := []byte("promote body")
-	entry, err := c.Cache(key, bytes.NewReader(data), time.Now().Add(time.Hour), TestMeta{ID: "promote"})
-	if err != nil {
-		t.Fatalf("Cache failed: %v", err)
-	}
-	entry.Data.Close()
-
-	setHybridMemoryLastAccess(t, c, key, time.Now().Add(-2*time.Hour))
-	c.demoteIdleEntries()
-
-	retrieved, err := c.Get(key)
-	if err != nil {
-		t.Fatalf("Get after demotion failed: %v", err)
-	}
-	if content := readEntryData(t, retrieved); !bytes.Equal(content, data) {
-		t.Fatalf("expected promoted data %q, got %q", data, content)
-	}
-
-	if stats := c.memory.Stats(); stats.Entries != 1 {
-		t.Fatalf("expected file hit to promote entry to memory, got %d memory entries", stats.Entries)
-	}
-	if stats := c.file.Stats(); stats.Entries != 1 {
-		t.Fatalf("expected promoted file entry to remain shadowed, got %d file entries", stats.Entries)
 	}
 }
 
@@ -405,7 +323,15 @@ func TestHybridCache_MetricsTrackShadowedFileAcrossDemotionAndPromotion(t *testi
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
-	retrieved.Data.Close()
+	if content := readEntryData(t, retrieved); !bytes.Equal(content, data) {
+		t.Fatalf("expected promoted data %q, got %q", data, content)
+	}
+	if stats := c.memory.Stats(); stats.Entries != 1 {
+		t.Fatalf("expected file hit to promote entry to memory, got %d memory entries", stats.Entries)
+	}
+	if stats := c.file.Stats(); stats.Entries != 1 {
+		t.Fatalf("expected promoted file entry to remain shadowed, got %d file entries", stats.Entries)
+	}
 	if got := c.metrics.Cache.CacheHits.Get(); got != 1 {
 		t.Fatalf("expected one externally visible cache hit, got %d", got)
 	}

@@ -11,27 +11,16 @@ describe("Loadable component", () => {
         render: () => `<div>Loaded: ${data()}</div>`,
     })) as unknown as Snippet<[data: never]>;
 
-    it("should render loading box when state is null", () => {
+    it.each([null, undefined])("should render loading box when state is %s", (state) => {
         const { container } = render(Loadable<string>, {
             props: {
-                state: null,
+                state,
                 children: childrenSnippet as unknown as Snippet<[data: string]>,
             },
         });
 
         expect(container.querySelector(".loading-box")).toBeInTheDocument();
         expect(screen.queryByText(/Loaded:/)).not.toBeInTheDocument();
-    });
-
-    it("should render loading box when state is undefined", () => {
-        const { container } = render(Loadable<string>, {
-            props: {
-                state: undefined,
-                children: childrenSnippet as unknown as Snippet<[data: string]>,
-            },
-        });
-
-        expect(container.querySelector(".loading-box")).toBeInTheDocument();
     });
 
     it("should render error when error prop is provided", () => {

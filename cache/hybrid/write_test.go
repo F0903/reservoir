@@ -179,19 +179,41 @@ func TestHybridCache_RecordsCleanupOncePerCycle(t *testing.T) {
 	}
 }
 
-func TestHybridCache_UnknownSizedEntryGoesToFile(t *testing.T) {
-	c := newTestHybridCache(t, time.Hour)
+func TestHybridCache_UnbufferableEntriesGoToFile(t *testing.T) {
+	oversized := bytes.Repeat([]byte("x"), 1200)
+	unknown := []byte("unknown size content")
 
-	key := cache.FromString("unknown-size")
-	data := []byte("unknown size content")
-	entry, err := c.Cache(key, unknownSizeReader(data), time.Now().Add(time.Hour), TestMeta{})
-	if err != nil {
-		t.Fatalf("failed to cache entry: %v", err)
+	tests := []struct {
+		name         string
+		maxCacheSize int64
+		memoryCap    int64 // Zero keeps the default budget.
+		data         []byte
+		reader       io.Reader
+	}{
+		{"oversized", 2000, 1000, oversized, bytes.NewReader(oversized)},
+		{"unknown size", 1024 * 1024 * 1024, 0, unknown, unknownSizeReader(unknown)},
 	}
-	if got := readEntryData(t, entry); !bytes.Equal(got, data) {
-		t.Fatalf("got %q, want %q", got, data)
-	}
-	if got := c.memory.StoredBytes(); got != 0 {
-		t.Fatalf("expected unknown-size entry on disk, memory holds %d bytes", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestHybridCacheWithMax(t, time.Hour, tt.maxCacheSize)
+			if tt.memoryCap > 0 {
+				setHybridMemoryCap(c, tt.memoryCap)
+			}
+
+			entry, err := c.Cache(cache.FromString(tt.name), tt.reader, time.Now().Add(time.Hour), TestMeta{})
+			if err != nil {
+				t.Fatalf("failed to cache entry: %v", err)
+			}
+			if got := readEntryData(t, entry); !bytes.Equal(got, tt.data) {
+				t.Fatalf("got %q, want %q", got, tt.data)
+			}
+
+			if stats := c.memory.Stats(); stats.Entries != 0 || stats.Bytes != 0 {
+				t.Fatalf("expected entry to skip memory, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
+			}
+			if stats := c.file.Stats(); stats.Entries != 1 || stats.Bytes != int64(len(tt.data)) {
+				t.Fatalf("expected entry in file, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
+			}
+		})
 	}
 }

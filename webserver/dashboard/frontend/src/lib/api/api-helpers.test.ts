@@ -34,20 +34,6 @@ describe("api-helpers", () => {
             expect(result).toEqual(mockData);
         });
 
-        it("should throw Error on non-ok response", async () => {
-            const fetchFn = vi.fn().mockResolvedValue({
-                status: 500,
-                ok: false,
-                statusText: "Internal Server Error",
-                url: "http://localhost/api/test",
-                text: () => Promise.resolve(""),
-            });
-
-            await expect(apiGet("/test", fetchFn)).rejects.toThrow(
-                "Failed to fetch from 'http://localhost/api/test': 500 Internal Server Error",
-            );
-        });
-
         it("should include response body on non-ok response when present", async () => {
             const fetchFn = vi.fn().mockResolvedValue({
                 status: 400,

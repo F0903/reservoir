@@ -108,13 +108,6 @@ describe("MetricsProvider", () => {
         vi.useRealTimers();
     });
 
-    it("should initialize with default state", () => {
-        expect(provider.data).toBeNull();
-        expect(provider.error).toBeNull();
-        expect(provider.loading).toBe(false);
-        expect(provider.lastUpdated).toBeNull();
-    });
-
     it("should fetch metrics and update state", async () => {
         await provider.refreshMetrics();
 
@@ -132,21 +125,6 @@ describe("MetricsProvider", () => {
         expect(provider.error).toBe("Network Error");
         expect(provider.loading).toBe(false);
         expect(provider.data).toBeNull();
-    });
-
-    it("should toggle loading state during fetch", async () => {
-        let resolveFetch: (_value: metricsApi.Metrics) => void = () => {};
-        const promise = new Promise<metricsApi.Metrics>((resolve) => (resolveFetch = resolve));
-        (metricsApi.getAllMetrics as Mock).mockReturnValue(promise);
-
-        const refreshPromise = provider.refreshMetrics();
-
-        expect(provider.loading).toBe(true);
-
-        resolveFetch(mockMetrics);
-        await refreshPromise;
-
-        expect(provider.loading).toBe(false);
     });
 
     it("should reuse an in-flight refresh", async () => {

@@ -35,7 +35,7 @@ func TestChangePasswordEndpointRejectsShortPassword(t *testing.T) {
 		"new_password": "short"
 	}`))
 	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(session.BuildSessionCookie())
+	req.AddCookie(session.BuildSessionCookieWithSecure(false))
 
 	ctx, err := apitypes.CreateContext(req, services)
 	if err != nil {

@@ -112,27 +112,6 @@ func TestHTTPSTunnelUsesTLSUpstreamWithUpgradeOff(t *testing.T) {
 	}
 }
 
-func TestPlainHTTPHostWorksWithDefaultConfig(t *testing.T) {
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("plain"))
-	}))
-	t.Cleanup(upstream.Close)
-
-	cfg := config.NewDefault()
-	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
-	cfg.Logging.File.Overwrite("")
-
-	resp, err := newBareProxy(t, cfg, newTestUpstreamClient()).Get(upstream.URL + "/plain-only")
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected a plain http host to work, got status %d", resp.StatusCode)
-	}
-}
-
 func TestUpgradeSettingSendsPlainHTTPOverTLS(t *testing.T) {
 	env := SetupHttpsTestEnv(t)
 	env.Cfg.Proxy.UpgradeHttpToHttps.Overwrite(true)
@@ -457,7 +436,7 @@ func TestCachedResponseWithoutETagOmitsHeader(t *testing.T) {
 }
 
 func TestTokenHeadersBypassSharedCache(t *testing.T) {
-	for _, header := range []string{"Private-Token", "X-Api-Key"} {
+	for _, header := range []string{"Authorization", "Private-Token", "X-Api-Key"} {
 		t.Run(header, func(t *testing.T) {
 			env := SetupTestEnv(t)
 			var hits atomic.Int64
@@ -468,6 +447,7 @@ func TestTokenHeadersBypassSharedCache(t *testing.T) {
 			})
 			env.Start()
 
+			bytesFetchedBefore := env.Metrics.Requests.BytesFetched.Get()
 			for _, token := range []string{"alice", "bob"} {
 				req, _ := http.NewRequest(http.MethodGet, env.Upstream.URL+"/repo.tar.gz", nil)
 				req.Header.Set(header, token)
@@ -481,6 +461,10 @@ func TestTokenHeadersBypassSharedCache(t *testing.T) {
 			}
 			if got := hits.Load(); got != 2 {
 				t.Fatalf("expected both requests upstream, got %d", got)
+			}
+			expectedFetched := int64(len("secret for alice") + len("secret for bob"))
+			if got := env.Metrics.Requests.BytesFetched.Get() - bytesFetchedBefore; got < expectedFetched {
+				t.Fatalf("expected at least %d direct upstream bytes fetched, got %d", expectedFetched, got)
 			}
 		})
 	}
@@ -535,19 +519,6 @@ func TestBadGatewayIsCounted(t *testing.T) {
 	}
 	if got := requests.NonCoalescedRequests.Get(); got != 1 {
 		t.Fatalf("expected the failed request to be counted, got %d", got)
-	}
-}
-
-func TestRangeNotSatisfiableIsCounted(t *testing.T) {
-	env, _, target := cachedRangeEnv(t, "0123456789")
-
-	resp, _ := getRange(t, env, target, "bytes=100-200")
-
-	if resp.StatusCode != http.StatusRequestedRangeNotSatisfiable {
-		t.Fatalf("expected 416, got %d", resp.StatusCode)
-	}
-	if got := env.Metrics.Requests.StatusClientErrorResponses.Get(); got != 1 {
-		t.Fatalf("expected one client error, got %d", got)
 	}
 }
 

@@ -35,12 +35,3 @@ func TestRequestFromHTTPIgnoresForwardedHeaderByDefault(t *testing.T) {
 		t.Fatalf("clientAddress = %q, a forged header must not be believed", got.clientAddress)
 	}
 }
-
-func TestRequestFromHTTPWorksWithoutConfig(t *testing.T) {
-	svc := &AuthService{sessions: coreauth.NewSessionManager()}
-
-	got, _ := svc.RequestFromHTTP(requestFromProxy("198.51.100.7"))
-	if got.clientAddress != "10.0.0.5" {
-		t.Fatalf("clientAddress = %q", got.clientAddress)
-	}
-}

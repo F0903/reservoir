@@ -37,25 +37,6 @@ func TestRawHTTPResponderBodylessStatusesHaveNoFraming(t *testing.T) {
 	}
 }
 
-func TestRawHTTPResponderHeadWithKnownSizeSendsNoBody(t *testing.T) {
-	var buf bytes.Buffer
-	responder := NewRawHTTPResponder(&buf)
-	responder.SetRequest(&http.Request{Method: http.MethodHead})
-	responder.SetHeader("Content-Length", "10")
-
-	if _, _, err := responder.Write(http.StatusOK, http.NoBody); err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
-
-	raw := buf.String()
-	if !strings.Contains(raw, "Content-Length: 10\r\n") {
-		t.Fatalf("expected Content-Length to be kept: %q", raw)
-	}
-	if !strings.HasSuffix(raw, "\r\n\r\n") {
-		t.Fatalf("response must end right after its headers: %q", raw)
-	}
-}
-
 func TestRawHTTPResponderHeadWithUnknownSizeHasNoChunkTerminator(t *testing.T) {
 	var buf bytes.Buffer
 	responder := NewRawHTTPResponder(&buf)

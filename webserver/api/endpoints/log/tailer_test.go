@@ -76,58 +76,48 @@ func TestLogTailerReadsFromStartAfterRotation(t *testing.T) {
 	assertTailerLines(t, tailer, []string{"new line"})
 }
 
-func TestLogTailerRetriesAfterTransientStatFailure(t *testing.T) {
-	statErr := errors.New("stat failed")
-	file := &fakeTailerFile{id: "log", data: []byte("line\n")}
-	tailer := &logTailer{
-		path:        "log",
-		currentInfo: fakeFileInfo{name: "log", size: 0, sys: "log"},
-		offset:      0,
-		ops: logTailerOps{
-			open: func(string) (logTailerFile, error) {
-				return file, nil
-			},
-			stat: func(string) (os.FileInfo, error) {
-				if statErr != nil {
-					return nil, statErr
-				}
-				return file.Stat()
-			},
-			sameFile: fakeSameFile,
-		},
+func TestLogTailerRetriesAfterTransientFailure(t *testing.T) {
+	tests := []struct {
+		name    string
+		statErr error
+		readErr error
+	}{
+		{name: "StatFailure", statErr: errors.New("stat failed")},
+		{name: "ReadFailure", readErr: errors.New("read failed")},
 	}
 
-	assertTailerLines(t, tailer, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			statErr := tt.statErr
+			file := &fakeTailerFile{id: "log", data: []byte("line\n"), readErr: tt.readErr}
+			tailer := &logTailer{
+				path:        "log",
+				currentInfo: fakeFileInfo{name: "log", size: 0, sys: "log"},
+				offset:      0,
+				ops: logTailerOps{
+					open: func(string) (logTailerFile, error) {
+						return file, nil
+					},
+					stat: func(string) (os.FileInfo, error) {
+						if statErr != nil {
+							return nil, statErr
+						}
+						return file.Stat()
+					},
+					sameFile: fakeSameFile,
+				},
+			}
 
-	statErr = nil
-	assertTailerLines(t, tailer, []string{"line"})
-}
+			assertTailerLines(t, tailer, nil)
+			if tailer.offset != 0 {
+				t.Fatalf("expected failed tick to preserve offset 0, got %d", tailer.offset)
+			}
 
-func TestLogTailerRetriesAfterTransientReadFailure(t *testing.T) {
-	readErr := errors.New("read failed")
-	file := &fakeTailerFile{id: "log", data: []byte("line\n"), readErr: readErr}
-	tailer := &logTailer{
-		path:        "log",
-		currentInfo: fakeFileInfo{name: "log", size: 0, sys: "log"},
-		offset:      0,
-		ops: logTailerOps{
-			open: func(string) (logTailerFile, error) {
-				return file, nil
-			},
-			stat: func(string) (os.FileInfo, error) {
-				return file.Stat()
-			},
-			sameFile: fakeSameFile,
-		},
+			statErr = nil
+			file.readErr = nil
+			assertTailerLines(t, tailer, []string{"line"})
+		})
 	}
-
-	assertTailerLines(t, tailer, nil)
-	if tailer.offset != 0 {
-		t.Fatalf("expected failed read to preserve offset 0, got %d", tailer.offset)
-	}
-
-	file.readErr = nil
-	assertTailerLines(t, tailer, []string{"line"})
 }
 
 func newTestLogFile(t *testing.T, contents string) string {

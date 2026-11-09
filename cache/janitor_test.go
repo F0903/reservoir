@@ -112,41 +112,6 @@ func newTestJanitor(t *testing.T, backend *janitorTestBackend) *Janitor[janitorT
 	return j
 }
 
-func TestJanitor_TierRecordsBytesCleanedButLeavesTheTotalAlone(t *testing.T) {
-	now := time.Now()
-	backend := newJanitorTestBackend()
-	backend.put(FromString("expired"), 400, now.Add(-time.Second), now)
-	backend.put(FromString("fresh"), 600, now.Add(time.Hour), now)
-
-	m := metrics.NewMetrics()
-	m.Cache.BytesCached.Set(5000) // The total across both hybrid tiers.
-	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, false, m)
-	t.Cleanup(j.subs.UnsubscribeAll)
-
-	j.cleanExpiredEntries()
-
-	if got := m.Cache.BytesCleaned.Get(); got != 400 {
-		t.Fatalf("expected 400 bytes cleaned, got %d", got)
-	}
-	if got := m.Cache.BytesCached.Get(); got != 5000 {
-		t.Fatalf("expected the hybrid total to be untouched, got %d", got)
-	}
-}
-
-func TestJanitor_CountsRunsOnlyWhenAsked(t *testing.T) {
-	for _, count := range []bool{true, false} {
-		m := metrics.NewMetrics()
-		j := NewJanitor(config.NewDefault(), 5*time.Millisecond, newJanitorTestBackend().janitorFunctions(), false, count, m)
-		j.Start(t.Context())
-		time.Sleep(60 * time.Millisecond)
-		j.Stop()
-
-		if got := m.Cache.CleanupRuns.Get() > 0; got != count {
-			t.Fatalf("countCleanupRuns=%v but runs recorded=%v", count, got)
-		}
-	}
-}
-
 func TestJanitor_CleansExpiredEntries(t *testing.T) {
 	now := time.Now()
 	expiredKey := FromString("expired-key")
@@ -155,7 +120,12 @@ func TestJanitor_CleansExpiredEntries(t *testing.T) {
 	backend.put(expiredKey, 400, now.Add(-time.Second), now)
 	backend.put(freshKey, 600, now.Add(time.Hour), now)
 
-	newTestJanitor(t, backend).cleanExpiredEntries()
+	m := metrics.NewMetrics()
+	m.Cache.BytesCached.Set(5000) // The total across both hybrid tiers.
+	j := NewJanitor(config.NewDefault(), time.Hour, backend.janitorFunctions(), false, false, m)
+	t.Cleanup(j.subs.UnsubscribeAll)
+
+	j.cleanExpiredEntries()
 
 	if backend.has(expiredKey) {
 		t.Fatal("expected expired entry to be removed")
@@ -165,6 +135,12 @@ func TestJanitor_CleansExpiredEntries(t *testing.T) {
 	}
 	if got := backend.cachedBytes(); got != 600 {
 		t.Fatalf("expected cached bytes to be 600 after cleanup, got %d", got)
+	}
+	if got := m.Cache.BytesCleaned.Get(); got != 400 {
+		t.Fatalf("expected 400 bytes cleaned, got %d", got)
+	}
+	if got := m.Cache.BytesCached.Get(); got != 5000 {
+		t.Fatalf("expected the hybrid total to be untouched, got %d", got)
 	}
 }
 

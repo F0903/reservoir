@@ -176,99 +176,75 @@ func TestStaleCacheReplacedWhenUpstreamReturnsNewBody(t *testing.T) {
 	}
 }
 
-func TestStaleCacheServedWhenUpstreamReturnsServerError(t *testing.T) {
-	env := SetupTestEnv(t)
+func TestStaleCacheServedWhenUpstreamFails(t *testing.T) {
+	tests := []struct {
+		name          string
+		closeUpstream bool
+		wantFwdStatus string // Empty when the upstream could not be reached.
+		wantRequests  int64
+	}{
+		{name: "server error", wantFwdStatus: "fwd-status=503", wantRequests: 2},
+		{name: "unreachable", closeUpstream: true, wantRequests: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := SetupTestEnv(t)
 
-	var requestCount atomic.Int64
-	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		count := requestCount.Add(1)
-		if count > 1 {
-			http.Error(w, "upstream unavailable", http.StatusServiceUnavailable)
-			return
-		}
+			var requestCount atomic.Int64
+			env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if requestCount.Add(1) > 1 {
+					http.Error(w, "upstream unavailable", http.StatusServiceUnavailable)
+					return
+				}
 
-		w.Header().Set("Cache-Control", "max-age=1")
-		w.Header().Set("ETag", "\"stale-on-error\"")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("cached package body"))
-	})
-	env.Start()
+				w.Header().Set("Cache-Control", "max-age=1")
+				w.Header().Set("ETag", "\"stale-fallback\"")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("cached package body"))
+			})
+			env.Start()
 
-	targetURL := env.Upstream.URL + "/stale-on-error"
-	resp1, err := env.Client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("first request failed: %v", err)
-	}
-	if body := readResponseBody(t, resp1); body != "cached package body" {
-		t.Fatalf("unexpected first response body: %q", body)
-	}
+			targetURL := env.Upstream.URL + "/stale-fallback"
+			resp1, err := env.Client.Get(targetURL)
+			if err != nil {
+				t.Fatalf("first request failed: %v", err)
+			}
+			if body := readResponseBody(t, resp1); body != "cached package body" {
+				t.Fatalf("unexpected first response body: %q", body)
+			}
 
-	time.Sleep(1100 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
+			if tt.closeUpstream {
+				env.Upstream.Close()
+			}
 
-	resp2, err := env.Client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("second request failed: %v", err)
-	}
-	if resp2.StatusCode != http.StatusOK {
-		t.Fatalf("expected stale cache to be served with 200 OK, got %d", resp2.StatusCode)
-	}
-	if body := readResponseBody(t, resp2); body != "cached package body" {
-		t.Fatalf("expected stale cached body, got %q", body)
-	}
-	cacheStatus := resp2.Header.Get("Cache-Status")
-	if !strings.Contains(cacheStatus, "detail=\"stale\"") || !strings.Contains(cacheStatus, "fwd-status=503") {
-		t.Fatalf("expected stale Cache-Status with upstream 503, got %q", cacheStatus)
-	}
-	if got := resp2.Header.Get("X-Cache"); got != "STALE" {
-		t.Fatalf("expected X-Cache STALE, got %q", got)
-	}
-	if count := requestCount.Load(); count != 2 {
-		t.Fatalf("expected one failed revalidation attempt, got %d upstream requests", count)
-	}
-}
-
-func TestStaleCacheServedWhenUpstreamIsUnavailable(t *testing.T) {
-	env := SetupTestEnv(t)
-
-	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "max-age=1")
-		w.Header().Set("ETag", "\"stale-when-offline\"")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("offline cached package"))
-	})
-	env.Start()
-
-	targetURL := env.Upstream.URL + "/stale-when-offline"
-	resp1, err := env.Client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("first request failed: %v", err)
-	}
-	if body := readResponseBody(t, resp1); body != "offline cached package" {
-		t.Fatalf("unexpected first response body: %q", body)
-	}
-
-	time.Sleep(1100 * time.Millisecond)
-	env.Upstream.Close()
-
-	resp2, err := env.Client.Get(targetURL)
-	if err != nil {
-		t.Fatalf("second request failed: %v", err)
-	}
-	if resp2.StatusCode != http.StatusOK {
-		t.Fatalf("expected stale cache to be served with 200 OK, got %d", resp2.StatusCode)
-	}
-	if body := readResponseBody(t, resp2); body != "offline cached package" {
-		t.Fatalf("expected stale cached body, got %q", body)
-	}
-	cacheStatus := resp2.Header.Get("Cache-Status")
-	if !strings.Contains(cacheStatus, "detail=\"stale\"") {
-		t.Fatalf("expected stale Cache-Status for unavailable upstream, got %q", cacheStatus)
-	}
-	if strings.Contains(cacheStatus, "fwd-status=") {
-		t.Fatalf("did not expect fwd-status when upstream was unreachable, got %q", cacheStatus)
-	}
-	if got := resp2.Header.Get("X-Cache"); got != "STALE" {
-		t.Fatalf("expected X-Cache STALE, got %q", got)
+			resp2, err := env.Client.Get(targetURL)
+			if err != nil {
+				t.Fatalf("second request failed: %v", err)
+			}
+			if resp2.StatusCode != http.StatusOK {
+				t.Fatalf("expected stale cache to be served with 200 OK, got %d", resp2.StatusCode)
+			}
+			if body := readResponseBody(t, resp2); body != "cached package body" {
+				t.Fatalf("expected stale cached body, got %q", body)
+			}
+			cacheStatus := resp2.Header.Get("Cache-Status")
+			if !strings.Contains(cacheStatus, "detail=\"stale\"") {
+				t.Fatalf("expected stale Cache-Status, got %q", cacheStatus)
+			}
+			if tt.wantFwdStatus != "" && !strings.Contains(cacheStatus, tt.wantFwdStatus) {
+				t.Fatalf("expected Cache-Status with %s, got %q", tt.wantFwdStatus, cacheStatus)
+			}
+			if tt.wantFwdStatus == "" && strings.Contains(cacheStatus, "fwd-status=") {
+				t.Fatalf("did not expect fwd-status when upstream was unreachable, got %q", cacheStatus)
+			}
+			if got := resp2.Header.Get("X-Cache"); got != "STALE" {
+				t.Fatalf("expected X-Cache STALE, got %q", got)
+			}
+			if count := requestCount.Load(); count != tt.wantRequests {
+				t.Fatalf("expected %d upstream requests, got %d", tt.wantRequests, count)
+			}
+		})
 	}
 }
 

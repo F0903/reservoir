@@ -19,7 +19,7 @@ describe("DashboardSettings", () => {
         vi.clearAllMocks();
     });
 
-    it("loads saved dashboard settings from localStorage", () => {
+    it("loads saved dashboard settings from localStorage and reloads them", async () => {
         localStorage.setItem(
             "dashboardConfig",
             JSON.stringify({
@@ -36,21 +36,6 @@ describe("DashboardSettings", () => {
             span: { width: 4, height: 4 },
             mobileSpan: { width: 2, height: 6 },
         });
-    });
-
-    it("saves dashboard settings to localStorage", () => {
-        const settings = new DashboardSettings();
-
-        settings.fields.updateInterval = 2500;
-        settings.save();
-
-        const saved = JSON.parse(localStorage.getItem("dashboardConfig") ?? "{}");
-        expect(saved.updateInterval).toBe(2500);
-        expect(saved.layout).toEqual(defaultDashboardLayout());
-    });
-
-    it("reloads dashboard settings from localStorage", async () => {
-        const settings = new DashboardSettings();
 
         localStorage.setItem(
             "dashboardConfig",
@@ -67,6 +52,17 @@ describe("DashboardSettings", () => {
             span: { width: 8, height: 2 },
             mobileSpan: { width: 4, height: 4 },
         });
+    });
+
+    it("saves dashboard settings to localStorage", () => {
+        const settings = new DashboardSettings();
+
+        settings.fields.updateInterval = 2500;
+        settings.save();
+
+        const saved = JSON.parse(localStorage.getItem("dashboardConfig") ?? "{}");
+        expect(saved.updateInterval).toBe(2500);
+        expect(saved.layout).toEqual(defaultDashboardLayout());
     });
 
     it("keeps defaults when stored dashboard settings are invalid JSON", () => {

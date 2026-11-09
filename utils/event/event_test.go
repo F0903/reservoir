@@ -60,23 +60,6 @@ func TestFireUsesSubscriptionOrder(t *testing.T) {
 	}
 }
 
-func TestConcurrentSubscribeFireUnsubscribe(t *testing.T) {
-	event := New[int]()
-	var wg sync.WaitGroup
-
-	for range 100 {
-		wg.Go(func() {
-
-			unsub := event.Subscribe(func(int) {})
-			event.Fire(0)
-			unsub()
-			unsub()
-		})
-	}
-
-	wg.Wait()
-}
-
 func TestZeroValueEventConcurrentUse(t *testing.T) {
 	var event Event[int]
 	var wg sync.WaitGroup

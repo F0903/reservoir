@@ -69,25 +69,24 @@ describe("AuthProvider", () => {
         expect(provider.user).toEqual(mockUser);
     });
 
-    it("should handle no active session during init", async () => {
-        (authApi.me as Mock).mockRejectedValue(new UnauthorizedError());
-        provider = new AuthProvider();
+    it.each([false, true])(
+        "should handle no active session during init (bootstrap required: %s)",
+        async (bootstrapRequired) => {
+            (authApi.me as Mock).mockRejectedValue(new UnauthorizedError());
+            (authApi.bootstrapStatus as Mock).mockResolvedValue({
+                bootstrap_required: bootstrapRequired,
+            });
+            provider = new AuthProvider();
 
-        await vi.waitFor(() => expect(provider.loading).toBe(false));
+            await vi.waitFor(() => expect(provider.loading).toBe(false));
 
-        expect(provider.user).toBeNull();
-    });
-
-    it("should redirect to bootstrap when no session exists and bootstrap is required", async () => {
-        (authApi.me as Mock).mockRejectedValue(new UnauthorizedError());
-        (authApi.bootstrapStatus as Mock).mockResolvedValue({ bootstrap_required: true });
-        provider = new AuthProvider();
-
-        await vi.waitFor(() => expect(provider.loading).toBe(false));
-
-        expect(authApi.bootstrapStatus).toHaveBeenCalled();
-        expect(goto).toHaveBeenCalledWith("/bootstrap", { replaceState: true });
-    });
+            expect(provider.user).toBeNull();
+            if (bootstrapRequired) {
+                expect(authApi.bootstrapStatus).toHaveBeenCalled();
+                expect(goto).toHaveBeenCalledWith("/bootstrap", { replaceState: true });
+            }
+        },
+    );
 
     it("should create bootstrap admin and store the returned user", async () => {
         (authApi.bootstrapAdmin as Mock).mockResolvedValue(mockUser);
