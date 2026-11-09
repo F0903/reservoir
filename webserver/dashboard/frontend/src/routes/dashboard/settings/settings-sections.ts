@@ -2,15 +2,15 @@ import {
     patchConfig,
     type ConfigPropPath,
     type ConfigPropValue,
-} from "$lib/api/objects/config/config";
-import Dropdown from "$lib/components/ui/input/Dropdown.svelte";
-import NumberInput from "$lib/components/ui/input/NumberInput.svelte";
-import PercentInput from "$lib/components/ui/input/PercentInput.svelte";
-import TextInput from "$lib/components/ui/input/TextInput.svelte";
-import Toggle from "$lib/components/ui/input/Toggle.svelte";
-import type { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
-import { parseByteString } from "$lib/utils/bytestring";
-import { log } from "$lib/utils/logger";
+} from "#lib/api/objects/config/config.ts";
+import Dropdown from "#lib/components/ui/input/Dropdown.svelte";
+import NumberInput from "#lib/components/ui/input/NumberInput.svelte";
+import PercentInput from "#lib/components/ui/input/PercentInput.svelte";
+import TextInput from "#lib/components/ui/input/TextInput.svelte";
+import Toggle from "#lib/components/ui/input/Toggle.svelte";
+import type { SettingsProvider } from "#lib/providers/settings/settings-provider.svelte.ts";
+import { parseByteString } from "#lib/utils/bytestring.ts";
+import { log } from "#lib/utils/logger.ts";
 import { Database, FileText, Globe, PanelsTopLeft } from "@lucide/svelte";
 import type { Component, ComponentProps } from "svelte";
 

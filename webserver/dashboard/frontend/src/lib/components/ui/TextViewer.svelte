@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import LogLine from "./LogLine.svelte";
-    import { isNumber } from "$lib/utils/generic-type-predicates";
-    import { log } from "$lib/utils/logger";
+    import { isNumber } from "#lib/utils/generic-type-predicates.ts";
+    import { log } from "#lib/utils/logger.ts";
 
     type SyntaxHighlightingType = "none" | "slog";
 

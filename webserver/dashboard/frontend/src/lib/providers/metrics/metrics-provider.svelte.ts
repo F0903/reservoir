@@ -1,9 +1,9 @@
-import { browser } from "$app/environment";
-import { type FetchFn } from "$lib/api/api-helpers";
-import { getAllMetrics, type Metrics } from "$lib/api/objects/metrics/metrics";
-import { log } from "$lib/utils/logger";
+import { browser } from "$app/env";
+import { type FetchFn } from "#lib/api/api-helpers.ts";
+import { getAllMetrics, type Metrics } from "#lib/api/objects/metrics/metrics.ts";
+import { log } from "#lib/utils/logger.ts";
 import type { SettingsProvider } from "../settings/settings-provider.svelte";
-import { patch } from "$lib/utils/patch";
+import { patch } from "#lib/utils/patch.ts";
 import { SvelteDate } from "svelte/reactivity";
 
 export class MetricsProvider {

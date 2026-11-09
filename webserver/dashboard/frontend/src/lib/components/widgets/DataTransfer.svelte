@@ -1,9 +1,9 @@
 <script lang="ts">
     import Widget from "./base/Widget.svelte";
     import Loadable from "../ui/Loadable.svelte";
-    import { formatBytesToLargest } from "$lib/utils/bytestring";
+    import { formatBytesToLargest } from "#lib/utils/bytestring.ts";
     import MetricCard from "./utils/MetricCard.svelte";
-    import { getMetricsProvider } from "$lib/context";
+    import { getMetricsProvider } from "#lib/context.ts";
 
     const metrics = getMetricsProvider();
 </script>

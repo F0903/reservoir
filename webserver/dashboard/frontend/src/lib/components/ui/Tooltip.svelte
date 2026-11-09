@@ -58,7 +58,8 @@
             return;
         }
 
-        hideTooltip();
+        // Removing a focused element fires focusout during teardown, where Svelte forbids state changes.
+        queueMicrotask(hideTooltip);
     }
 
     function handleKeydown(event: KeyboardEvent) {

@@ -1,5 +1,5 @@
-import type { ToastProps } from "$lib/components/ui/Toast.svelte";
-import { log } from "$lib/utils/logger";
+import type { ToastProps } from "#lib/components/ui/Toast.svelte";
+import { log } from "#lib/utils/logger.ts";
 
 export interface ToastEntry {
     id: string;

@@ -1,14 +1,14 @@
 <script lang="ts">
-    import ContentShell from "$lib/components/layout/ContentShell.svelte";
-    import PagePanel from "$lib/components/layout/PagePanel.svelte";
-    import PanelHeading from "$lib/components/layout/PanelHeading.svelte";
-    import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
-    import PageTitle from "$lib/components/ui/PageTitle.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import Form from "$lib/components/ui/input/Form.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
-    import { getAuthProvider, getToastProvider } from "$lib/context";
-    import { log } from "$lib/utils/logger";
+    import ContentShell from "#lib/components/layout/ContentShell.svelte";
+    import PagePanel from "#lib/components/layout/PagePanel.svelte";
+    import PanelHeading from "#lib/components/layout/PanelHeading.svelte";
+    import ErrorBox from "#lib/components/ui/ErrorBox.svelte";
+    import PageTitle from "#lib/components/ui/PageTitle.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import Form from "#lib/components/ui/input/Form.svelte";
+    import TextInput from "#lib/components/ui/input/TextInput.svelte";
+    import { getAuthProvider, getToastProvider } from "#lib/context.ts";
+    import { log } from "#lib/utils/logger.ts";
     import { KeyRound, RefreshCw, Save, UserRound } from "@lucide/svelte";
 
     const auth = getAuthProvider();

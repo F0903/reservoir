@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { formatTimeSinceDate } from "$lib/utils/dates";
-    import { formatBytesToLargest } from "$lib/utils/bytestring";
+    import { formatTimeSinceDate } from "#lib/utils/dates.ts";
+    import { formatBytesToLargest } from "#lib/utils/bytestring.ts";
     import MetricCard from "./utils/MetricCard.svelte";
     import Loadable from "../ui/Loadable.svelte";
     import Widget from "./base/Widget.svelte";
     import Poller from "./utils/Poller.svelte";
-    import type { Metrics } from "$lib/api/objects/metrics/metrics";
-    import { getMetricsProvider } from "$lib/context";
+    import type { Metrics } from "#lib/api/objects/metrics/metrics.ts";
+    import { getMetricsProvider } from "#lib/context.ts";
     import { Activity, Clock, Cpu } from "@lucide/svelte";
     import CapacityMetricCard from "./utils/CapacityMetricCard.svelte";
 

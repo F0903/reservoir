@@ -1,4 +1,4 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import {
@@ -18,9 +18,9 @@ import {
     me,
     updateMe,
     updateUser as updateManagedUser,
-} from "$lib/api/auth/auth";
-import { log } from "$lib/utils/logger";
-import UnauthorizedError from "$lib/api/unauthorized-error";
+} from "#lib/api/auth/auth.ts";
+import { log } from "#lib/utils/logger.ts";
+import UnauthorizedError from "#lib/api/unauthorized-error.ts";
 
 export class AuthProvider {
     user = $state<UserInfo | null>(null);
@@ -57,7 +57,7 @@ export class AuthProvider {
         if (!status.bootstrap_required) return;
         if (window.location.pathname === "/bootstrap") return;
 
-        await goto(resolve("/bootstrap"), { replaceState: true });
+        await goto(resolve("/bootstrap"), { replace: true });
     };
 
     bootstrap = async (req: BootstrapRequest): Promise<UserInfo> => {

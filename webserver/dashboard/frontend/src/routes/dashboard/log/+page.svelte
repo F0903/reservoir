@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { getLogStream } from "$lib/api/objects/log/log";
-    import PageTitle from "$lib/components/ui/PageTitle.svelte";
-    import TextViewer from "$lib/components/ui/TextViewer.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import Toggle from "$lib/components/ui/input/Toggle.svelte";
-    import { log } from "$lib/utils/logger";
+    import { getLogStream } from "#lib/api/objects/log/log.ts";
+    import PageTitle from "#lib/components/ui/PageTitle.svelte";
+    import TextViewer from "#lib/components/ui/TextViewer.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import Toggle from "#lib/components/ui/input/Toggle.svelte";
+    import { log } from "#lib/utils/logger.ts";
     import { onDestroy, onMount } from "svelte";
 
     let textViewer: TextViewer;

@@ -1,15 +1,15 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import Form from "$lib/components/ui/input/Form.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
-    import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
-    import { log } from "$lib/utils/logger";
+    import ErrorBox from "#lib/components/ui/ErrorBox.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import Form from "#lib/components/ui/input/Form.svelte";
+    import TextInput from "#lib/components/ui/input/TextInput.svelte";
+    import VerticalSpacer from "#lib/components/ui/VerticalSpacer.svelte";
+    import { log } from "#lib/utils/logger.ts";
     import type { PageProps } from "./$types";
-    import { getAuthProvider } from "$lib/context";
-    import UnauthorizedError from "$lib/api/unauthorized-error";
+    import { getAuthProvider } from "#lib/context.ts";
+    import UnauthorizedError from "#lib/api/unauthorized-error.ts";
     import { User, Lock, ArrowRight } from "@lucide/svelte";
 
     let { data }: PageProps = $props();
@@ -46,14 +46,14 @@
                 let url = resolve("/change-password");
                 url += `?${params.toString()}`;
 
-                await goto(url, { replaceState: true });
+                await goto(url, { replace: true });
                 return;
             }
 
             log.debug("Login successful, redirecting...");
             let returnToBase = resolve("/");
             returnToBase += returnTo.startsWith("/") ? returnTo.substring(1) : returnTo;
-            await goto(returnToBase, { replaceState: true, invalidateAll: true });
+            await goto(returnToBase, { replace: true, refreshAll: true });
             log.debug("Redirected to ", returnTo);
         } catch (err) {
             log.error("Login failed: ", err);

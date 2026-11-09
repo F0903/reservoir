@@ -21,7 +21,7 @@ const contextMocks = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 
@@ -37,11 +37,11 @@ vi.mock("$app/state", () => ({
     page: contextMocks.page,
 }));
 
-vi.mock("$lib/api/objects/version/version", () => ({
+vi.mock("#lib/api/objects/version/version.ts", () => ({
     version: vi.fn().mockResolvedValue({ version: "test-version" }),
 }));
 
-vi.mock("$lib/context", () => ({
+vi.mock("#lib/context.ts", () => ({
     getAuthProvider: () => contextMocks.auth,
 }));
 
@@ -87,8 +87,6 @@ describe("dashboard layout", () => {
 
         render(DashboardLayout, { props: { children } });
 
-        await waitFor(() =>
-            expect(goto).toHaveBeenCalledWith("/dashboard", { replaceState: true }),
-        );
+        await waitFor(() => expect(goto).toHaveBeenCalledWith("/dashboard", { replace: true }));
     });
 });

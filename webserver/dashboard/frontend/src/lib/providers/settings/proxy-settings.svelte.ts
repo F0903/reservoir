@@ -1,8 +1,8 @@
-import { browser } from "$app/environment";
-import { getConfig, type Config } from "$lib/api/objects/config/config";
-import { getRestartRequired } from "$lib/api/objects/config/restart-required";
-import { log } from "$lib/utils/logger";
-import { patch } from "$lib/utils/patch";
+import { browser } from "$app/env";
+import { getConfig, type Config } from "#lib/api/objects/config/config.ts";
+import { getRestartRequired } from "#lib/api/objects/config/restart-required.ts";
+import { log } from "#lib/utils/logger.ts";
+import { patch } from "#lib/utils/patch.ts";
 import type { Settings } from "./settings-provider.svelte";
 
 // Gets proxy settings from API.

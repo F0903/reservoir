@@ -18,11 +18,11 @@ vi.mock("$app/paths", () => ({
     resolve: (path: string) => path,
 }));
 
-vi.mock("$lib/context", () => ({
+vi.mock("#lib/context.ts", () => ({
     getAuthProvider: () => contextMocks.auth,
 }));
 
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),
@@ -67,8 +67,8 @@ describe("login page", () => {
             );
             await waitFor(() =>
                 expect(goto).toHaveBeenCalledWith("/dashboard", {
-                    replaceState: true,
-                    invalidateAll: true,
+                    replace: true,
+                    refreshAll: true,
                 }),
             );
         },

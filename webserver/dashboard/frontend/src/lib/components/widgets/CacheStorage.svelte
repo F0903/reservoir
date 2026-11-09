@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { clearCache } from "$lib/api/objects/cache/cache";
-    import { userIsAdmin } from "$lib/auth/permissions";
-    import Loadable from "$lib/components/ui/Loadable.svelte";
-    import Tooltip from "$lib/components/ui/Tooltip.svelte";
-    import { getAuthProvider, getMetricsProvider, getToastProvider } from "$lib/context";
-    import { formatBytesToLargest } from "$lib/utils/bytestring";
-    import { log } from "$lib/utils/logger";
-    import { Database, HardDrive, MemoryStick, RefreshCw, Trash2 } from "@lucide/svelte";
+    import { clearCache } from "#lib/api/objects/cache/cache.ts";
+    import { userIsAdmin } from "#lib/auth/permissions.ts";
+    import Loadable from "#lib/components/ui/Loadable.svelte";
+    import Tooltip from "#lib/components/ui/Tooltip.svelte";
+    import { getAuthProvider, getMetricsProvider, getToastProvider } from "#lib/context.ts";
+    import { formatBytesToLargest } from "#lib/utils/bytestring.ts";
+    import { log } from "#lib/utils/logger.ts";
+    import { Database, HardDrive, MemoryStick, RefreshCw, Trash } from "@lucide/svelte";
     import Widget from "./base/Widget.svelte";
     import CapacityMetricCard from "./utils/CapacityMetricCard.svelte";
     import MetricCard from "./utils/MetricCard.svelte";
@@ -81,7 +81,7 @@
                     {#if clearing}
                         <RefreshCw size={14} class="spin" />
                     {:else}
-                        <Trash2 size={14} />
+                        <Trash size={14} />
                     {/if}
                 </button>
             </Tooltip>

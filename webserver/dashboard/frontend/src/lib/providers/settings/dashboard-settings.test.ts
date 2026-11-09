@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { defaultDashboardLayout } from "$lib/dashboard/dashboard-layout";
+import { defaultDashboardLayout } from "#lib/dashboard/dashboard-layout.ts";
 import { DashboardSettings } from "./dashboard-settings.svelte";
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),

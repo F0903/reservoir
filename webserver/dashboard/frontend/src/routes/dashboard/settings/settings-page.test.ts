@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import * as configApi from "$lib/api/objects/config/config";
-import type { Config } from "$lib/api/objects/config/config";
-import * as restartRequiredApi from "$lib/api/objects/config/restart-required";
-import { SettingsProvider } from "$lib/providers/settings/settings-provider.svelte";
+import * as configApi from "#lib/api/objects/config/config.ts";
+import type { Config } from "#lib/api/objects/config/config.ts";
+import * as restartRequiredApi from "#lib/api/objects/config/restart-required.ts";
+import { SettingsProvider } from "#lib/providers/settings/settings-provider.svelte.ts";
 import SettingsPage from "./+page.svelte";
 
 const contextMocks = vi.hoisted(() => ({
@@ -14,25 +14,25 @@ const contextMocks = vi.hoisted(() => ({
     },
 }));
 
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 
-vi.mock("$lib/api/objects/config/config", () => ({
+vi.mock("#lib/api/objects/config/config.ts", () => ({
     getConfig: vi.fn(),
     patchConfig: vi.fn(),
 }));
 
-vi.mock("$lib/api/objects/config/restart-required", () => ({
+vi.mock("#lib/api/objects/config/restart-required.ts", () => ({
     getRestartRequired: vi.fn(),
 }));
 
-vi.mock("$lib/context", () => ({
+vi.mock("#lib/context.ts", () => ({
     getSettingsProvider: () => contextMocks.settings,
     getToastProvider: () => contextMocks.toast,
 }));
 
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),

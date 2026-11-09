@@ -1,4 +1,4 @@
-import { apiPost, type FetchFn } from "$lib/api/api-helpers";
+import { apiPost, type FetchFn } from "#lib/api/api-helpers.ts";
 
 export async function clearCache(fetchFn: FetchFn = fetch): Promise<void> {
     await apiPost<unknown>("/cache/clear", {}, fetchFn);

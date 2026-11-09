@@ -2,7 +2,7 @@
     lang="ts"
     generics="C extends Component<CP, CE, 'value'>, CP extends { label: string, value: string | number | boolean }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value'], O = V"
 >
-    import { log } from "$lib/utils/logger";
+    import { log } from "#lib/utils/logger.ts";
     import type { Component } from "svelte";
 
     let {

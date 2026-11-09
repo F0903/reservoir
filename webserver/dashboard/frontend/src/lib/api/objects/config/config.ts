@@ -1,5 +1,5 @@
-import { apiGet, type FetchFn, apiPatch } from "$lib/api/api-helpers";
-import type { DeepPartial } from "$lib/utils/patch";
+import { apiGet, type FetchFn, apiPatch } from "#lib/api/api-helpers.ts";
+import type { DeepPartial } from "#lib/utils/patch.ts";
 
 export type CachePolicyConfig = {
     ignore_cache_control: boolean;

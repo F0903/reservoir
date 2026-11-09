@@ -1,14 +1,14 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { resolve } from "$app/paths";
-    import UnauthorizedError from "$lib/api/unauthorized-error";
-    import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import Form from "$lib/components/ui/input/Form.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
-    import VerticalSpacer from "$lib/components/ui/VerticalSpacer.svelte";
-    import { getAuthProvider, getToastProvider } from "$lib/context";
-    import { log } from "$lib/utils/logger";
+    import UnauthorizedError from "#lib/api/unauthorized-error.ts";
+    import ErrorBox from "#lib/components/ui/ErrorBox.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import Form from "#lib/components/ui/input/Form.svelte";
+    import TextInput from "#lib/components/ui/input/TextInput.svelte";
+    import VerticalSpacer from "#lib/components/ui/VerticalSpacer.svelte";
+    import { getAuthProvider, getToastProvider } from "#lib/context.ts";
+    import { log } from "#lib/utils/logger.ts";
     import { ArrowRight, Lock, UserPlus } from "@lucide/svelte";
     import { onMount } from "svelte";
 
@@ -26,7 +26,7 @@
         try {
             const status = await auth.bootstrapStatus();
             if (!status.bootstrap_required) {
-                await goto(resolve("/dashboard"), { replaceState: true });
+                await goto(resolve("/dashboard"), { replace: true });
                 return;
             }
         } catch (err) {
@@ -57,7 +57,7 @@
 
             await auth.bootstrap({ username, password });
             toast.success("Admin account created.");
-            await goto(resolve("/dashboard"), { replaceState: true, invalidateAll: true });
+            await goto(resolve("/dashboard"), { replace: true, refreshAll: true });
         } catch (err) {
             log.error("Bootstrap setup failed:", err);
             if (err instanceof UnauthorizedError) {

@@ -9,12 +9,16 @@ type fileLogger struct {
 }
 
 func newFileLogger(path string, maxSizeMb int, maxBackups int, compress bool) *fileLogger {
+	compression := "none"
+	if compress {
+		compression = "gzip"
+	}
 	tj := &timberjack.Logger{
-		Filename:   path,
-		MaxSize:    maxSizeMb,
-		MaxBackups: maxBackups,
-		Compress:   compress,
-		LocalTime:  true,
+		Filename:    path,
+		MaxSize:     maxSizeMb,
+		MaxBackups:  maxBackups,
+		Compression: compression,
+		LocalTime:   true,
 	}
 	return &fileLogger{
 		path: path,

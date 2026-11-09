@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { MetricsProvider } from "./metrics-provider.svelte";
-import * as metricsApi from "$lib/api/objects/metrics/metrics";
+import * as metricsApi from "#lib/api/objects/metrics/metrics.ts";
 import type { SettingsProvider } from "../settings/settings-provider.svelte";
 
 // Mock Svelte/Kit environment
-vi.mock("$app/environment", () => ({
+vi.mock("$app/env", () => ({
     browser: true,
 }));
 
 // Mock the API
-vi.mock("$lib/api/objects/metrics/metrics", () => ({
+vi.mock("#lib/api/objects/metrics/metrics.ts", () => ({
     getAllMetrics: vi.fn(),
 }));
 
 // Mock logger to keep test output clean
-vi.mock("$lib/utils/logger", () => ({
+vi.mock("#lib/utils/logger.ts", () => ({
     log: {
         debug: vi.fn(),
         error: vi.fn(),

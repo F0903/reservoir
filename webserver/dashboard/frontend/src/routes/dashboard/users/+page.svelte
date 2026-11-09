@@ -1,18 +1,18 @@
 <script lang="ts">
-    import ContentShell from "$lib/components/layout/ContentShell.svelte";
-    import PagePanel from "$lib/components/layout/PagePanel.svelte";
-    import PanelHeading from "$lib/components/layout/PanelHeading.svelte";
-    import ErrorBox from "$lib/components/ui/ErrorBox.svelte";
-    import PageTitle from "$lib/components/ui/PageTitle.svelte";
-    import Tooltip from "$lib/components/ui/Tooltip.svelte";
-    import Button from "$lib/components/ui/input/Button.svelte";
-    import Form from "$lib/components/ui/input/Form.svelte";
-    import PanelActionButton from "$lib/components/ui/input/PanelActionButton.svelte";
-    import TextInput from "$lib/components/ui/input/TextInput.svelte";
-    import Toggle from "$lib/components/ui/input/Toggle.svelte";
-    import { getAuthProvider, getToastProvider } from "$lib/context";
-    import { log } from "$lib/utils/logger";
-    import { KeyRound, RefreshCw, ShieldCheck, ShieldOff, Trash2, UserPlus } from "@lucide/svelte";
+    import ContentShell from "#lib/components/layout/ContentShell.svelte";
+    import PagePanel from "#lib/components/layout/PagePanel.svelte";
+    import PanelHeading from "#lib/components/layout/PanelHeading.svelte";
+    import ErrorBox from "#lib/components/ui/ErrorBox.svelte";
+    import PageTitle from "#lib/components/ui/PageTitle.svelte";
+    import Tooltip from "#lib/components/ui/Tooltip.svelte";
+    import Button from "#lib/components/ui/input/Button.svelte";
+    import Form from "#lib/components/ui/input/Form.svelte";
+    import PanelActionButton from "#lib/components/ui/input/PanelActionButton.svelte";
+    import TextInput from "#lib/components/ui/input/TextInput.svelte";
+    import Toggle from "#lib/components/ui/input/Toggle.svelte";
+    import { getAuthProvider, getToastProvider } from "#lib/context.ts";
+    import { log } from "#lib/utils/logger.ts";
+    import { KeyRound, RefreshCw, ShieldCheck, ShieldOff, Trash, UserPlus } from "@lucide/svelte";
     import { onMount } from "svelte";
 
     const auth = getAuthProvider();
@@ -345,7 +345,7 @@
                                                     aria-label={`Delete ${user.username}`}
                                                     onclick={() => deleteManagedUser(user)}
                                                 >
-                                                    <Trash2 size={15} />
+                                                    <Trash size={15} />
                                                 </button>
                                             </Tooltip>
                                         </div>
