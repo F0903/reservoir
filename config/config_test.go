@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -526,5 +527,167 @@ func TestConfig_Verify(t *testing.T) {
 				t.Errorf("Config.verify() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestLoadOrDefault_MigratesUpstreamDefaultHttps(t *testing.T) {
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
+
+	defaultData, err := json.Marshal(NewDefault())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(defaultData, &raw); err != nil {
+		t.Fatal(err)
+	}
+	proxy := raw["proxy"].(map[string]any)
+	delete(proxy, "upgrade_http_to_https")
+	proxy["upstream_default_https"] = true // The old default, saved in every existing config.
+
+	oldConfigData, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadOrDefault(tmpFile)
+	if err != nil {
+		t.Fatalf("expected old config to be migrated: %v", err)
+	}
+	if cfg.Proxy.UpgradeHttpToHttps.Read() {
+		t.Fatal("expected the old value not to turn on upgrading")
+	}
+
+	persisted, err := os.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(persisted), "upstream_default_https") {
+		t.Fatal("expected the old key to be removed from the saved config")
+	}
+	if !strings.Contains(string(persisted), "upgrade_http_to_https") {
+		t.Fatal("expected the new key in the saved config")
+	}
+}
+
+func TestTrustedProxiesValidation(t *testing.T) {
+	tests := []struct {
+		value   string
+		wantErr bool
+	}{
+		{"", false},
+		{"10.0.0.1", false},
+		{"10.0.0.0/8, 192.168.1.1", false},
+		{"::1,fd00::/8", false},
+		{"not-an-ip", true},
+		{"10.0.0.0/99", true},
+		{"10.0.0.1, nope", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			cfg := NewDefault()
+			cfg.Webserver.TrustedProxies.Overwrite(tt.value)
+			if err := cfg.verify(); (err != nil) != tt.wantErr {
+				t.Fatalf("verify() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestTrustedProxyPrefixesParsesAddressesAndRanges(t *testing.T) {
+	cfg := NewDefault()
+	if got := cfg.Webserver.TrustedProxyPrefixes(); len(got) != 0 {
+		t.Fatalf("expected nothing trusted by default, got %v", got)
+	}
+
+	cfg.Webserver.TrustedProxies.Overwrite("10.0.0.0/8, 192.168.1.1")
+	prefixes := cfg.Webserver.TrustedProxyPrefixes()
+	if len(prefixes) != 2 {
+		t.Fatalf("expected 2 prefixes, got %v", prefixes)
+	}
+	if !prefixes[0].Contains(netip.MustParseAddr("10.200.0.1")) {
+		t.Fatalf("expected %v to contain 10.200.0.1", prefixes[0])
+	}
+	if !prefixes[1].Contains(netip.MustParseAddr("192.168.1.1")) || prefixes[1].Contains(netip.MustParseAddr("192.168.1.2")) {
+		t.Fatalf("expected %v to contain only 192.168.1.1", prefixes[1])
+	}
+}
+
+func TestLoadOrDefault_AddsMissingTrustedProxies(t *testing.T) {
+	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "config.json"))
+
+	defaultData, err := json.Marshal(NewDefault())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(defaultData, &raw); err != nil {
+		t.Fatal(err)
+	}
+	delete(raw["webserver"].(map[string]any), "trusted_proxies")
+
+	oldConfigData, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tmpFile, oldConfigData, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := LoadOrDefault(tmpFile)
+	if err != nil {
+		t.Fatalf("expected old config to be migrated: %v", err)
+	}
+	if got := cfg.Webserver.TrustedProxies.Read(); got != "" {
+		t.Fatalf("expected nothing trusted after migration, got %q", got)
+	}
+}
+
+func TestPersistFailureLeavesExistingConfigIntact(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := NewDefault()
+	cfg.path = path
+	if err := cfg.persist(); err != nil {
+		t.Fatalf("initial persist failed: %v", err)
+	}
+	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// A directory at the temp path makes the next write fail before it can touch the config.
+	if err := os.Mkdir(path+".tmp", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Proxy.Listen.Overwrite(":1234")
+	if err := cfg.persist(); err == nil {
+		t.Fatal("expected persist to fail")
+	}
+
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(current) != string(original) {
+		t.Fatal("failed persist changed the existing config")
+	}
+}
+
+func TestPersistLeavesNoTempFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	cfg := NewDefault()
+	cfg.path = path
+	if err := cfg.persist(); err != nil {
+		t.Fatalf("persist failed: %v", err)
+	}
+
+	if _, err := os.Stat(path + ".tmp"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no temp file, stat err=%v", err)
+	}
+	if _, err := load(path); err != nil {
+		t.Fatalf("persisted config does not load: %v", err)
 	}
 }

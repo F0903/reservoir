@@ -31,6 +31,10 @@ func newTestUserStore(t *testing.T) *UserStore {
 	return store
 }
 
+func adminChange(isAdmin bool) UserChanges {
+	return UserChanges{IsAdmin: &isAdmin}
+}
+
 func testUser(username string) *models.User {
 	return &models.User{
 		Username:               username,
@@ -144,7 +148,7 @@ func TestUpdateAdminRejectsDemotingLastAdmin(t *testing.T) {
 		t.Fatalf("failed to create admin: %v", err)
 	}
 
-	_, err = store.UpdateAdmin(admin.ID, false)
+	_, err = store.Update(admin.ID, adminChange(false))
 	if !errors.Is(err, ErrLastAdmin) {
 		t.Fatalf("expected ErrLastAdmin, got %v", err)
 	}
@@ -163,11 +167,11 @@ func TestUpdateAdminConcurrentDemotionsKeepOneAdmin(t *testing.T) {
 
 	errs := runConcurrently(
 		func() error {
-			_, err := store.UpdateAdmin(first.ID, false)
+			_, err := store.Update(first.ID, adminChange(false))
 			return err
 		},
 		func() error {
-			_, err := store.UpdateAdmin(second.ID, false)
+			_, err := store.Update(second.ID, adminChange(false))
 			return err
 		},
 	)
@@ -187,7 +191,7 @@ func TestUpdateAdminAllowsMultipleAdmins(t *testing.T) {
 		t.Fatalf("failed to create second admin: %v", err)
 	}
 
-	updated, err := store.UpdateAdmin(secondAdmin.ID, false)
+	updated, err := store.Update(secondAdmin.ID, adminChange(false))
 	if err != nil {
 		t.Fatalf("failed to demote second admin: %v", err)
 	}
@@ -273,8 +277,11 @@ func TestUpdatePasswordSetsPasswordAndRequirement(t *testing.T) {
 		t.Fatalf("failed to create admin: %v", err)
 	}
 
-	hash := *phc.GenerateArgon2id("new-password")
-	updated, err := store.UpdatePassword(user.ID, hash, true)
+	required := true
+	updated, err := store.Update(user.ID, UserChanges{
+		PasswordHash:           phc.GenerateArgon2id("new-password"),
+		PasswordChangeRequired: &required,
+	})
 	if err != nil {
 		t.Fatalf("failed to update password: %v", err)
 	}
@@ -283,6 +290,69 @@ func TestUpdatePasswordSetsPasswordAndRequirement(t *testing.T) {
 	}
 	if !updated.PasswordHash.VerifyArgon2id("new-password") {
 		t.Fatal("expected updated password hash to verify")
+	}
+}
+
+func TestUpdateSavesNothingWhenOneChangeFails(t *testing.T) {
+	store := newTestUserStore(t)
+	admin, err := store.Create(testUser("admin"))
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+
+	username := "renamed"
+	demote := false
+	_, err = store.Update(admin.ID, UserChanges{Username: &username, IsAdmin: &demote})
+	if !errors.Is(err, ErrLastAdmin) {
+		t.Fatalf("expected ErrLastAdmin, got %v", err)
+	}
+
+	stored, err := store.GetByID(admin.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Username != "admin" {
+		t.Fatalf("failed update changed the username to %q", stored.Username)
+	}
+}
+
+func TestUpdateLeavesOtherFieldsAlone(t *testing.T) {
+	store := newTestUserStore(t)
+	user, err := store.Create(testUser("admin"))
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+
+	required := true
+	updated, err := store.Update(user.ID, UserChanges{PasswordChangeRequired: &required})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	if !updated.PasswordChangeRequired {
+		t.Fatal("expected the flag to be set")
+	}
+	if updated.Username != "admin" || !updated.IsAdmin || !updated.PasswordHash.VerifyArgon2id("test-password") {
+		t.Fatalf("other fields changed: username=%q admin=%v", updated.Username, updated.IsAdmin)
+	}
+}
+
+func TestUpdateWithNoChangesDoesNotWrite(t *testing.T) {
+	store := newTestUserStore(t)
+	user, err := store.Create(testUser("admin"))
+	if err != nil {
+		t.Fatalf("failed to create admin: %v", err)
+	}
+	if _, err := store.db.ExecResult("UPDATE users SET updated_at = '2000-01-01 00:00:00' WHERE id = ?", user.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	updated, err := store.Update(user.ID, UserChanges{})
+	if err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+	if updated.UpdatedAt.Year() != 2000 {
+		t.Fatalf("an empty update changed updated_at to %v", updated.UpdatedAt)
 	}
 }
 

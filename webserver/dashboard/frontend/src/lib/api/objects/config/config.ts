@@ -11,7 +11,7 @@ export type ProxyConfig = {
     listen: string;
     ca_cert: string;
     ca_key: string;
-    upstream_default_https: boolean;
+    upgrade_http_to_https: boolean;
     retry_on_range_416: boolean;
     retry_on_invalid_range: boolean;
     cache_policy: CachePolicyConfig;
@@ -21,6 +21,7 @@ export type WebserverConfig = {
     listen: string;
     dashboard_disabled: boolean;
     api_disabled: boolean;
+    trusted_proxies: string;
 };
 
 export type FileCacheConfig = {

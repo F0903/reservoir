@@ -38,6 +38,11 @@ jobs:
       - name: Enable pnpm
         run: corepack enable pnpm
 
+      - name: Check tag matches project version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: make check-release-version
+
       - name: Build and test
         run: make ci
 

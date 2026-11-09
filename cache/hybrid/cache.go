@@ -17,11 +17,12 @@ import (
 )
 
 type Cache[MetadataT any] struct {
-	file         *filecache.Cache[MetadataT]
-	memory       *memorycache.Cache[MetadataT]
-	maxCacheSize atomics.Int64
-	demoteAfter  atomics.Int64
-	placementMu  sync.Mutex
+	file          *filecache.Cache[MetadataT]
+	memory        *memorycache.Cache[MetadataT]
+	maxCacheSize  atomics.Int64
+	demoteAfter   atomics.Int64
+	bufferedBytes atomics.Int64 // Downloads being read into memory, not yet counted by the memory tier.
+	placementMu   sync.Mutex
 
 	stopDemoter chan struct{}
 	demoterDone chan struct{}
@@ -33,13 +34,14 @@ type Cache[MetadataT any] struct {
 func New[MetadataT any](cfg *config.Config, m *metrics.Metrics, rootDir string, memoryBudgetPercent int, maxCacheSize int64, cleanupInterval time.Duration, shardCount int, ctx context.Context) *Cache[MetadataT] {
 	m = metrics.Ensure(m)
 	c := &Cache[MetadataT]{
-		file:         filecache.NewTier[MetadataT](cfg, m, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx),
-		memory:       memorycache.NewTier[MetadataT](cfg, m, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx),
-		maxCacheSize: atomics.NewInt64(maxCacheSize),
-		demoteAfter:  atomics.NewInt64(int64(cfg.Cache.Hybrid.DemoteAfter.Read().Cast())),
-		stopDemoter:  make(chan struct{}),
-		demoterDone:  make(chan struct{}),
-		metrics:      m,
+		file:          filecache.NewTier[MetadataT](cfg, m, rootDir, maxCacheSize, cleanupInterval, shardCount, ctx),
+		memory:        memorycache.NewTier[MetadataT](cfg, m, memoryBudgetPercent, maxCacheSize, cleanupInterval, shardCount, ctx),
+		maxCacheSize:  atomics.NewInt64(maxCacheSize),
+		demoteAfter:   atomics.NewInt64(int64(cfg.Cache.Hybrid.DemoteAfter.Read().Cast())),
+		bufferedBytes: atomics.NewInt64(0),
+		stopDemoter:   make(chan struct{}),
+		demoterDone:   make(chan struct{}),
+		metrics:       m,
 	}
 
 	c.subs.Add(cfg.Cache.MaxCacheSize.OnChange(func(newSize bytesize.ByteSize) {
@@ -125,10 +127,23 @@ func (c *Cache[MetadataT]) Get(key cache.CacheKey) (*cache.Entry[MetadataT], err
 }
 
 func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT) (*cache.Entry[MetadataT], error) {
-	if sizeHint, ok := cache.ReaderSizeHint(data); ok {
-		return c.cacheKnownSize(key, data, sizeHint, expires, metadata)
+	size, known := cache.ReaderSizeHint(data)
+	if !known || !c.reserveMemory(key, size) {
+		return c.cacheStreamInFileReplacingMemory(key, data, expires, metadata) // The file tier counts its own errors.
 	}
-	return c.cacheUnknownSize(key, data, expires, metadata)
+	defer c.bufferedBytes.Sub(size)
+
+	dataBytes, err := cache.ReadAllCacheBytes(data, c.memoryLimit())
+	if err != nil {
+		c.recordCacheError()
+		return nil, err
+	}
+
+	result, err := c.cacheBuffered(key, dataBytes, expires, metadata)
+	if err != nil {
+		return nil, err
+	}
+	return result.entryForCaller(), nil
 }
 
 func (c *Cache[MetadataT]) Delete(key cache.CacheKey) error {

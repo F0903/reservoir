@@ -11,9 +11,12 @@ func (c *Cache[MetadataT]) promoteToMemory(key cache.CacheKey, fileEntry *cache.
 	if fileEntry == nil || fileEntry.Data == nil || fileEntry.Metadata == nil || fileEntry.Stale {
 		return fileEntry, false
 	}
-	if fileEntry.Metadata.Size > c.memoryLimit() {
+	size := fileEntry.Metadata.Size
+	if !c.reserveMemory(key, size) {
 		return fileEntry, false
 	}
+	defer c.bufferedBytes.Sub(size)
+
 	if _, err := fileEntry.Data.Seek(0, io.SeekStart); err != nil {
 		slog.Debug("Skipping memory promotion because cached data could not be rewound", "key", key.Hex, "error", err)
 		return fileEntry, false

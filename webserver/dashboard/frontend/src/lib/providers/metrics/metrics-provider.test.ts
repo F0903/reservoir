@@ -69,6 +69,7 @@ describe("MetricsProvider", () => {
                 coalesced_cache_hits: 1,
                 coalesced_cache_revalidations: 0,
                 coalesced_cache_misses: 1,
+                coalesced_cache_stales: 0,
                 status_ok_responses: 10,
                 status_client_error_responses: 2,
                 status_server_error_responses: 0,

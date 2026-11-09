@@ -198,7 +198,7 @@ func newFileCacheProxyConfig(t *testing.T) *config.Config {
 	t.Helper()
 
 	cfg := config.NewDefault()
-	cfg.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	cfg.Proxy.UpgradeHttpToHttps.Overwrite(false)
 	cfg.Proxy.RetryOnRange416.Overwrite(false)
 	cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(false)
 	cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Overwrite(false)
@@ -221,8 +221,9 @@ func startRestartableProxy(t *testing.T, cfg *config.Config) *restartableProxy {
 		t.Fatalf("failed to create proxy cache: %v", err)
 	}
 	p, err := proxy.NewProxy(cfg, &FakeCA{}, proxy.Dependencies{
-		Cache:   cacheStore,
-		Metrics: runtimeMetrics,
+		Cache:          cacheStore,
+		Metrics:        runtimeMetrics,
+		UpstreamClient: newTestUpstreamClient(),
 	})
 	if err != nil {
 		cacheStore.Destroy()

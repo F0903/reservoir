@@ -134,12 +134,12 @@ func (r rangeHeader) SliceSize(dataSize int64) (start int64, end int64, err erro
 		// This should be caught in ParseRange and not be able to happen.
 		return 0, 0, ErrInvalidRangeFormat
 	} else if r.start == -1 {
-		// Suffix range
-		start = dataSize - r.end
+		// Suffix range. RFC 9110 serves the whole file when the suffix is longer than it.
+		start = max(dataSize-r.end, 0)
 		end = dataSize - 1
 	} else if r.start != -1 && r.end != -1 {
 		start = r.start
-		end = r.end
+		end = min(r.end, dataSize-1) // RFC 9110 trims an end past the file instead of rejecting it.
 	} else if r.end == -1 {
 		start = r.start
 		end = dataSize - 1

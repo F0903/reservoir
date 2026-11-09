@@ -75,6 +75,20 @@ func TestWriteJSON(t *testing.T) {
 	}
 }
 
+func TestDecodeJSONRejectsOversizedBody(t *testing.T) {
+	body := `{"username":"` + strings.Repeat("x", 2*maxJSONBodyBytes) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	var payload map[string]any
+	if DecodeJSON(rec, req, &payload) {
+		t.Fatal("expected oversized JSON to be rejected")
+	}
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+	}
+}
+
 func TestDecodeJSONRejectsInvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader("{"))
 	rec := httptest.NewRecorder()

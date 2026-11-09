@@ -55,7 +55,7 @@ func TestClientAddressUsesRemoteHost(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.RemoteAddr = "203.0.113.10:54321"
 
-	if got := ClientAddress(req); got != "203.0.113.10" {
+	if got := ClientAddress(req, nil); got != "203.0.113.10" {
 		t.Fatalf("expected remote host, got %q", got)
 	}
 }

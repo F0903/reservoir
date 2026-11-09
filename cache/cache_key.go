@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"path"
 	"strings"
 
 	"golang.org/x/crypto/blake2b"
@@ -34,8 +33,8 @@ func MakeFromRequest(r *http.Request) CacheKey {
 		scheme = "https"
 	}
 	normHost := strings.ToLower(r.Host)
-	normPath := path.Clean(r.URL.Path)
-	stringKey := fmt.Sprintf("%s|%s|%s|%s|%s", scheme, r.Method, normHost, normPath, r.URL.RawQuery)
+	// The path is used exactly as sent: /dir and /dir/, or %2F and /, can be different resources.
+	stringKey := fmt.Sprintf("%s|%s|%s|%s|%s", scheme, r.Method, normHost, r.URL.EscapedPath(), r.URL.RawQuery)
 	slog.Debug("Creating cache key", "key", stringKey)
 	return FromString(stringKey)
 }

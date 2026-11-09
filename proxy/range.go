@@ -22,7 +22,7 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 
 			r.SetHeader("Accept-Ranges", "bytes")
 			r.SetHeader("Content-Range", fmt.Sprintf("bytes */%d", cached.Metadata.Size))
-			r.WriteError("invalid Range header", http.StatusRequestedRangeNotSatisfiable)
+			p.writeError(r, "invalid Range header", http.StatusRequestedRangeNotSatisfiable)
 
 			return ErrRangeNotSatisfiable
 		}
@@ -69,7 +69,6 @@ func (p *Proxy) handleRangeRequest(r responder.Responder, req *http.Request, cac
 	r.SetHeader("Accept-Ranges", "bytes")
 	r.SetHeader("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, cached.Metadata.Size))
 	r.SetHeader("Content-Length", fmt.Sprintf("%d", length))
-	r.SetHeader("ETag", cached.Metadata.Object.ETag)
 	r.SetHeader("Last-Modified", cached.Metadata.Object.LastModified.Format(http.TimeFormat))
 
 	sections := io.NewSectionReader(cached.Data, start, length)

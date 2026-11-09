@@ -21,7 +21,7 @@ function testConfig(): Config {
             listen: ":9999",
             ca_cert: "ssl/ca.crt",
             ca_key: "ssl/ca.key",
-            upstream_default_https: true,
+            upgrade_http_to_https: true,
             retry_on_range_416: true,
             retry_on_invalid_range: true,
             cache_policy: {
@@ -34,6 +34,7 @@ function testConfig(): Config {
             listen: ":8080",
             dashboard_disabled: false,
             api_disabled: false,
+            trusted_proxies: "",
         },
         cache: {
             type: "hybrid",
@@ -119,9 +120,10 @@ describe("settings sections", () => {
             "Update Interval",
             "Proxy Listen",
             "Webserver Listen",
+            "Trusted Proxies",
             "CA Certificate Path",
             "CA Key Path",
-            "Upstream Default HTTPS",
+            "Upgrade HTTP to HTTPS",
             "Retry on Range 416",
             "Package Freshness Window",
             "Force Freshness Window",

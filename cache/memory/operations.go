@@ -115,32 +115,47 @@ func (c *Cache[MetadataT]) cacheBytesInternal(key cache.CacheKey, dataBytes []by
 	}, nil
 }
 
-func (c *Cache[MetadataT]) cacheInternal(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, evictIfFull bool, strictLimit bool, recordErrors bool) (*cache.Entry[MetadataT], error) {
+// reserve claims budget for a download about to be read into memory, evicting if needed.
+// The caller must release it with reservedBytes.Sub once the download is stored or abandoned.
+func (c *Cache[MetadataT]) reserve(size int64) bool {
 	limit := c.CapacityBytes()
-	dataBytes, err := cache.ReadAllCacheBytes(data, limit)
+	if c.byteSize.Get()+c.reservedBytes.Get()+size > limit {
+		c.janitor.Evict(limit)
+	}
+
+	c.reservedBytes.Add(size)
+	if c.byteSize.Get()+c.reservedBytes.Get() > limit {
+		c.reservedBytes.Sub(size)
+		return false
+	}
+	return true
+}
+
+func (c *Cache[MetadataT]) cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
+	if size, ok := cache.ReaderSizeHint(data); ok {
+		if !c.reserve(size) {
+			if recordErrors {
+				c.recordCacheError()
+			}
+			return nil, cache.ErrCacheMemoryExceeded
+		}
+		defer c.reservedBytes.Sub(size)
+	}
+
+	// Read before locking so a slow download can't hold up other keys on this shard.
+	dataBytes, err := cache.ReadAllCacheBytes(data, c.CapacityBytes())
 	if err != nil {
 		if recordErrors {
 			c.recordCacheError()
 		}
 		return nil, err
 	}
-	return c.cacheBytesInternal(key, dataBytes, expires, metadata, evictIfFull, strictLimit, recordErrors)
-}
 
-func (c *Cache[MetadataT]) cache(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
 	lock := cache.GetLock(c.locks, key)
 	lock.Lock()
 	defer lock.Unlock()
 
-	return c.cacheInternal(key, data, expires, metadata, true, false, recordErrors)
-}
-
-func (c *Cache[MetadataT]) cacheStrict(key cache.CacheKey, data io.Reader, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {
-	lock := cache.GetLock(c.locks, key)
-	lock.Lock()
-	defer lock.Unlock()
-
-	return c.cacheInternal(key, data, expires, metadata, true, true, recordErrors)
+	return c.cacheBytesInternal(key, dataBytes, expires, metadata, true, false, recordErrors)
 }
 
 func (c *Cache[MetadataT]) cacheBytesStrict(key cache.CacheKey, data []byte, expires time.Time, metadata MetadataT, recordErrors bool) (*cache.Entry[MetadataT], error) {

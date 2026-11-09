@@ -24,7 +24,7 @@ func TestRuntimeRunStopsServicesOnCancel(t *testing.T) {
 
 	cfg := config.NewDefault()
 	cfg.Proxy.Listen.Overwrite(freeTCPAddress(t))
-	cfg.Proxy.UpstreamDefaultHttps.Overwrite(false)
+	cfg.Proxy.UpgradeHttpToHttps.Overwrite(false)
 	cfg.Webserver.Listen.Overwrite(freeTCPAddress(t))
 	cfg.Cache.Type.Overwrite(config.CacheTypeMemory)
 	cfg.Cache.File.Dir.Overwrite(t.TempDir())

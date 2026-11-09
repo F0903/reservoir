@@ -18,8 +18,9 @@
             {@const coalescedHits = data.requests.coalesced_cache_hits}
             {@const coalescedRevalidations = data.requests.coalesced_cache_revalidations}
             {@const coalescedMisses = data.requests.coalesced_cache_misses}
+            {@const coalescedStales = data.requests.coalesced_cache_stales}
             {@const resolvedCoalescedRequests =
-                coalescedHits + coalescedRevalidations + coalescedMisses}
+                coalescedHits + coalescedRevalidations + coalescedMisses + coalescedStales}
             {@const coalescedCacheHitRate =
                 resolvedCoalescedRequests > 0
                     ? (coalescedHits / resolvedCoalescedRequests) * 100
@@ -68,6 +69,11 @@
                                     label: "Cache Misses",
                                     data: [coalescedMisses],
                                     backgroundColor: "var(--tertiary-400)",
+                                },
+                                {
+                                    label: "Served Stale",
+                                    data: [coalescedStales],
+                                    backgroundColor: "var(--warning-color)",
                                 },
                             ],
                         }}

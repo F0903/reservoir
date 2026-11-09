@@ -84,6 +84,8 @@ If the API is disabled, Reservoir cannot create dashboard users or accept dashbo
 
 The embedded dashboard/API webserver listens over HTTP. To serve it over HTTPS, put it behind a TLS-terminating reverse proxy and forward the original scheme with `Forwarded: proto=https` or `X-Forwarded-Proto: https`. Reservoir marks session cookies as `Secure` when the request is received over TLS or those forwarded scheme headers indicate HTTPS.
 
+Login limits apply per client address. Behind a reverse proxy, set `webserver.trusted_proxies` to its IP or CIDR range (comma-separated if there are several) and have it send `X-Forwarded-For`. Without this, every user behind the proxy shares one address. Only list proxies you control, since Reservoir believes that header from them.
+
 ### Package Cache Behavior
 
 Reservoir is tuned first as a shared package cache for package-manager traffic. By default the proxy cache policy favors useful package caching over strict upstream cache directives:
@@ -134,7 +136,7 @@ Other cache settings are currently configured through `var/config.json` or the d
 - `cache.type` - `memory`, `file`, or `hybrid`.
 - `cache.max_cache_size` - Maximum total cache size.
 - `cache.cleanup_interval` - How often expired entries and over-budget cache data are cleaned up.
-- `cache.memory.memory_budget_percent` - Memory-cache budget as a percentage of total system memory.
+- `cache.memory.memory_budget_percent` - Memory-cache budget as a percentage of total system memory, or of the memory limit on its container or service on Linux (cgroup v2) if that is lower.
 - `cache.hybrid.demote_after` - How long an entry can sit in hybrid memory storage without access before being moved to file storage.
 - `proxy.cache_policy.ignore_cache_control` - Whether to ignore upstream cache-control directives.
 - `proxy.cache_policy.force_default_max_age` - Whether to always use Reservoir's configured default freshness lifetime.

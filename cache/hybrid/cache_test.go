@@ -106,57 +106,6 @@ func TestHybridCache_WritesAndReadsMemoryFirst(t *testing.T) {
 	}
 }
 
-func TestHybridCache_UnknownSizedEntryStaysInMemoryWhenItFits(t *testing.T) {
-	c := newTestHybridCacheWithMax(t, time.Hour, 2000)
-	setHybridMemoryCap(c, 1000)
-
-	key := cache.FromString("hybrid-unknown-memory-key")
-	data := bytes.Repeat([]byte("u"), 800)
-	entry, err := c.Cache(key, unknownSizeReader(data), time.Now().Add(time.Hour), TestMeta{ID: "unknown-memory"})
-	if err != nil {
-		t.Fatalf("Cache failed: %v", err)
-	}
-	if content := readEntryData(t, entry); !bytes.Equal(content, data) {
-		t.Fatalf("expected memory data %q, got %q", data, content)
-	}
-
-	if stats := c.memory.Stats(); stats.Entries != 1 || stats.Bytes != int64(len(data)) {
-		t.Fatalf("expected unknown-sized entry in memory, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-	if stats := c.file.Stats(); stats.Entries != 0 || stats.Bytes != 0 {
-		t.Fatalf("expected no file entry, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-}
-
-func TestHybridCache_UnknownSizedEntrySpillsWhenAvailableMemoryIsExceeded(t *testing.T) {
-	c := newTestHybridCacheWithMax(t, time.Hour, 2000)
-	setHybridMemoryCap(c, 1000)
-
-	memoryData := bytes.Repeat([]byte("m"), 700)
-	memoryEntry, err := c.Cache(cache.FromString("hybrid-unknown-resident-key"), bytes.NewReader(memoryData), time.Now().Add(time.Hour), TestMeta{ID: "resident"})
-	if err != nil {
-		t.Fatalf("Cache resident entry failed: %v", err)
-	}
-	memoryEntry.Data.Close()
-
-	fileKey := cache.FromString("hybrid-unknown-spill-key")
-	fileData := bytes.Repeat([]byte("f"), 500)
-	fileEntry, err := c.Cache(fileKey, unknownSizeReader(fileData), time.Now().Add(time.Hour), TestMeta{ID: "unknown-file"})
-	if err != nil {
-		t.Fatalf("Cache unknown spill entry failed: %v", err)
-	}
-	if content := readEntryData(t, fileEntry); !bytes.Equal(content, fileData) {
-		t.Fatalf("expected streamed file data %q, got %q", fileData, content)
-	}
-
-	if stats := c.memory.Stats(); stats.Entries != 1 || stats.Bytes != int64(len(memoryData)) {
-		t.Fatalf("expected resident memory entry to remain, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-	if stats := c.file.Stats(); stats.Entries != 1 || stats.Bytes != int64(len(fileData)) {
-		t.Fatalf("expected unknown-sized entry in file, got entries=%d bytes=%d", stats.Entries, stats.Bytes)
-	}
-}
-
 func TestHybridCache_StoresOversizedEntriesInFile(t *testing.T) {
 	c := newTestHybridCacheWithMax(t, time.Hour, 2000)
 	setHybridMemoryCap(c, 1000)

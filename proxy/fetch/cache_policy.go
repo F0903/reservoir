@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-var supportedVaryHeaders = []string{"accept-encoding"}
+var (
+	supportedVaryHeaders = []string{"accept-encoding"}
+	credentialHeaders    = []string{"Authorization", "Cookie", "Private-Token", "X-Api-Key"}
+)
 
 type cachePolicy struct {
 	cfg *config.Config
@@ -59,7 +62,12 @@ func varyContains(vary []string, headerName string) bool {
 }
 
 func (p cachePolicy) RequestAllowsSharedCache(req *http.Request) bool {
-	return req.Header.Get("Authorization") == "" && req.Header.Get("Cookie") == ""
+	for _, name := range credentialHeaders {
+		if req.Header.Get(name) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func (p cachePolicy) Decide(req *http.Request, resp *http.Response, upstreamHd *headers.HeaderDirectives) cacheDecision {

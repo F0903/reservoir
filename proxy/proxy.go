@@ -10,17 +10,14 @@ import (
 	"reservoir/proxy/certs"
 	"reservoir/proxy/fetch"
 	"reservoir/utils/httplistener"
+	"time"
 )
 
 var (
-	ErrCacheGetFailed       = errors.New("error getting cache for key")
-	ErrNoCachedResponse304  = errors.New("received 304 Not Modified but no cached response found")
 	ErrTLSCertFailed        = errors.New("error getting TLS certificate")
 	ErrClientResponseFailed = errors.New("failed to write HTTP OK response to client")
-	ErrReadRequestFailed    = errors.New("error reading request from client")
 	ErrRangeNotSatisfiable  = errors.New("range not satisfiable")
 	ErrIfRangeMismatch      = errors.New("If-Range header mismatch")
-	ErrBadGateway           = errors.New("bad gateway. Error when sending request to upstream")
 	ErrCacheStoreRequired   = errors.New("proxy cache store is required")
 )
 
@@ -30,17 +27,16 @@ type Proxy struct {
 	fetcher *fetch.Fetcher
 	cfg     *config.Config
 	metrics *metrics.Metrics
+
+	tunnelHandshakeTimeout time.Duration
+	tunnelIdleTimeout      time.Duration
+	clientWriteTimeout     time.Duration
 }
 
 type Dependencies struct {
 	Cache          cache.Cache[fetch.CacheMetadata]
 	Metrics        *metrics.Metrics
 	UpstreamClient *http.Client
-}
-
-func (p *Proxy) Listen(address string, errChan chan error, ctx context.Context) {
-	listener := httplistener.New(address, p)
-	listener.ListenWithCancel(errChan, ctx)
 }
 
 func (p *Proxy) Run(address string, ctx context.Context) error {
@@ -73,5 +69,9 @@ func NewProxy(cfg *config.Config, ca certs.CertAuthority, deps Dependencies) (*P
 		fetcher: fetch.New(deps.Cache, cfg, deps.UpstreamClient, m),
 		cfg:     cfg,
 		metrics: m,
+
+		tunnelHandshakeTimeout: defaultTunnelHandshakeTimeout,
+		tunnelIdleTimeout:      defaultTunnelIdleTimeout,
+		clientWriteTimeout:     defaultClientWriteTimeout,
 	}, nil
 }

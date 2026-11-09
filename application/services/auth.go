@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"time"
 
+	"reservoir/config"
 	dbmodels "reservoir/db/models"
 	"reservoir/db/stores"
 	"reservoir/utils/phc"
@@ -13,6 +15,7 @@ import (
 )
 
 type AuthService struct {
+	cfg          *config.Config
 	users        *stores.UserStore
 	sessions     *coreauth.SessionManager
 	loginLimiter *coreauth.LoginAttemptLimiter
@@ -27,7 +30,7 @@ type RequestContext struct {
 func (s *AuthService) RequestFromHTTP(r *http.Request) (RequestContext, bool) {
 	req := RequestContext{
 		secureSessionCookie: coreauth.RequestUsesHTTPS(r),
-		clientAddress:       coreauth.ClientAddress(r),
+		clientAddress:       coreauth.ClientAddress(r, s.trustedProxies()),
 	}
 	if s == nil || s.sessions == nil {
 		return req, false
@@ -39,6 +42,13 @@ func (s *AuthService) RequestFromHTTP(r *http.Request) (RequestContext, bool) {
 	session, ok := s.sessions.SessionFromRequest(r)
 	req.session = session
 	return req, ok
+}
+
+func (s *AuthService) trustedProxies() []netip.Prefix {
+	if s == nil || s.cfg == nil {
+		return nil
+	}
+	return s.cfg.Webserver.TrustedProxyPrefixes()
 }
 
 func (s *AuthService) CurrentUser(req RequestContext) (*dbmodels.User, error) {

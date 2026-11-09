@@ -13,9 +13,9 @@ func TestRequestCoalescing(t *testing.T) {
 	env := SetupTestEnv(t)
 
 	// 1. Setup Mock Upstream to track hits
-	var requestCount int32
+	var requestCount atomic.Int32
 	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&requestCount, 1)
+		requestCount.Add(1)
 		// Delay to ensure concurrent requests pile up
 		time.Sleep(200 * time.Millisecond)
 		w.Header().Set("Cache-Control", "max-age=60")
@@ -56,7 +56,7 @@ func TestRequestCoalescing(t *testing.T) {
 	wg.Wait()
 
 	// 3. Verify
-	count := atomic.LoadInt32(&requestCount)
+	count := requestCount.Load()
 	if count != 1 {
 		t.Errorf("Coalescing failed: Expected 1 upstream request, got %d", count)
 	} else {

@@ -129,8 +129,8 @@ func TestInvalidCachedRangeReturns416WhenRetryDisabled(t *testing.T) {
 	if got := resp.Header.Get("Content-Range"); got != fmt.Sprintf("bytes */%d", len(content)) {
 		t.Fatalf("expected Content-Range bytes */%d, got %q", len(content), got)
 	}
-	if got := upstreamRequests.Load(); got != 2 {
-		t.Fatalf("expected warmup plus original range request, got %d upstream requests", got)
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected only the warmup to reach upstream, got %d upstream requests", got)
 	}
 }
 
@@ -177,8 +177,8 @@ func TestInvalidCachedRangeRetriesAsFullResponseWhenEnabled(t *testing.T) {
 	if !bytes.Equal(body, content) {
 		t.Fatalf("expected full cached body %q, got %q", content, body)
 	}
-	if got := upstreamRequests.Load(); got != 2 {
-		t.Fatalf("expected warmup plus original range request, got %d upstream requests", got)
+	if got := upstreamRequests.Load(); got != 1 {
+		t.Fatalf("expected only the warmup to reach upstream, got %d upstream requests", got)
 	}
 }
 
@@ -435,7 +435,7 @@ func assertRepeatedRequestsBypassCache(t testing.TB, env *TestEnv, path string, 
 
 	targetURL := env.Upstream.URL + path
 	bodies := make([]string, 0, 2)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		resp, err := env.Client.Get(targetURL)
 		if err != nil {
 			t.Fatalf("request %d failed: %v", i, err)
@@ -473,7 +473,7 @@ func TestNoStoreCachesWhenAggressivePackageCacheEnabled(t *testing.T) {
 	env.Start()
 
 	targetURL := env.Upstream.URL + "/package.deb"
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		resp, err := env.Client.Get(targetURL)
 		if err != nil {
 			t.Fatalf("request failed: %v", err)

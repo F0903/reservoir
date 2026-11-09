@@ -13,13 +13,16 @@ type CachePolicyConfig struct {
 }
 
 type ProxyConfig struct {
-	Listen               ConfigProp[string] `json:"listen"`                 // The address and port that the proxy will listen on.
-	CaCert               ConfigProp[string] `json:"ca_cert"`                // Path to CA certificate file.
-	CaKey                ConfigProp[string] `json:"ca_key"`                 // Path to CA private key file.
-	UpstreamDefaultHttps ConfigProp[bool]   `json:"upstream_default_https"` // If true, the proxy will always send HTTPS instead of HTTP to the upstream server.
-	RetryOnRange416      ConfigProp[bool]   `json:"retry_on_range_416"`     // If true, the proxy will retry a request without the Range header if the upstream responds with a 416 Range Not Satisfiable.
-	RetryOnInvalidRange  ConfigProp[bool]   `json:"retry_on_invalid_range"` // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header. (not recommended)
-	CachePolicy          CachePolicyConfig  `json:"cache_policy"`
+	Listen              ConfigProp[string] `json:"listen"`                 // The address and port that the proxy will listen on.
+	CaCert              ConfigProp[string] `json:"ca_cert"`                // Path to CA certificate file.
+	CaKey               ConfigProp[string] `json:"ca_key"`                 // Path to CA private key file.
+	UpgradeHttpToHttps  ConfigProp[bool]   `json:"upgrade_http_to_https"`  // If true, plain HTTP requests are sent to the upstream server over HTTPS. Breaks hosts that only serve HTTP.
+	RetryOnRange416     ConfigProp[bool]   `json:"retry_on_range_416"`     // If true, the proxy will retry a request without the Range header if the upstream responds with a 416 Range Not Satisfiable.
+	RetryOnInvalidRange ConfigProp[bool]   `json:"retry_on_invalid_range"` // If true, the proxy will retry a request without the Range header if the client sends an invalid Range header. (not recommended)
+	CachePolicy         CachePolicyConfig  `json:"cache_policy"`
+
+	// Removed setting. Only accepted so old config files still load; applyMigrations clears it.
+	LegacyUpstreamDefaultHttps *bool `json:"upstream_default_https,omitempty"`
 }
 
 func (c *ProxyConfig) setRestartNeededProps() {
@@ -43,12 +46,12 @@ func (c *ProxyConfig) verify() error {
 
 func defaultProxyConfig() ProxyConfig {
 	return ProxyConfig{
-		Listen:               NewConfigProp(":9999"),
-		CaCert:               NewConfigProp("ssl/ca.crt"),
-		CaKey:                NewConfigProp("ssl/ca.key"),
-		UpstreamDefaultHttps: NewConfigProp(true),
-		RetryOnRange416:      NewConfigProp(true),
-		RetryOnInvalidRange:  NewConfigProp(false),
+		Listen:              NewConfigProp(":9999"),
+		CaCert:              NewConfigProp("ssl/ca.crt"),
+		CaKey:               NewConfigProp("ssl/ca.key"),
+		UpgradeHttpToHttps:  NewConfigProp(false),
+		RetryOnRange416:     NewConfigProp(true),
+		RetryOnInvalidRange: NewConfigProp(false),
 		CachePolicy: CachePolicyConfig{
 			IgnoreCacheControl: NewConfigProp(true),
 			DefaultMaxAge:      NewConfigProp(duration.Duration(15 * time.Minute)),

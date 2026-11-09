@@ -52,6 +52,11 @@ func (c *RawHTTPResponder) parseAndSetContentLength() error {
 	return nil
 }
 
+// SetRequest records the request being answered, so a HEAD response is written without a body.
+func (c *RawHTTPResponder) SetRequest(req *http.Request) {
+	c.response.Request = req
+}
+
 func (c *RawHTTPResponder) SetHeader(name string, value string) {
 	c.response.Header.Set(name, value)
 }
@@ -74,8 +79,14 @@ func (c *RawHTTPResponder) GetHeaders() http.Header {
 }
 
 func (c *RawHTTPResponder) writeResponse() (time.Duration, error) {
-	// If Content-Length is unknown, we must either use chunked encoding or close the connection.
-	if c.response.ContentLength < 0 {
+	status := c.response.StatusCode
+	if status < 200 || status == http.StatusNoContent || status == http.StatusNotModified {
+		// These statuses never have a body. Without the request, Go won't add Content-Length: 0 for POST/PUT.
+		c.response.ContentLength = 0
+		c.response.Body = http.NoBody
+		c.response.Request = nil
+	} else if c.response.ContentLength < 0 {
+		// If Content-Length is unknown, we must either use chunked encoding or close the connection.
 		c.response.TransferEncoding = []string{"chunked"}
 	}
 

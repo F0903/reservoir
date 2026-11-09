@@ -28,7 +28,7 @@ func TestHTTPResponderWriteDurationExcludesBodyReadTime(t *testing.T) {
 	readDelay := 50 * time.Millisecond
 
 	rec := httptest.NewRecorder()
-	responder := NewHTTPResponder(rec)
+	responder := NewHTTPResponder(rec, time.Minute)
 	bodyReader := &delayedReader{
 		reader: bytes.NewReader([]byte(body)),
 		delay:  readDelay,

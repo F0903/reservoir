@@ -246,6 +246,34 @@ func TestCachePolicyAllowsEncodedResponseWithAcceptEncodingVary(t *testing.T) {
 	}
 }
 
+func TestCachePolicyRejectsTokenHeaderRequests(t *testing.T) {
+	for _, header := range []string{"Private-Token", "X-Api-Key"} {
+		cfg := config.NewDefault()
+		req := httptestRequest(t)
+		req.Header.Set(header, "secret")
+		resp := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header)}
+
+		if decision := decideForTest(req, resp, cfg); decision.Cacheable {
+			t.Fatalf("expected request with %s to be uncacheable", header)
+		}
+	}
+}
+
+func TestCachePolicyRejectsPrivateEvenWhenIgnoringCacheControl(t *testing.T) {
+	cfg := config.NewDefault()
+	cfg.Proxy.CachePolicy.IgnoreCacheControl.Overwrite(true)
+
+	req := httptestRequest(t)
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Cache-Control": []string{"private"}},
+	}
+
+	if decision := decideForTest(req, resp, cfg); decision.Cacheable {
+		t.Fatal("expected private response to be uncacheable")
+	}
+}
+
 func httptestRequest(t *testing.T) *http.Request {
 	t.Helper()
 

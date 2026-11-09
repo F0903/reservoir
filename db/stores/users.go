@@ -178,29 +178,28 @@ func getUserByID(q userGetter, id int64) (*models.User, error) {
 }
 
 func (s *UserStore) UpdateUsername(id int64, username string) (*models.User, error) {
-	username, err := normalizeUsername(username)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := s.ensureUsernameAvailable(username, id); err != nil {
-		return nil, err
-	}
-
-	result, err := s.db.ExecResult("UPDATE users SET username = ? WHERE id = ?", username, id)
-	if err != nil {
-		return nil, err
-	}
-	if err := ensureRowsAffected(result); err != nil {
-		return nil, err
-	}
-
-	return s.GetByID(id)
+	return s.Update(id, UserChanges{Username: &username})
 }
 
-func (s *UserStore) UpdateAdmin(id int64, isAdmin bool) (*models.User, error) {
-	var updated *models.User
+// UserChanges lists the fields to update. Nil fields are left as they are.
+type UserChanges struct {
+	Username               *string
+	IsAdmin                *bool
+	PasswordHash           *phc.PHC
+	PasswordChangeRequired *bool
+}
 
+// Update applies every change in one transaction, so a failure saves none of them.
+func (s *UserStore) Update(id int64, changes UserChanges) (*models.User, error) {
+	if changes.Username != nil {
+		username, err := normalizeUsername(*changes.Username)
+		if err != nil {
+			return nil, err
+		}
+		changes.Username = &username
+	}
+
+	var updated *models.User
 	err := s.db.WithTransaction(func(tx *db.Tx) error {
 		user, err := getUserByID(tx, id)
 		if err != nil {
@@ -210,15 +209,43 @@ func (s *UserStore) UpdateAdmin(id int64, isAdmin bool) (*models.User, error) {
 			return ErrUserNotFound
 		}
 
-		if err := ensureCanRemoveAdmin(tx, user.IsAdmin && !isAdmin); err != nil {
-			return err
+		updated = user
+		if changes == (UserChanges{}) {
+			return nil // Writing would change updated_at when nothing else did.
 		}
 
-		result, err := tx.ExecResult("UPDATE users SET is_admin = ? WHERE id = ?", isAdmin, id)
-		if err != nil {
-			return err
+		if changes.Username != nil {
+			existing, err := getUserByUsername(tx, *changes.Username)
+			if err != nil {
+				return err
+			}
+			if existing != nil && existing.ID != id {
+				return ErrUsernameTaken
+			}
+			user.Username = *changes.Username
 		}
-		if err := ensureRowsAffected(result); err != nil {
+		if changes.IsAdmin != nil {
+			if err := ensureCanRemoveAdmin(tx, user.IsAdmin && !*changes.IsAdmin); err != nil {
+				return err
+			}
+			user.IsAdmin = *changes.IsAdmin
+		}
+		if changes.PasswordHash != nil {
+			user.PasswordHash = *changes.PasswordHash
+		}
+		if changes.PasswordChangeRequired != nil {
+			user.PasswordChangeRequired = *changes.PasswordChangeRequired
+		}
+
+		err = tx.Exec(
+			"UPDATE users SET username = ?, password_hash = ?, is_admin = ?, password_change_required = ? WHERE id = ?",
+			user.Username,
+			user.PasswordHash,
+			user.IsAdmin,
+			user.PasswordChangeRequired,
+			id,
+		)
+		if err != nil {
 			return err
 		}
 
@@ -229,23 +256,6 @@ func (s *UserStore) UpdateAdmin(id int64, isAdmin bool) (*models.User, error) {
 		return nil, err
 	}
 	return updated, nil
-}
-
-func (s *UserStore) UpdatePassword(id int64, passwordHash phc.PHC, passwordChangeRequired bool) (*models.User, error) {
-	result, err := s.db.ExecResult(
-		"UPDATE users SET password_hash = ?, password_change_required = ? WHERE id = ?",
-		passwordHash,
-		passwordChangeRequired,
-		id,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := ensureRowsAffected(result); err != nil {
-		return nil, err
-	}
-
-	return s.GetByID(id)
 }
 
 func (s *UserStore) Delete(id int64) error {

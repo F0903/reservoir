@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-const JSONContentType = "application/json"
+const (
+	JSONContentType  = "application/json"
+	maxJSONBodyBytes = 1 << 20
+)
 
 func WriteJSON(w http.ResponseWriter, status int, value any) bool {
 	body, err := json.Marshal(value)
@@ -63,6 +66,7 @@ func RequireJSONContentType(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func DecodeJSON(w http.ResponseWriter, r *http.Request, value any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(value); err != nil {
 		slog.Error("Error decoding JSON request", "error", err)
 		BadRequest(w, "Invalid JSON")
