@@ -34,9 +34,8 @@ export default defineConfig(({ mode }) => {
         build: {
             sourcemap: mode === "development",
         },
-        resolve: {
-            conditions: ["import", "module", "browser", "svelte"],
-        },
+        // Vitest runs in Node, so without this it would load Svelte's server build.
+        resolve: process.env.VITEST ? { conditions: ["browser"] } : undefined,
         test: {
             environment: "jsdom",
             globals: true,

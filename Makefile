@@ -71,7 +71,7 @@ bench:
 # Run cache performance comparison
 .PHONY: bench-cache
 bench-cache:
-	$(GO) test -v -bench BenchmarkCacheComparison -run ^$$ ./cache
+	$(GO) test -v -bench BenchmarkCacheBackends -run ^$$ ./cache
 
 # The proxy build depends on the generated CSP hashes
 .PHONY: build-proxy
