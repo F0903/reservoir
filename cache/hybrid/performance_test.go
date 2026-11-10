@@ -173,26 +173,19 @@ func BenchmarkHybridCacheTiering(b *testing.B) {
 		}
 	})
 
-	b.Run("UnknownLengthMemoryPressureSpillToFile", func(b *testing.B) {
+	// Entries without a known size skip the memory tier entirely.
+	b.Run("UnknownLengthGoesToFile", func(b *testing.B) {
 		cfg := newBenchmarkConfig()
 		c := New[benchMetadata](cfg, nil, b.TempDir(), 50, benchmarkMaxCacheSize, time.Hour, benchmarkShardCount, context.Background())
 		b.Cleanup(c.Destroy)
-		c.memory.OverrideMemoryCapForTesting(int64(size + size/2))
 
-		residentKey := cache.FromString("benchmark-hybrid-unknown-resident-key")
-		residentEntry, err := c.Cache(residentKey, bytes.NewReader(data), time.Now().Add(time.Hour), benchMetadata{ID: "unknown-resident"})
-		if err != nil {
-			b.Fatal(err)
-		}
-		closeBenchmarkEntry(b, residentEntry)
-
-		spillKeys := benchmarkKeys("benchmark-hybrid-unknown-spill", benchmarkWorkingSetEntries(size))
+		keys := benchmarkKeys("benchmark-hybrid-unknown", benchmarkWorkingSetEntries(size))
 
 		b.ReportAllocs()
 		b.SetBytes(int64(len(data)))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			entry, err := c.Cache(spillKeys[i%len(spillKeys)], benchmarkUnknownReader(data), time.Now().Add(time.Hour), benchMetadata{ID: "unknown-spill"})
+			entry, err := c.Cache(keys[i%len(keys)], benchmarkUnknownReader(data), time.Now().Add(time.Hour), benchMetadata{ID: "unknown"})
 			if err != nil {
 				b.Fatal(err)
 			}
