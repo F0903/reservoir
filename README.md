@@ -43,7 +43,7 @@ Before getting started, you will need to install a few dependencies:
 
 #### Installing dependencies
 
-First off you will need to have [**Node.js** installed](https://nodejs.org/en/download) and **pnpm** enabled *(run the command `corepack enable pnpm`)*.
+First off you will need to have [**Node.js** installed](https://nodejs.org/en/download) and [**pnpm** installed](https://pnpm.io/installation).
 
 Then you need to have **GNU make** installed.
 The way to do this will vary depending on your OS. If you use a Linux distro it will be easy to install via your package manager (it might even be preinstalled).

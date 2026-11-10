@@ -4,7 +4,7 @@ This is the frontend for reservoir, a web dashboard for configuring and monitori
 
 ## Development
 
-Before starting the frontend, make sure you have [**Node** installed](https://nodejs.org/en/download) and **pnpm** enabled _(run the command `corepack enable pnpm`)_
+Before starting the frontend, make sure you have [**Node** installed](https://nodejs.org/en/download) and [**pnpm** installed](https://pnpm.io/installation)
 
 Then install the frontend dependencies by running `pnpm install` in the `frontend/` directory.
 
