@@ -110,6 +110,10 @@ The file cache writes metadata sidecars next to cached response bodies. On start
 
 Loaded file-cache entries are still subject to `cache.max_cache_size`, normal expiry, and the cleanup interval. If restored entries exceed the configured cache size, startup eviction trims them before serving traffic.
 
+### Large Downloads and Client Timeouts
+
+Reservoir downloads a cacheable response completely before it sends the first byte to the client. On the first request for a large file, the client therefore receives nothing until the proxy has the whole file, and a client with a short read timeout may give up and retry. If you see that, raise the timeout in the client, for example `pip --timeout 120` or `Acquire::http::Timeout "120";` for apt. Later requests are served from the cache and are not affected.
+
 ### Command-Line Arguments
 
 You can always display info about the command-line arguments by running the proxy with the `--help` flag. Command-line arguments only override the generated configuration when they are supplied.

@@ -62,7 +62,7 @@ function baseConfig(): Config {
         },
         cache: {
             type: "hybrid",
-            max_cache_size: 1024,
+            max_cache_size: "10G",
             cleanup_interval: "5m",
             lock_shards: 64,
             file: {
@@ -78,7 +78,7 @@ function baseConfig(): Config {
         logging: {
             level: "INFO",
             file: "var/log/reservoir.log",
-            max_size: 1024,
+            max_size: "500M",
             max_backups: 3,
             compress: true,
             to_stdout: true,
@@ -148,6 +148,37 @@ describe("settings page", () => {
         );
         expect(getConfigMock()).toHaveBeenCalled();
         expect(contextMocks.toast.success).toHaveBeenCalledWith("Settings saved successfully.");
+    });
+
+    it("saves a byte size as the text the server expects", async () => {
+        await renderSettingsPage();
+        patchConfigMock().mockClear();
+
+        await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
+        await fireEvent.input(screen.getByLabelText("Total Cache Limit"), {
+            target: { value: "20G" },
+        });
+        await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+        await waitFor(() =>
+            expect(patchConfigMock()).toHaveBeenCalledWith("cache.max_cache_size", "20G"),
+        );
+    });
+
+    it("saves an edit made on a tab that is no longer open", async () => {
+        await renderSettingsPage();
+        patchConfigMock().mockClear();
+
+        await fireEvent.click(screen.getByRole("button", { name: /network/i }));
+        await fireEvent.input(screen.getByLabelText("Proxy Listen"), {
+            target: { value: ":7777" },
+        });
+        await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
+        await fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+        await waitFor(() =>
+            expect(patchConfigMock()).toHaveBeenCalledWith("proxy.listen", ":7777"),
+        );
     });
 
     it("shows restart-required state after saving a restart-required setting", async () => {

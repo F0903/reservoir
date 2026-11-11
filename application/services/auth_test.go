@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"reservoir/db"
 	"reservoir/db/models"
@@ -207,5 +210,73 @@ func TestChangePasswordRejectsShortNewPassword(t *testing.T) {
 	}
 	if !unchanged.PasswordHash.VerifyArgon2id("current-password") {
 		t.Fatal("short password update changed the stored password")
+	}
+}
+
+func TestLoginRateLimitHoldsForParallelGuesses(t *testing.T) {
+	store := newAuthTestStore(t)
+	createAuthTestUser(t, store)
+	svc := &AuthService{
+		users:        store,
+		sessions:     coreauth.NewSessionManager(),
+		loginLimiter: coreauth.NewLoginAttemptLimiter(),
+	}
+	reqCtx := RequestContext{clientAddress: "203.0.113.10"}
+
+	var checked atomic.Int64
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Go(func() {
+			if _, _, err := svc.Login(reqCtx, "operator", "wrong-password"); errors.Is(err, ErrInvalidCredentials) {
+				checked.Add(1)
+			}
+		})
+	}
+	wg.Wait()
+
+	if got := checked.Load(); got != 5 {
+		t.Fatalf("%d parallel guesses were checked against the password, the limit is 5", got)
+	}
+}
+
+func TestChangePasswordKeepsChangesMadeMeanwhile(t *testing.T) {
+	store := newAuthTestStore(t)
+	createAuthTestUser(t, store) // A second admin, so bob can be demoted.
+	bob, err := store.Create(&models.User{
+		Username:     "bob",
+		PasswordHash: *phc.GenerateArgon2id("current-password"),
+		IsAdmin:      true,
+	})
+	if err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+
+	sessions := coreauth.NewSessionManager()
+	svc := &AuthService{users: store, sessions: sessions}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- svc.ChangePassword(RequestContext{session: sessions.Create(bob.ID)}, "current-password", "a-new-long-password")
+	}()
+
+	// Hashing takes far longer than this, so the demotion lands after ChangePassword has read bob.
+	time.Sleep(20 * time.Millisecond)
+	isAdmin := false
+	if _, err := store.Update(bob.ID, stores.UserChanges{IsAdmin: &isAdmin}); err != nil {
+		t.Fatalf("failed to demote bob: %v", err)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("ChangePassword returned error: %v", err)
+	}
+
+	got, err := store.GetByID(bob.ID)
+	if err != nil {
+		t.Fatalf("failed to reload bob: %v", err)
+	}
+	if got.IsAdmin {
+		t.Fatal("the password change gave back admin rights that were removed meanwhile")
+	}
+	if !got.PasswordHash.VerifyArgon2id("a-new-long-password") {
+		t.Fatal("the new password was not saved")
 	}
 }

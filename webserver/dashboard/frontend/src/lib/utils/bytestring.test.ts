@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatBytesToLargest, parseByteString } from "./bytestring";
+import { formatBytesToLargest } from "./bytestring";
 
 describe("bytestring utils", () => {
     describe("formatBytesToLargest", () => {
@@ -13,28 +13,15 @@ describe("bytestring utils", () => {
             expect(formatBytesToLargest(1024 * 1024 * 1024)).toBe("1G");
         });
 
+        it("should format values below one byte and below zero", () => {
+            // Rates such as bytes per second can be fractions.
+            expect(formatBytesToLargest(0.5)).toBe("0.5B");
+            expect(formatBytesToLargest(-1024)).toBe("-1K");
+        });
+
         it("should respect decimals", () => {
             expect(formatBytesToLargest(1500, 1)).toBe("1.5K");
             expect(formatBytesToLargest(1500, 2)).toBe("1.46K");
-        });
-    });
-
-    describe("parseByteString", () => {
-        it("should parse valid byte strings", () => {
-            expect(parseByteString("1B")).toBe(1);
-            expect(parseByteString("1K")).toBe(1024);
-            expect(parseByteString("1M")).toBe(1024 * 1024);
-            expect(parseByteString("1G")).toBe(1024 * 1024 * 1024);
-        });
-
-        it("should be case insensitive", () => {
-            expect(parseByteString("1k")).toBe(1024);
-            expect(parseByteString("1m")).toBe(1024 * 1024);
-        });
-
-        it("should throw error for invalid strings", () => {
-            expect(() => parseByteString("invalid")).toThrow("Invalid byte string: invalid");
-            expect(() => parseByteString("1X")).toThrow();
         });
     });
 });

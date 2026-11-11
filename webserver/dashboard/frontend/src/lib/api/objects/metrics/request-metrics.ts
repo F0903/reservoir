@@ -1,5 +1,3 @@
-import { apiGet, type FetchFn } from "#lib/api/api-helpers.ts";
-
 export type RequestMetrics = {
     http_proxy_requests: number;
     https_proxy_requests: number;
@@ -20,9 +18,3 @@ export type RequestMetrics = {
     status_client_error_responses: number;
     status_server_error_responses: number;
 };
-
-export async function getRequestMetrics(
-    fetchFn: FetchFn = fetch,
-): Promise<Readonly<RequestMetrics>> {
-    return apiGet<RequestMetrics>("/metrics/requests", fetchFn);
-}

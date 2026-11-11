@@ -137,8 +137,10 @@ func (c *Cache[MetadataT]) Cache(key cache.CacheKey, data io.Reader, expires tim
 	}
 	c.mu.RUnlock()
 
-	if c.byteSize.Get()-oldSize+fileSize > maxCacheSize {
-		c.janitor.Evict(maxCacheSize)
+	// Evict down to the room this entry needs. Evicting to the limit alone frees
+	// nothing while the cache is under 80% full, however big the entry is.
+	if room := maxCacheSize - fileSize + oldSize; c.byteSize.Get() > room {
+		c.janitor.Evict(room)
 	}
 	if c.byteSize.Get()-oldSize+fileSize > maxCacheSize {
 		c.metrics.Cache.CacheErrors.Increment()

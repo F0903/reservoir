@@ -69,6 +69,7 @@ async function getAssert(
     endpoint: string,
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
+    headers?: HeadersInit,
 ): Promise<Response> {
     const fullEndpoint = `/api${endpoint}`;
 
@@ -80,22 +81,21 @@ async function getAssert(
     const response = await fetchFn(url, {
         method: "GET",
         credentials: "same-origin",
+        headers,
     });
     await assertResponse(response, redirectOnUnauthorized);
 
     return response;
 }
 
-export async function apiGetTextStream(
+// For callers that need the status or headers of the response as well as its body.
+export function apiGetResponse(
     endpoint: string,
+    headers?: HeadersInit,
     fetchFn: FetchFn = fetch,
     redirectOnUnauthorized: LoginRedirectOptions | null = DefaultRedirectOptions,
-): Promise<ReadableStream<string>> {
-    const resp = await getAssert(endpoint, fetchFn, redirectOnUnauthorized);
-    if (!resp.body) {
-        throw new Error(`Body was empty when fetching text stream from '${endpoint}'`);
-    }
-    return resp.body.pipeThrough(new TextDecoderStream());
+): Promise<Response> {
+    return getAssert(endpoint, fetchFn, redirectOnUnauthorized, headers);
 }
 
 export async function apiGet<T>(

@@ -7,7 +7,7 @@ import (
 )
 
 func TestUnsubscribeOutOfOrder(t *testing.T) {
-	event := New[int]()
+	event := NewEvent[int]()
 	var calls []int
 
 	unsubOne := event.Subscribe(func(int) {
@@ -40,7 +40,7 @@ func TestUnsubscribeOutOfOrder(t *testing.T) {
 }
 
 func TestFireUsesSubscriptionOrder(t *testing.T) {
-	event := New[int]()
+	event := NewEvent[int]()
 	var calls []int
 
 	event.Subscribe(func(int) {

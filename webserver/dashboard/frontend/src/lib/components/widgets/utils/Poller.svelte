@@ -3,6 +3,7 @@
 <script lang="ts">
     import { visible } from "#lib/attachments/visible.ts";
     import { log } from "#lib/utils/logger.ts";
+    import { untrack } from "svelte";
 
     let { isVisible = $bindable(true), pollFn, pollInterval = 5000, children } = $props();
 
@@ -32,12 +33,13 @@
     }
 
     $effect(() => {
-        // Stop polling if the widget is no longer visible
-        if (isVisible) {
-            startPolling();
-        } else {
-            stopPolling();
-        }
+        // Poll only while the widget is visible. The cleanup also runs when the widget
+        // is removed, so the timer never outlives it.
+        if (!isVisible) return;
+
+        // Untracked, so state read by pollFn does not restart the timer.
+        untrack(startPolling);
+        return stopPolling;
     });
 </script>
 

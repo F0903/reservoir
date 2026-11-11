@@ -119,8 +119,11 @@ func (c *Cache[MetadataT]) cacheBytesInternal(key cache.CacheKey, dataBytes []by
 // The caller must release it with reservedBytes.Sub once the download is stored or abandoned.
 func (c *Cache[MetadataT]) reserve(size int64) bool {
 	limit := c.CapacityBytes()
-	if c.byteSize.Get()+c.reservedBytes.Get()+size > limit {
-		c.janitor.Evict(limit)
+	// Evict down to the room this download needs. Evicting to the limit alone frees
+	// nothing while the cache is under 80% full. A download that can never fit
+	// (room < 0) must not empty the cache.
+	if room := limit - c.reservedBytes.Get() - size; room >= 0 && c.byteSize.Get() > room {
+		c.janitor.Evict(room)
 	}
 
 	c.reservedBytes.Add(size)

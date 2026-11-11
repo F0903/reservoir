@@ -44,20 +44,6 @@ func (o *overwritable[T]) Overwrite(value T) {
 	o.overwritten = typeutils.Some(value)
 }
 
-func (o *overwritable[T]) IsOverwritten() bool {
-	return o.overwritten.IsSome()
-}
-
-// Applies the overwrite if it exists, otherwise does nothing.
-func (o *overwritable[T]) ApplyOverwrite() {
-	if !o.IsOverwritten() {
-		return
-	}
-
-	o.value = o.overwritten.ForceUnwrap()
-	o.ClearOverwrite()
-}
-
 func (o *overwritable[T]) ClearOverwrite() {
 	o.overwritten = typeutils.None[T]()
 }

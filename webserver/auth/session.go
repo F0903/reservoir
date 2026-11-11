@@ -85,14 +85,6 @@ func (m *SessionManager) RunGC(ctx context.Context) error {
 	}
 }
 
-func (m *SessionManager) StartGC(ctx context.Context) {
-	go func() {
-		if err := m.RunGC(ctx); err != nil {
-			slog.Error("Session garbage collector stopped with error", "error", err)
-		}
-	}()
-}
-
 func (m *SessionManager) Get(sid string) (*Session, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

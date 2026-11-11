@@ -31,7 +31,7 @@ func newTestBootstrapUserStore(t *testing.T, users ...*models.User) *stores.User
 	})
 
 	for _, user := range users {
-		if err := store.Save(user); err != nil {
+		if _, err := store.Create(user); err != nil {
 			t.Fatalf("failed to seed test user %q: %v", user.Username, err)
 		}
 	}

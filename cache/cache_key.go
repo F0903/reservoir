@@ -42,11 +42,3 @@ func MakeFromRequest(r *http.Request) CacheKey {
 func (ck *CacheKey) String() string {
 	return ck.Hex
 }
-
-func (ck *CacheKey) Bytes() ([]byte, error) {
-	hashBytes, err := hex.DecodeString(ck.Hex)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding cache key: %v", err)
-	}
-	return hashBytes, nil
-}

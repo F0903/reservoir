@@ -263,6 +263,26 @@ func TestLoadOrDefault_Migrations(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "KeepsDefaultForSettingAddedAfterTheConfigWasWritten",
+			mutate: func(raw map[string]any) {
+				delete(raw["cache"].(map[string]any), "hybrid") // Added in v0.16.0.
+			},
+			check: func(t *testing.T, cfg *Config, path string) {
+				want := NewDefault().Cache.Hybrid.DemoteAfter.Read()
+				if got := cfg.Cache.Hybrid.DemoteAfter.Read(); got != want {
+					t.Fatalf("expected default demote_after %v, got %v", want, got)
+				}
+
+				persisted, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(persisted), "demote_after") {
+					t.Fatal("expected the saved config to list the new setting")
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -296,7 +316,7 @@ func TestLoadOrDefault_Migrations(t *testing.T) {
 	}
 }
 
-func TestLoadOrDefault_MissingFields(t *testing.T) {
+func TestLoadOrDefault_MissingFieldsKeepDefaults(t *testing.T) {
 	tmpFile := filepath.ToSlash(filepath.Join(t.TempDir(), "test_config_missing.json"))
 
 	// Write JSON with missing fields (e.g. no proxy section)
@@ -306,14 +326,14 @@ func TestLoadOrDefault_MissingFields(t *testing.T) {
 	}
 
 	cfg, err := LoadOrDefault(tmpFile)
-	if err == nil {
-		t.Fatal("expected existing config with missing fields to return an error")
+	if err != nil {
+		t.Fatalf("expected missing fields to keep their defaults: %v", err)
 	}
-	if cfg != nil {
-		t.Fatal("expected existing config with missing fields to return nil config")
+	if got := cfg.Cache.Type.Read(); got != CacheTypeMemory {
+		t.Fatalf("expected the value from the file, got cache type %q", got)
 	}
-	if !strings.Contains(err.Error(), "missing or uninitialized required configuration property") {
-		t.Fatalf("expected missing field error, got %v", err)
+	if got, want := cfg.Proxy.Listen.Read(), NewDefault().Proxy.Listen.Read(); got != want {
+		t.Fatalf("expected default proxy listen %q, got %q", want, got)
 	}
 }
 

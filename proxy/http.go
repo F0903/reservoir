@@ -20,6 +20,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, proxyReq *http.Request) {
 			slog.Error("Error handling CONNECT request", "error", err)
 			return
 		}
+	} else if proxyReq.URL.Host == "" {
+		// Sent to the proxy, not through it. Forwarding it to its own Host header
+		// would make the proxy request itself in a loop.
+		p.writeError(r, "this is a proxy: send requests through it, not to it", http.StatusBadRequest)
 	} else {
 		if err := p.handleHTTP(r, proxyReq); err != nil {
 			slog.Error("Error handling HTTP request", "error", err)

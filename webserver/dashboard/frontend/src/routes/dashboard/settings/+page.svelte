@@ -33,13 +33,14 @@
 
     let hasChanges = $state(false);
     let saving = $state(false);
-    let inputsDisabled = $state(true);
+    // Every tab's inputs are created at once and read the config as they are created,
+    // so the tabs are only rendered once the config has loaded.
+    let loaded = $state(false);
 
     onMount(async () => {
         await Promise.all([settings.proxySettings.reload(), settings.dashboardSettings.reload()]);
         syncSelectedCacheBackend();
-        await resetInputs();
-        inputsDisabled = false;
+        loaded = true;
     });
 
     function isCacheBackend(value: unknown): value is CacheBackend {
@@ -157,20 +158,22 @@
     </div>
 
     <div class="settings-container">
-        <Tabs {tabs} bind:activeTab>
-            {#snippet dashboard()}
-                {@render pane("dashboard")}
-            {/snippet}
-            {#snippet network()}
-                {@render pane("network")}
-            {/snippet}
-            {#snippet cache()}
-                {@render pane("cache")}
-            {/snippet}
-            {#snippet logging()}
-                {@render pane("logging")}
-            {/snippet}
-        </Tabs>
+        {#if loaded}
+            <Tabs {tabs} bind:activeTab>
+                {#snippet dashboard()}
+                    {@render pane("dashboard")}
+                {/snippet}
+                {#snippet network()}
+                    {@render pane("network")}
+                {/snippet}
+                {#snippet cache()}
+                    {@render pane("cache")}
+                {/snippet}
+                {#snippet logging()}
+                    {@render pane("logging")}
+                {/snippet}
+            </Tabs>
+        {/if}
     </div>
 
     {#snippet pane(tabId: TabId)}
@@ -189,7 +192,6 @@
                             >}
                             get={input.get as () => unknown}
                             commit={input.commit as (_val: unknown) => Promise<unknown>}
-                            disabled={inputsDisabled}
                             {onChange}
                         />
                     {/each}

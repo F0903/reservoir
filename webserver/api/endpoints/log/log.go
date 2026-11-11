@@ -49,6 +49,6 @@ func (m *LogEndpoint) Get(w http.ResponseWriter, r *http.Request, ctx apitypes.C
 
 	filename := filepath.Base(logFile.Name())
 
-	r.Header.Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", "no-store")
 	http.ServeContent(w, r, filename, logFileStat.ModTime(), logFile)
 }

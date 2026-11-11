@@ -42,8 +42,11 @@ func (d *Dashboard) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	// Try to open the requested file, if it doesn't exist serve index.html (for SPA routing)
 	if f, err := buildFS.Open(fName); err == nil {
 		defer f.Close()
-		http.ServeContent(w, r, fName, time.Time{}, f.(io.ReadSeeker))
-		return
+		// A directory (such as _app) opens too, but is not seekable.
+		if content, ok := f.(io.ReadSeeker); ok {
+			http.ServeContent(w, r, fName, time.Time{}, content)
+			return
+		}
 	}
 
 	index, err := buildFS.Open("index.html")

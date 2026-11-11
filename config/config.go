@@ -1,11 +1,13 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
 	"reservoir/utils/assertedpath"
 )
 
@@ -95,22 +97,27 @@ func (c *Config) persist() error {
 }
 
 func load(path string) (*Config, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		slog.Error("Failed to open config file", "path", path, "error", err)
 		return nil, fmt.Errorf("%w: failed to open config file '%s': %w", ErrConfigFileRead, path, err)
 	}
 
-	decoder := json.NewDecoder(f)
+	// Decode on top of the defaults, so a setting added in a newer version keeps
+	// its default instead of failing the load.
+	cfg := NewDefault()
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-
-	var cfg Config
-	err = decoder.Decode(&cfg)
-	f.Close() // Windows can't rename over a file that is still open, and a migration persists below.
-	if err != nil {
+	if err := decoder.Decode(cfg); err != nil {
 		slog.Error("Failed to decode config JSON", "path", path, "error", err)
 		return nil, fmt.Errorf("%w: failed to decode config from '%s'", ErrConfigInvalidFormat, path)
 	}
+
+	// Decoded on its own, the file shows whether it lacks a setting. If it does,
+	// it is saved again below so the file keeps listing every setting.
+	var asWritten Config
+	_ = json.Unmarshal(data, &asWritten)
+	incomplete := checkIsSetRecursive(reflect.ValueOf(&asWritten)) != nil
 
 	migrated := cfg.applyMigrations()
 	cfg.path = path
@@ -119,8 +126,7 @@ func load(path string) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.setRestartNeededProps()
-	if migrated {
+	if migrated || incomplete {
 		if err := cfg.persist(); err != nil {
 			slog.Error("Failed to persist migrated config", "path", path, "error", err)
 			return nil, fmt.Errorf("%w: failed to persist migrated config", ErrConfigPersist)
@@ -128,7 +134,7 @@ func load(path string) (*Config, error) {
 	}
 
 	slog.Info("Successfully loaded config", "path", path)
-	return &cfg, nil
+	return cfg, nil
 }
 
 func LoadOrDefault(path string) (*Config, error) {

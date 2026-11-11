@@ -1,5 +1,3 @@
-import { apiGet, type FetchFn } from "#lib/api/api-helpers.ts";
-
 export type SystemMetrics = {
     start_time: string;
     mem_alloc_bytes: number;
@@ -9,7 +7,3 @@ export type SystemMetrics = {
     cores_available: number;
     num_goroutines: number;
 };
-
-export async function getSystemMetrics(fetchFn: FetchFn = fetch): Promise<Readonly<SystemMetrics>> {
-    return apiGet<SystemMetrics>("/metrics/system", fetchFn);
-}

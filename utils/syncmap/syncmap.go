@@ -33,41 +33,12 @@ func (s *SyncMap[K, V]) Keys() iter.Seq[K] {
 	}
 }
 
-func (s *SyncMap[K, V]) Items() iter.Seq[V] {
-	return func(yield func(V) bool) {
-		s.mu.RLock()
-		items := make([]V, 0, len(s.ma))
-		for _, v := range s.ma {
-			items = append(items, v)
-		}
-		s.mu.RUnlock()
-
-		for _, v := range items {
-			if !yield(v) {
-				return
-			}
-		}
-	}
-}
-
 func (sm *SyncMap[K, V]) Get(key K) (V, bool) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
 	val, ok := sm.ma[key]
 	return val, ok
-}
-
-func (sm *SyncMap[K, V]) GetOrSet(key K, value V) V {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	val, ok := sm.ma[key]
-	if !ok {
-		val = value
-		sm.ma[key] = value
-	}
-	return val
 }
 
 func (sm *SyncMap[K, V]) Delete(key K) {

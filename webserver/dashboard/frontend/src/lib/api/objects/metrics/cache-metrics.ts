@@ -1,5 +1,3 @@
-import { apiGet, type FetchFn } from "#lib/api/api-helpers.ts";
-
 export type CacheStorageMetrics = {
     type: "memory" | "file" | "hybrid";
     entries: number;
@@ -25,7 +23,3 @@ export type CacheMetrics = {
     cache_miss_latency: number;
     storage: CacheStorageMetrics;
 };
-
-export async function getCacheMetrics(fetchFn: FetchFn = fetch): Promise<Readonly<CacheMetrics>> {
-    return apiGet<CacheMetrics>("/metrics/cache", fetchFn);
-}

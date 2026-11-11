@@ -13,7 +13,6 @@ var (
 	ErrEmptyCurrentPassword = "current password must not be empty"
 	ErrEmptyNewPassword     = "new password must not be empty"
 	ErrMissingFields        = "both current_password and new_password fields are required"
-	ErrEmptyPasswords       = "passwords must not be empty"
 )
 
 type changePasswordRequest struct {

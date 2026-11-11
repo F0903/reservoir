@@ -1,6 +1,6 @@
 <script
     lang="ts"
-    generics="C extends Component<CP, CE, 'value'>, CP extends { label: string, value: string | number | boolean }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value'], O = V"
+    generics="C extends Component<CP, CE, 'value'>, CP extends { label: string, value: string | number | boolean }, CE extends Record<string, unknown> = Record<string, unknown>, V = CP['value']"
 >
     import { log } from "#lib/utils/logger.ts";
     import type { Component } from "svelte";
@@ -9,7 +9,6 @@
         InputComponent,
         get,
         commit: commitValue,
-        valueTransform,
         onChange,
         onValueChange,
         visibleForBackends: _visibleForBackends,
@@ -17,8 +16,7 @@
     }: {
         InputComponent: C;
         get: () => V;
-        commit: (_val: O) => Promise<unknown>;
-        valueTransform?: (_val: V) => O;
+        commit: (_val: V) => Promise<unknown>;
         onChange?: (_different: boolean) => void;
         onValueChange?: (_value: V) => void;
         visibleForBackends?: unknown;
@@ -40,14 +38,7 @@
         if (!hasDiverged() || inputValue === undefined) return;
 
         try {
-            let valueToWrite: O;
-            if (valueTransform) {
-                valueToWrite = valueTransform(inputValue);
-                log.debug(`Committing setting with transformed value: ${valueToWrite}`);
-            } else {
-                valueToWrite = inputValue as O;
-            }
-            await commitValue(valueToWrite);
+            await commitValue(inputValue);
 
             log.debug("Setting committed successfully.");
         } catch (e) {

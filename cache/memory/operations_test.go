@@ -142,6 +142,30 @@ func TestMemoryCache_CountsInFlightWritesAgainstBudget(t *testing.T) {
 	<-firstDone
 }
 
+func TestMemoryCache_EvictsToFitEntryLargerThanFreeSpace(t *testing.T) {
+	c := newOperationsTestCache(t, 1024)
+	c.OverrideMemoryCapForTesting(1000)
+
+	// 750 of 1000 bytes used: below the 80% mark that eviction trims down to.
+	for i := range 3 {
+		entry, err := c.Cache(cache.FromString(fmt.Sprint("old-", i)), bytes.NewReader(make([]byte, 250)), time.Now().Add(time.Hour), TestMeta{})
+		if err != nil {
+			t.Fatalf("failed to seed entry %d: %v", i, err)
+		}
+		entry.Data.Close()
+	}
+
+	entry, err := c.Cache(cache.FromString("new"), bytes.NewReader(make([]byte, 300)), time.Now().Add(time.Hour), TestMeta{})
+	if err != nil {
+		t.Fatalf("expected old entries to be evicted to make room, got %v", err)
+	}
+	entry.Data.Close()
+
+	if got := c.StoredBytes(); got > 1000 {
+		t.Fatalf("stored %d bytes, want at most 1000", got)
+	}
+}
+
 func TestMemoryTotalUsesLowestLimitOnOwnCgroupPath(t *testing.T) {
 	const host = int64(8 << 30)
 	const small, smaller = "1073741824\n", "536870912\n"

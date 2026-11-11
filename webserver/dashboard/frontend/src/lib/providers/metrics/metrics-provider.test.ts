@@ -159,6 +159,16 @@ describe("MetricsProvider", () => {
         expect(metricsApi.getAllMetrics).toHaveBeenCalledTimes(3);
     });
 
+    it("should not poll back to back when the interval is 0", async () => {
+        // What clearing the Update Interval field stores.
+        settings.dashboardSettings.fields.updateInterval = 0;
+
+        provider.startRefresh();
+        await vi.advanceTimersByTimeAsync(400);
+
+        expect(metricsApi.getAllMetrics).toHaveBeenCalledTimes(1);
+    });
+
     it("should stop the refresh loop", async () => {
         provider.startRefresh();
         expect(metricsApi.getAllMetrics).toHaveBeenCalledTimes(1);

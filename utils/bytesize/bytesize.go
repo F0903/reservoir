@@ -81,20 +81,8 @@ func (b ByteSize) Bytes() int64 {
 	return b.Convert(UnitB)
 }
 
-func (b ByteSize) KiloBytes() int64 {
-	return b.Convert(UnitK)
-}
-
 func (b ByteSize) MegaBytes() int64 {
 	return b.Convert(UnitM)
-}
-
-func (b ByteSize) GigaBytes() int64 {
-	return b.Convert(UnitG)
-}
-
-func (b ByteSize) TeraBytes() int64 {
-	return b.Convert(UnitT)
 }
 
 func ParseUnchecked(s string) ByteSize {
@@ -120,7 +108,8 @@ func (b ByteSize) FindLargestFittingUnit() rune {
 	largestUnitRune := 'B'
 
 	for unitRune, unitSize := range unitRuneMap {
-		if int64(b) < unitSize {
+		// A unit that does not divide the size evenly would drop the remainder: 1500M saved as "1G".
+		if int64(b) < unitSize || int64(b)%unitSize != 0 {
 			continue
 		}
 

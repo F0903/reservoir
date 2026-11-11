@@ -82,6 +82,17 @@ describe("dashboard layout", () => {
         expect(screen.getByText("Users")).toBeInTheDocument();
     });
 
+    it("sends users who must change their password to the change-password page", async () => {
+        contextMocks.auth.user.is_admin = true;
+        contextMocks.auth.user.password_change_required = true;
+
+        render(DashboardLayout, { props: { children } });
+
+        await waitFor(() =>
+            expect(goto).toHaveBeenCalledWith("/change-password?required=true", { replace: true }),
+        );
+    });
+
     it("redirects non-admin users away from admin-only routes", async () => {
         contextMocks.page.url = new URL("http://localhost/dashboard/settings");
 

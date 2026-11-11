@@ -46,7 +46,7 @@ func testUser(username string) *models.User {
 
 func TestUpdateUsernameRenamesExistingUser(t *testing.T) {
 	store := newTestUserStore(t)
-	if err := store.Save(testUser("admin")); err != nil {
+	if _, err := store.Create(testUser("admin")); err != nil {
 		t.Fatalf("failed to save user: %v", err)
 	}
 	user, err := store.GetByUsername("admin")
@@ -77,10 +77,10 @@ func TestUpdateUsernameRenamesExistingUser(t *testing.T) {
 
 func TestUpdateUsernameRejectsTakenUsername(t *testing.T) {
 	store := newTestUserStore(t)
-	if err := store.Save(testUser("alice")); err != nil {
+	if _, err := store.Create(testUser("alice")); err != nil {
 		t.Fatalf("failed to save first user: %v", err)
 	}
-	if err := store.Save(testUser("bob")); err != nil {
+	if _, err := store.Create(testUser("bob")); err != nil {
 		t.Fatalf("failed to save second user: %v", err)
 	}
 	alice, err := store.GetByUsername("alice")
@@ -164,21 +164,6 @@ func TestUpdateAdminConcurrentDemotionsKeepOneAdmin(t *testing.T) {
 	)
 
 	assertOneSuccessOneLastAdmin(t, errs)
-	assertAdminCount(t, store, 1)
-}
-
-func TestSaveRejectsDemotingLastAdmin(t *testing.T) {
-	store := newTestUserStore(t)
-	admin, err := store.Create(testUser("admin"))
-	if err != nil {
-		t.Fatalf("failed to create admin: %v", err)
-	}
-
-	admin.IsAdmin = false
-	err = store.Save(admin)
-	if !errors.Is(err, ErrLastAdmin) {
-		t.Fatalf("expected ErrLastAdmin, got %v", err)
-	}
 	assertAdminCount(t, store, 1)
 }
 

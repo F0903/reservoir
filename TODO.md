@@ -8,6 +8,15 @@ A '(?)' at the end of an element indicates a possible future feature or idea.
 
 Highest priority first.
 
+- [x] A request sent straight to the proxy's own address makes it request itself in a loop (201 hops for one `HEAD`). Answer 400 to plain requests that are sent to the proxy instead of through it. (`proxy/http.go:16`)
+- [x] Changing a password writes the whole user row back from a stale copy, so a demotion or rename done in between is undone. Use `users.Update` with only the password fields and delete `Save`. (`application/services/auth.go:154`, `db/stores/users.go:28`)
+- [x] The login limit is checked before the password hash and recorded after it, so parallel guesses all get through. Check and record under one lock in `Login`. (`application/services/auth.go:79`)
+- [x] A file that does not fit in the free space is rejected without evicting anything while the cache is under 80% full, then downloaded a second time. Tell `Evict` how much room is needed. (`cache/file/operations.go:140`, `cache/memory/operations.go:120`, `cache/janitor.go:200`)
+- [x] A config from v0.15 or older fails at startup because `cache.hybrid.demote_after` has no migration. Decode the file on top of `NewDefault()` and drop the `IsSet` migrations. (`config/config.go:107`, `config/migrations.go:3`)
+- [x] Cache size and log size cannot be saved from the dashboard: the frontend sends a number, the server only accepts text like `20G`. Remove `valueTransform` and fix the test fixtures. (`webserver/dashboard/frontend/src/routes/dashboard/settings/settings-sections.ts:258`)
+- [x] Switching settings tabs discards unsaved edits, and Save still reports success. Render every tab pane and hide the inactive ones. (`webserver/dashboard/frontend/src/lib/components/ui/Tabs.svelte:31`, `webserver/dashboard/frontend/src/routes/dashboard/settings/+page.svelte:74`)
+- [x] Sizes are rounded down when written back (`1500M` becomes `1G`), so a limit shrinks after the next save. Skip units that do not divide evenly. (`utils/bytesize/bytesize.go:118`)
+
 - [x] Memory cache deadlocks when full: eviction waits on a shard lock the write already holds. Use `TryRLock` and skip busy entries. (`cache/memory/cache.go:74`)
 - [x] One client disconnecting fails the shared download for all waiters, and a stalled upstream body hangs that URL forever. Detach the download from the client's context and add a read-idle timeout. (`proxy/fetch/fetcher.go:70`)
 - [x] A failed cache write (empty body with the file cache, full disk) returns 502. Wrap the error as `errNotCacheable` so the direct-fetch fallback runs. (`proxy/fetch/upstream.go:85`)
@@ -20,6 +29,17 @@ Highest priority first.
 ## Should Fix
 
 Highest priority first.
+
+- [x] `GET /_app` panics the dashboard handler without a login, because an embedded directory is not seekable. Check the type assertion and fall through to `index.html`. (`webserver/dashboard/dashboard.go:43`)
+- [ ] A dashboard admin can read any file the service can read, including the CA key, by pointing `logging.file` at it and opening `/api/log`. Decide whether dashboard admins should equal shell access; if not, refuse path settings over the API. (`application/services/config.go:100`, `webserver/api/endpoints/log/log.go:19`)
+- [x] An admin who resets their own password with "require change" gets a dashboard full of 403s, because only the login page handles that flag. Redirect flagged users to `/change-password` in the dashboard layout. (`webserver/dashboard/frontend/src/routes/dashboard/+layout.svelte:20`)
+- [x] Logging in while a session exists answers with the text "Already Authenticated", which the frontend stores as the user. Return the current user as JSON. (`webserver/api/auth/login.go:46`)
+- [x] In strict cache mode a 304 recheck always extends the entry by `default_max_age`, ignoring upstream freshness. Use `GetExpiresOrDefault` with the 304's headers. (`proxy/fetch/revalidation.go:13`)
+- [ ] Clients get no bytes until the proxy has the whole file, so large downloads hit client read timeouts (pip: 15 s). The README now tells users to raise the client timeout. Still open: stream to the first client while caching, without letting a slow or gone client stall the shared download. (`proxy/fetch/upstream.go:76`)
+- [x] The log page downloads the whole log file (up to 500M), and `Cache-Control: no-store` is set on the request, not the response. Ask for the tail with a `Range` header and set the header on `w`. (`webserver/dashboard/frontend/src/routes/dashboard/log/+page.svelte:16`, `webserver/api/endpoints/log/log.go:52`)
+- [x] An update interval of 0 or empty makes the dashboard request metrics back to back. Clamp to at least 500 ms. (`webserver/dashboard/frontend/src/lib/providers/metrics/metrics-provider.svelte.ts:54`)
+- [x] Delete unused Go code, about 270 lines: packages `utils/writesynced` and `utils/set`, `utils/countingreader/read_closer.go`, and unused functions in `utils`, `assertedpath`, `syncmap`, `atomics`, `bytesize`, `config`, `event`, `auth` and `cache`.
+- [x] Delete unused frontend code and dependencies: `FlexGrid.svelte`, three unused metrics getters, `parseByteString`, `@sveltejs/adapter-auto`, `@vitest/browser`, `postcss-load-config`.
 
 - [x] Session IDs are written to debug logs that non-admins can read. Remove `session_id` from the six log lines and make the log endpoints admin-only unless non-admins need them. (`webserver/auth/session.go:112`, `webserver/api/endpoints/log/log.go:24`)
 - [x] Private responses can be served to other clients: `private` is ignored by default and custom token headers aren't treated as credentials. Always honour `private` and add common token headers (`Private-Token`, `X-Api-Key`). (`proxy/fetch/cache_policy.go:62`, `proxy/headers/header_directives.go:136`)
@@ -39,6 +59,9 @@ Highest priority first.
 - [x] A user update can still be half saved if a later store write fails, such as renaming and demoting the last admin together. Do the writes in one transaction. (`application/services/users.go`)
 
 ## Nice to Have
+
+- [x] The byte formatter shows "NaN" for values between 0 and 1 or below 0 (idle throughput). Clamp the unit index. (`webserver/dashboard/frontend/src/lib/utils/bytestring.ts:22`)
+- [x] The Poller's timer is never stopped when its widget is removed while visible. Return `stopPolling` from the effect. (`webserver/dashboard/frontend/src/lib/components/widgets/utils/Poller.svelte:34`)
 
 - [x] Generated certificates use `NotBefore: time.Now()`, so clients with a slightly slow clock reject them. Backdate by an hour. (`proxy/certs/private_ca.go:129`)
 - [x] Cached responses with no upstream ETag are sent with an empty `ETag` header. Only set it when there is a value. (`proxy/http.go:103`, `proxy/range.go:72`)

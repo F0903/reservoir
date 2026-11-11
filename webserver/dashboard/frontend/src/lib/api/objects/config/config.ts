@@ -37,7 +37,7 @@ export type HybridCacheConfig = {
 };
 
 export type CacheConfig = {
-    max_cache_size: number;
+    max_cache_size: string; // Such as "10G". The server only accepts this text form.
     type: string;
     cleanup_interval: string;
     lock_shards: number;
@@ -49,7 +49,7 @@ export type CacheConfig = {
 export type LogConfig = {
     level: string;
     file: string;
-    max_size: number;
+    max_size: string; // Such as "500M".
     max_backups: number;
     compress: boolean;
     to_stdout: boolean;

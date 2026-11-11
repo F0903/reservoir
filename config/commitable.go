@@ -34,10 +34,6 @@ func (c *commitable[T]) Commit() {
 	}
 }
 
-func (c *commitable[T]) Uncommit() {
-	c.stagedValue = typeutils.None[T]()
-}
-
 func (c *commitable[T]) String() string {
 	if val, ok := c.stagedValue.Get(); ok {
 		return fmt.Sprintf("Staged: %v", val)

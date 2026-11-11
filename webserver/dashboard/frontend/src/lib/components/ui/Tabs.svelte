@@ -28,11 +28,14 @@
         {/each}
     </nav>
 
-    <div class="tab-content" in:fade={{ duration: 200 }} data-key={activeTab}>
-        {#if rest[activeTab]}
-            {@render (rest[activeTab] as Snippet)()}
-        {/if}
-    </div>
+    <!-- Every pane stays mounted and the inactive ones are hidden, so what was typed in a pane survives a tab switch. -->
+    {#each tabs as tab (tab.id)}
+        <div class="tab-content" in:fade={{ duration: 200 }} hidden={activeTab !== tab.id}>
+            {#if rest[tab.id]}
+                {@render (rest[tab.id] as Snippet)()}
+            {/if}
+        </div>
+    {/each}
 </div>
 
 <style>
@@ -86,6 +89,11 @@
         width: 100%;
         display: flex;
         flex-direction: column;
+    }
+
+    /* "display: flex" above would otherwise win over the hidden attribute. */
+    .tab-content[hidden] {
+        display: none;
     }
 
     @media (max-width: 768px) {

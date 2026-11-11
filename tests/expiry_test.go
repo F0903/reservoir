@@ -101,6 +101,36 @@ func TestCacheExpiryAndRevalidation(t *testing.T) {
 	}
 }
 
+func TestRevalidationHonoursUpstreamFreshness(t *testing.T) {
+	env := SetupTestEnv(t) // Strict mode: upstream freshness is not overridden.
+
+	var requestCount atomic.Int64
+	env.Upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "max-age=1")
+		w.Header().Set("ETag", "\"fresh-etag\"")
+		if requestCount.Add(1) > 1 {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Write([]byte("freshness test body"))
+	})
+	env.Start()
+
+	targetURL := env.Upstream.URL + "/freshness-test"
+	for range 3 {
+		resp, err := env.Client.Get(targetURL)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		readResponseBody(t, resp)
+		time.Sleep(1100 * time.Millisecond)
+	}
+
+	if count := requestCount.Load(); count != 3 {
+		t.Fatalf("expected a recheck each time the 1 second lifetime ran out (3 upstream requests), got %d", count)
+	}
+}
+
 func TestStaleCacheReplacedWhenUpstreamReturnsNewBody(t *testing.T) {
 	env := SetupTestEnv(t)
 

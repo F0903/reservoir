@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"sync"
 	"time"
 
 	"reservoir/config"
@@ -19,6 +20,11 @@ type AuthService struct {
 	users        *stores.UserStore
 	sessions     *coreauth.SessionManager
 	loginLimiter *coreauth.LoginAttemptLimiter
+	// loginMu makes the limiter check and the failure it records one step, so parallel
+	// guesses cannot all pass the check before any of them is counted.
+	// shortcut: logins are checked one at a time (about 0.1 s each); count attempts
+	// up front in the limiter instead if login throughput ever matters.
+	loginMu sync.Mutex
 }
 
 type RequestContext struct {
@@ -76,6 +82,10 @@ func (s *AuthService) Login(req RequestContext, username string, password string
 	if s == nil || s.users == nil || s.sessions == nil {
 		return nil, nil, ErrUserStoreUnavailable
 	}
+
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+
 	if _, limited := s.loginLimiter.Check(req.clientAddress, username); limited {
 		return nil, nil, ErrLoginRateLimited
 	}
@@ -160,9 +170,14 @@ func (s *AuthService) ChangePassword(req RequestContext, currentPassword string,
 		return ErrCurrentPasswordIncorrect
 	}
 
-	user.PasswordHash = *phc.GenerateArgon2id(newPassword)
-	user.PasswordChangeRequired = false
-	if err := s.users.Save(user); err != nil {
+	// Write only the password fields: the user was read before the slow hashing,
+	// and an admin may have renamed or demoted them since.
+	changeRequired := false
+	_, err = s.users.Update(user.ID, stores.UserChanges{
+		PasswordHash:           phc.GenerateArgon2id(newPassword),
+		PasswordChangeRequired: &changeRequired,
+	})
+	if err != nil {
 		return mapUserStoreError(err)
 	}
 

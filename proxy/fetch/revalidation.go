@@ -7,17 +7,18 @@ import (
 	"net/http"
 	"reservoir/cache"
 	"reservoir/proxy/headers"
-	"time"
 )
 
-func (f *Fetcher) handleUpstream304(req *http.Request, key cache.CacheKey) (cached *cache.Entry[CacheMetadata], err error) {
+func (f *Fetcher) handleUpstream304(req *http.Request, key cache.CacheKey, upstreamHd *headers.HeaderDirectives) (cached *cache.Entry[CacheMetadata], err error) {
 	slog.Debug("Handling 304 response from upstream", "url", req.URL, "key", key)
 
 	slog.Debug("Revalidating cache metadata...", "url", req.URL, "key", key)
 	err = f.cache.UpdateMetadata(key, func(meta *cache.EntryMetadata[CacheMetadata]) {
-		// Update the metadata to reflect that the cached response is still valid.
-		maxAge := f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast()
-		meta.Expires = time.Now().Add(maxAge)
+		// The cached response is still valid. Its new lifetime follows the same rule as a 200.
+		meta.Expires = upstreamHd.GetExpiresOrDefault(
+			f.cfg.Proxy.CachePolicy.ForceDefaultMaxAge.Read(),
+			f.cfg.Proxy.CachePolicy.DefaultMaxAge.Read().Cast(),
+		)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errUpdateCacheMetadata, err)

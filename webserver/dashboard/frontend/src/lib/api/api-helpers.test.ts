@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { goto } from "$app/navigation";
-import { apiDelete, apiGet, apiGetTextStream, apiPatch, apiPost } from "./api-helpers";
+import { apiDelete, apiGet, apiGetResponse, apiPatch, apiPost } from "./api-helpers";
 import UnauthorizedError from "./unauthorized-error";
 
 // Mock $app/navigation and $app/paths
@@ -58,14 +58,14 @@ describe("api-helpers", () => {
         });
     });
 
-    describe("apiGetTextStream", () => {
+    describe("apiGetResponse", () => {
         it("should not redirect on 401 when redirect is disabled", async () => {
             const fetchFn = vi.fn().mockResolvedValue({
                 status: 401,
                 ok: false,
             });
 
-            await expect(apiGetTextStream("/stream", fetchFn, null)).rejects.toThrow(
+            await expect(apiGetResponse("/stream", undefined, fetchFn, null)).rejects.toThrow(
                 UnauthorizedError,
             );
             expect(goto).not.toHaveBeenCalled();

@@ -182,3 +182,27 @@ func TestFileCache_StartupDiscardsEntryWhoseSizeDoesNotMatch(t *testing.T) {
 		t.Fatalf("expected mismatched body to be removed, stat err=%v", err)
 	}
 }
+
+func TestFileCache_EvictsToFitEntryLargerThanFreeSpace(t *testing.T) {
+	c := New[TestMeta](config.NewDefault(), nil, t.TempDir(), 1000, time.Hour, 16, t.Context())
+	defer c.Destroy()
+
+	// 750 of 1000 bytes used: below the 80% mark that eviction trims down to.
+	for _, name := range []string{"old-a", "old-b", "old-c"} {
+		entry, err := c.Cache(cache.FromString(name), bytes.NewReader(make([]byte, 250)), time.Now().Add(time.Hour), TestMeta{})
+		if err != nil {
+			t.Fatalf("failed to seed %s: %v", name, err)
+		}
+		entry.Data.Close()
+	}
+
+	entry, err := c.Cache(cache.FromString("new"), bytes.NewReader(make([]byte, 300)), time.Now().Add(time.Hour), TestMeta{})
+	if err != nil {
+		t.Fatalf("expected old entries to be evicted to make room, got %v", err)
+	}
+	entry.Data.Close()
+
+	if got := c.Stats().Bytes; got > 1000 {
+		t.Fatalf("stored %d bytes, want at most 1000", got)
+	}
+}

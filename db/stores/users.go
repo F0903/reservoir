@@ -24,37 +24,6 @@ func NewUserStore(database db.Database) *UserStore {
 	return &UserStore{db: database}
 }
 
-// Saves the given user to the database. If a user with the same username already exists, it is updated.
-func (s *UserStore) Save(user *models.User) error {
-	return s.db.WithTransaction(func(tx *db.Tx) error {
-		existing, err := getUserByUsername(tx, user.Username)
-		if err != nil {
-			return err
-		}
-		if existing != nil {
-			if err := ensureCanRemoveAdmin(tx, existing.IsAdmin && !user.IsAdmin); err != nil {
-				return err
-			}
-		}
-
-		return tx.Exec(
-			`
-			INSERT INTO users (username, password_hash, is_admin, password_change_required)
-			VALUES (?, ?, ?, ?)
-			ON CONFLICT(username) DO UPDATE SET
-				username = excluded.username,
-				password_hash = excluded.password_hash,
-				is_admin = excluded.is_admin,
-				password_change_required = excluded.password_change_required;
-			`,
-			user.Username,
-			user.PasswordHash,
-			user.IsAdmin,
-			user.PasswordChangeRequired,
-		)
-	})
-}
-
 func (s *UserStore) Create(user *models.User) (*models.User, error) {
 	username, err := normalizeUsername(user.Username)
 	if err != nil {

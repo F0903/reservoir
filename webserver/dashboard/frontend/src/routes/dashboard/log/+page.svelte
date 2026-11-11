@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getLogStream } from "#lib/api/objects/log/log.ts";
+    import { getLogTail } from "#lib/api/objects/log/log.ts";
     import PageTitle from "#lib/components/ui/PageTitle.svelte";
     import TextViewer from "#lib/components/ui/TextViewer.svelte";
     import Button from "#lib/components/ui/input/Button.svelte";
@@ -13,20 +13,15 @@
     let autoScroll = $state(true);
     let paused = $state(false);
 
+    // The live stream starts after the history, so new lines are not shown above older ones.
+    let historyLoaded = $state(false);
+
     onMount(async () => {
-        const fetchHistory = async () => {
-            let textStream = await getLogStream();
-            const reader = textStream.getReader();
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                await textViewer.appendText(value);
-            }
-        };
-
-        await fetchHistory();
-        startLogListen();
+        try {
+            await textViewer.appendText(await getLogTail());
+        } finally {
+            historyLoaded = true;
+        }
     });
 
     onDestroy(() => {
@@ -35,7 +30,7 @@
 
     $effect(() => {
         log.debug("Effect triggered");
-        if (paused) {
+        if (paused || !historyLoaded) {
             stopLogListen();
         } else {
             startLogListen();

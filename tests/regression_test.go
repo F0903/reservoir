@@ -191,6 +191,31 @@ func TestDefaultUpstreamClientRefusesLoopback(t *testing.T) {
 	}
 }
 
+func TestRequestSentToProxyItselfIsRefused(t *testing.T) {
+	env := SetupTestEnv(t)
+
+	var hops atomic.Int64
+	env.ProxyServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Cap the recursion so a regression fails the test instead of hanging it.
+		if hops.Add(1) > 20 {
+			w.WriteHeader(http.StatusLoopDetected)
+			return
+		}
+		env.Proxy.ServeHTTP(w, r)
+	})
+	env.Start()
+
+	resp, err := http.Head(env.ProxyServer.URL + "/")
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest || hops.Load() != 1 {
+		t.Fatalf("status=%d proxy hops=%d; a request sent to the proxy itself must be refused at once", resp.StatusCode, hops.Load())
+	}
+}
+
 func TestEncodedPathReachesUpstreamIntact(t *testing.T) {
 	env := SetupTestEnv(t)
 

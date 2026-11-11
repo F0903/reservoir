@@ -18,7 +18,20 @@
     let isMenuOpen = $state(false);
 
     $effect(() => {
-        if (!browser || auth.loading || !auth.user || isAdmin) {
+        if (!browser || auth.loading || !auth.user) {
+            return;
+        }
+
+        // Until the password is changed the API answers 403 to almost everything,
+        // so the dashboard would only show errors.
+        if (auth.user.password_change_required) {
+            let changePasswordUrl = resolve("/change-password");
+            changePasswordUrl += "?required=true";
+            void goto(changePasswordUrl, { replace: true });
+            return;
+        }
+
+        if (isAdmin) {
             return;
         }
 

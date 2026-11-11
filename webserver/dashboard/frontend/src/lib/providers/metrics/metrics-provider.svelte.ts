@@ -51,7 +51,11 @@ export class MetricsProvider {
             if (!this.refreshing) break;
 
             // Calculate remaining wait time to respect the interval accurately
-            const interval = this.settings.dashboardSettings.fields.updateInterval;
+            // The setting comes from a free-text field: empty or 0 would mean polling back to back.
+            const interval = Math.max(
+                500,
+                Number(this.settings.dashboardSettings.fields.updateInterval) || 10000,
+            );
             const elapsed = Date.now() - startTime;
             const waitTime = Math.max(0, interval - elapsed);
 

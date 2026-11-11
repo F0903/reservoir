@@ -44,7 +44,14 @@ func (e *LoginEndpoint) Post(w http.ResponseWriter, r *http.Request, ctx apitype
 	user, cookie, err := ctx.Services.Auth.Login(ctx.Request, req.Username, req.Password)
 	if err != nil {
 		if errors.Is(err, appservices.ErrAlreadyAuthenticated) {
-			apihttp.WriteText(w, http.StatusOK, "Already Authenticated")
+			// Answer like a fresh login: the dashboard stores the body as the signed-in user.
+			current, err := ctx.GetCurrentUser()
+			if err != nil {
+				slog.Error("Error loading the already authenticated user", "error", err)
+				apihttp.InternalServerError(w)
+				return
+			}
+			apihttp.WriteJSON(w, http.StatusOK, models.FromUser(current))
 			return
 		}
 		if errors.Is(err, appservices.ErrInvalidCredentials) {

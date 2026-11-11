@@ -9,7 +9,6 @@ import PercentInput from "#lib/components/ui/input/PercentInput.svelte";
 import TextInput from "#lib/components/ui/input/TextInput.svelte";
 import Toggle from "#lib/components/ui/input/Toggle.svelte";
 import type { SettingsProvider } from "#lib/providers/settings/settings-provider.svelte.ts";
-import { parseByteString } from "#lib/utils/bytestring.ts";
 import { log } from "#lib/utils/logger.ts";
 import { Database, FileText, Globe, PanelsTopLeft } from "@lucide/svelte";
 import type { Component, ComponentProps } from "svelte";
@@ -41,12 +40,10 @@ type InputSection<
     C extends Component<CP, CE, "value">,
     CP extends Record<string, unknown> = { [key: string]: unknown },
     CE extends Record<string, unknown> = { [key: string]: unknown },
-    O = ComponentProps<C>["value"],
 > = {
     InputComponent: C;
     get: () => ComponentProps<C>["value"];
-    valueTransform?: (_val: ComponentProps<C>["value"]) => O;
-    commit: (_val: O) => Promise<unknown>;
+    commit: (_val: ComponentProps<C>["value"]) => Promise<unknown>;
     label: string;
     pattern?: string;
     tooltip?: string;
@@ -67,7 +64,6 @@ export type SettingsInput =
     | InputSection<typeof NumberInput, RegularInputProps<number>>
     | InputSection<typeof PercentInput, RegularInputProps<number>>
     | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp>
-    | InputSection<typeof TextInput, RegularInputProps<string>, SetErrorProp, number>
     | InputSection<typeof Toggle, RegularInputProps<boolean>>
     | InputSection<typeof Dropdown, RegularInputProps<string> & { options: string[] }>;
 
@@ -257,8 +253,7 @@ export function createSettingsSections(
             [
                 {
                     InputComponent: TextInput,
-                    get: () => String(cacheConfig().max_cache_size),
-                    valueTransform: (val: string) => parseByteString(val),
+                    get: () => cacheConfig().max_cache_size,
                     commit: commit("cache.max_cache_size"),
                     label: "Total Cache Limit",
                     pattern: bytesizePattern,
@@ -321,8 +316,7 @@ export function createSettingsSections(
                 },
                 {
                     InputComponent: TextInput,
-                    get: () => String(loggingConfig().max_size),
-                    valueTransform: (val: string) => parseByteString(val),
+                    get: () => loggingConfig().max_size,
                     commit: commit("logging.max_size"),
                     label: "Max File Size",
                     pattern: bytesizePattern,

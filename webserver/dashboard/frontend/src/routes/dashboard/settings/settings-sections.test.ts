@@ -38,7 +38,7 @@ function testConfig(): Config {
         },
         cache: {
             type: "hybrid",
-            max_cache_size: 1024,
+            max_cache_size: "10G",
             cleanup_interval: "5m",
             lock_shards: 64,
             file: {
@@ -54,7 +54,7 @@ function testConfig(): Config {
         logging: {
             level: "INFO",
             file: "var/log/reservoir.log",
-            max_size: 1024,
+            max_size: "500M",
             max_backups: 3,
             compress: true,
             to_stdout: true,
@@ -120,12 +120,12 @@ describe("settings sections", () => {
         const sections = createSettingsSections(testSettings());
 
         await findSetting(sections, "Proxy Listen").commit(":7777");
-        await findSetting(sections, "Total Cache Limit").commit(4096);
+        await findSetting(sections, "Total Cache Limit").commit("4G");
         await findSetting(sections, "Demote Idle Memory After").commit("5m");
         await findSetting(sections, "Ignore Cache Control").commit(false);
 
         expect(patchConfigMock()).toHaveBeenCalledWith("proxy.listen", ":7777");
-        expect(patchConfigMock()).toHaveBeenCalledWith("cache.max_cache_size", 4096);
+        expect(patchConfigMock()).toHaveBeenCalledWith("cache.max_cache_size", "4G");
         expect(patchConfigMock()).toHaveBeenCalledWith("cache.hybrid.demote_after", "5m");
         expect(patchConfigMock()).toHaveBeenCalledWith(
             "proxy.cache_policy.ignore_cache_control",

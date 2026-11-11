@@ -19,11 +19,6 @@ type eventState[T any] struct {
 	subscribers map[uint64]EventFn[T]
 }
 
-func New[T any]() *Event[T] {
-	event := NewEvent[T]()
-	return &event
-}
-
 func NewEvent[T any]() Event[T] {
 	return Event[T]{
 		state: newEventState[T](),

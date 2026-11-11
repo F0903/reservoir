@@ -127,7 +127,7 @@ func (f *Fetcher) handleUpstreamResponse(req *http.Request, resp *http.Response,
 	case http.StatusOK:
 		return f.handleUpstream200(req, resp, baseKey, lookupKey, upstreamHd)
 	case http.StatusNotModified:
-		return f.handleUpstream304(req, lookupKey)
+		return f.handleUpstream304(req, lookupKey, upstreamHd)
 	case http.StatusRequestedRangeNotSatisfiable:
 		return f.handleUpstream416(req, resp, baseKey, lookupKey, clientHd, noRetry)
 	default:

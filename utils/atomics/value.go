@@ -36,17 +36,6 @@ func (a *Value[T]) Load() (val T, some bool) {
 	return zero, false
 }
 
-func (a *Value[T]) Swap(new T) (old T, some bool) {
-	if oldAny := a.v.Swap(new); oldAny != nil {
-		return oldAny.(T), true
-	}
-	return old, false
-}
-
-func (a *Value[T]) CompareAndSwap(old, new T) bool {
-	return a.v.CompareAndSwap(old, new)
-}
-
 func (a *Value[T]) String() string {
 	if v, some := a.Load(); some {
 		return fmt.Sprintf("%v", v)

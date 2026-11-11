@@ -19,21 +19,8 @@ export function formatBytesToLargest(bytes: number, decimals = 2): string {
     const base = 1024;
     const dm = decimals < 0 ? 0 : decimals;
 
-    const i = Math.floor(Math.log2(bytes) / 10);
+    // Rates can be below one byte, or negative: both must still land on a real unit.
+    const i = Math.max(0, Math.floor(Math.log2(Math.abs(bytes)) / 10));
 
     return parseFloat((bytes / Math.pow(base, i)).toFixed(dm)) + unitLabels[i];
-}
-
-export function parseByteString(s: string): number {
-    const unitRe = /^(\d+)([BKMGT])$/i;
-
-    const matches = unitRe.exec(s);
-    if (!matches) throw new Error(`Invalid byte string: ${s}`);
-
-    const value = parseInt(matches[1]);
-    const unit = matches[2].toUpperCase() as keyof typeof ByteUnits;
-
-    if (!(unit in ByteUnits)) throw new Error(`Invalid byte unit: ${unit}`);
-
-    return value * ByteUnits[unit];
 }

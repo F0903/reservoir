@@ -3,14 +3,12 @@ package assertedpath
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 )
 
 type AssertedPath struct {
-	Path         string
-	createdAsDir bool
+	Path string
 }
 
 func createDirs(path string) error {
@@ -59,8 +57,7 @@ func AssertDirectory(path string) AssertedPath {
 	}
 
 	return AssertedPath{
-		Path:         path,
-		createdAsDir: true,
+		Path: path,
 	}
 }
 
@@ -74,38 +71,6 @@ func TryAssert(path string) (AssertedPath, error) {
 	return AssertedPath{
 		Path: path,
 	}, nil
-}
-
-// Asserts the existence of a directory at the specified path, creating it if necessary.
-// As opposed to Assert, this function returns an error instead of panicking.
-func TryAssertDirectory(path string) (AssertedPath, error) {
-	if err := assertPath(path, true); err != nil {
-		return AssertedPath{}, err
-	}
-
-	return AssertedPath{
-		Path:         path,
-		createdAsDir: true,
-	}, nil
-}
-
-func (ap AssertedPath) EnsureCleared() AssertedPath {
-	// Just remove the path and recreate it, simpler and faster than iterating through the directory
-	os.RemoveAll(ap.Path)
-
-	if ap.createdAsDir {
-		if err := assertPath(ap.Path, true); err != nil {
-			slog.Error("Failed to recreate cleared directory", "path", ap.Path, "error", err)
-			panic(err)
-		}
-	} else {
-		if err := createDirs(ap.Path); err != nil {
-			slog.Error("Failed to recreate cleared directory", "path", ap.Path, "error", err)
-			panic(err)
-		}
-	}
-
-	return ap
 }
 
 func (ap *AssertedPath) String() string {
