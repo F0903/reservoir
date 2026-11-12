@@ -92,6 +92,10 @@ func (f *Fetcher) getFromCacheOrFetch(req *http.Request, baseKey cache.CacheKey,
 	}
 
 	up := req.Clone(req.Context())
+	if fl := flightFrom(req.Context()); fl != nil {
+		// A new body from upstream replaces a stale entry, which counts as a revalidation.
+		fl.bodyStatus = StatusRevalidated
+	}
 
 	// Cache is stale: set conditional headers if available
 	if cached.Metadata.Object.ETag != "" {

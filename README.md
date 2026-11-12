@@ -70,7 +70,7 @@ If a setting is both specified in the configuration file and as a command-line a
 
 The configuration file is a JSON file that contains all the settings for the proxy.
 You can edit this file manually in ``var/config.json`` to change the configuration. If the ``var/`` folder or config does not exist, run the proxy once, and it will be created automatically.
-Some settings can also be changed in the Dashboard.
+Some settings can also be changed in the Dashboard. File and directory paths (log file, cache directory, database file, CA certificate and key) are the exception: they can only be set in the config file or with a command-line flag.
 
 ### Dashboard Bootstrap Login
 
@@ -110,9 +110,13 @@ The file cache writes metadata sidecars next to cached response bodies. On start
 
 Loaded file-cache entries are still subject to `cache.max_cache_size`, normal expiry, and the cleanup interval. If restored entries exceed the configured cache size, startup eviction trims them before serving traffic.
 
-### Large Downloads and Client Timeouts
+### Large Downloads
 
-Reservoir downloads a cacheable response completely before it sends the first byte to the client. On the first request for a large file, the client therefore receives nothing until the proxy has the whole file, and a client with a short read timeout may give up and retry. If you see that, raise the timeout in the client, for example `pip --timeout 120` or `Acquire::http::Timeout "120";` for apt. Later requests are served from the cache and are not affected.
+Clients receive a download while Reservoir is still caching it, so a large file does not make them wait for the whole download first. Requests for the same file that arrive during the download read along with it and share the one upstream request.
+
+The download never waits for a client. Reservoir keeps the newest 4 MiB of a running download in memory for the clients that read along. A client that falls further behind than that pauses until the download is complete, and is then continued from the cache. The same goes for a request that arrives after the download has passed its first 4 MiB. If such a pause is longer than the read timeout of the client, raise that timeout, for example `pip --timeout 120` or `Acquire::http::Timeout "120";` for apt.
+
+If a download breaks off halfway, or the cache cannot store it, Reservoir gets each client the rest of the file from upstream.
 
 ### Command-Line Arguments
 

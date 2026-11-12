@@ -181,6 +181,20 @@ describe("settings page", () => {
         );
     });
 
+    it("offers no file or directory path settings", async () => {
+        await renderSettingsPage();
+
+        // The server refuses these over the API, so offering them would only produce errors.
+        for (const label of [
+            "Log File Path",
+            "Cache Directory",
+            "CA Certificate Path",
+            "CA Key Path",
+        ]) {
+            expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+        }
+    });
+
     it("shows restart-required state after saving a restart-required setting", async () => {
         getRestartRequiredMock()
             .mockResolvedValueOnce({ restart_required: false })
@@ -203,7 +217,6 @@ describe("settings page", () => {
         await renderSettingsPage();
         await fireEvent.click(screen.getByRole("button", { name: /cache/i }));
 
-        expect(screen.getByLabelText("Cache Directory")).toBeInTheDocument();
         expect(screen.getByLabelText("Memory Budget (%)")).toBeInTheDocument();
         expect(screen.getByLabelText("Demote Idle Memory After")).toBeInTheDocument();
 
@@ -212,17 +225,17 @@ describe("settings page", () => {
         });
 
         await waitFor(() =>
-            expect(screen.queryByLabelText("Cache Directory")).not.toBeInTheDocument(),
+            expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument(),
         );
         expect(screen.getByLabelText("Memory Budget (%)")).toBeInTheDocument();
-        expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument();
 
         await fireEvent.change(screen.getByLabelText("Cache Backend"), {
             target: { value: "file" },
         });
 
-        await waitFor(() => expect(screen.getByLabelText("Cache Directory")).toBeInTheDocument());
-        expect(screen.queryByLabelText("Memory Budget (%)")).not.toBeInTheDocument();
+        await waitFor(() =>
+            expect(screen.queryByLabelText("Memory Budget (%)")).not.toBeInTheDocument(),
+        );
         expect(screen.queryByLabelText("Demote Idle Memory After")).not.toBeInTheDocument();
     });
 

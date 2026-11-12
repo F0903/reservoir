@@ -590,12 +590,13 @@ func TestBytesFetchedCountsFailedCacheWrites(t *testing.T) {
 		resp.Body.Close()
 	}
 
-	want := hits.Load() * 100
-	if want != 200 {
-		t.Fatalf("expected the cache attempt and the direct fallback upstream, got %d requests", hits.Load())
+	// The client reads along with the cache attempt, so the fallback is a request for the
+	// rest. This upstream answers it with a file that cannot be verified, which is not read.
+	if hits.Load() != 2 {
+		t.Fatalf("expected the cache attempt and a request for the rest upstream, got %d requests", hits.Load())
 	}
-	if got := env.Metrics.Requests.BytesFetched.Get(); got != want {
-		t.Fatalf("expected %d bytes fetched, got %d", want, got)
+	if got := env.Metrics.Requests.BytesFetched.Get(); got != 100 {
+		t.Fatalf("expected the 100 bytes of the failed cache attempt to be counted, got %d", got)
 	}
 }
 

@@ -33,6 +33,16 @@ func TestPatchReturnsBadRequest(t *testing.T) {
 			wantBody: []string{coreconfig.ErrValidationFailed.Error(), "cache.file.missing"},
 		},
 		{
+			name:     "LogFilePath",
+			body:     `{"logging":{"file":"ssl/ca.key"}}`,
+			wantBody: []string{coreconfig.ErrValidationFailed.Error(), "logging.file"},
+		},
+		{
+			name:     "CacheDirectoryPath",
+			body:     `{"cache":{"max_cache_size":"1G","file":{"dir":"/etc"}}}`,
+			wantBody: []string{coreconfig.ErrValidationFailed.Error(), "cache.file.dir"},
+		},
+		{
 			name:     "NullBody",
 			body:     `null`,
 			wantBody: []string{coreconfig.ErrValidationFailed.Error()},

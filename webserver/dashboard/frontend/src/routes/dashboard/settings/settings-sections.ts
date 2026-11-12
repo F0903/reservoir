@@ -14,7 +14,6 @@ import { Database, FileText, Globe, PanelsTopLeft } from "@lucide/svelte";
 import type { Component, ComponentProps } from "svelte";
 
 const optionalStringPattern = "^.*$";
-const stringPattern = "^.+$";
 const bytesizePattern = "^(\\d+)([BKMGT])$"; // eg. 100B, 1K, 1M, 1G, 1T
 const durationPattern = "^(?:\\+|-)?(?:(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:ns|us|\\u00B5s|ms|s|m|h))+$"; // eg. 100ms, 1s, 1m, 1h
 const ipPortPattern =
@@ -109,6 +108,8 @@ export function createInputInstances(
     };
 }
 
+// File and directory paths (log file, cache directory, CA certificate and key) are left
+// out on purpose: the server only accepts them from the config file or a command-line flag.
 export function createSettingsSections(
     settings: SettingsProvider,
     options: CreateSettingsSectionsOptions = {},
@@ -163,22 +164,6 @@ export function createSettingsSections(
                     pattern: optionalStringPattern,
                     tooltip:
                         "Comma-separated IPs or CIDR ranges of reverse proxies in front of the web server.",
-                },
-            ],
-            [
-                {
-                    InputComponent: TextInput,
-                    get: () => proxyConfig().ca_cert,
-                    commit: commit("proxy.ca_cert"),
-                    label: "CA Certificate Path",
-                    pattern: stringPattern,
-                },
-                {
-                    InputComponent: TextInput,
-                    get: () => proxyConfig().ca_key,
-                    commit: commit("proxy.ca_key"),
-                    label: "CA Key Path",
-                    pattern: stringPattern,
                 },
             ],
             [
@@ -239,16 +224,6 @@ export function createSettingsSections(
                     tooltip:
                         "Cache backend to use. Hybrid keeps hot package data in memory and spills colder data to disk. Changing this requires a restart.",
                 },
-                {
-                    InputComponent: TextInput,
-                    get: () => cacheConfig().file.dir,
-                    commit: commit("cache.file.dir"),
-                    label: "Cache Directory",
-                    pattern: stringPattern,
-                    visibleForBackends: ["file", "hybrid"],
-                    tooltip:
-                        "Directory used by the file backend and the hybrid file tier. Changing this requires a restart.",
-                },
             ],
             [
                 {
@@ -307,13 +282,6 @@ export function createSettingsSections(
                 },
             ],
             [
-                {
-                    InputComponent: TextInput,
-                    get: () => loggingConfig().file,
-                    commit: commit("logging.file"),
-                    label: "Log File Path",
-                    pattern: optionalStringPattern,
-                },
                 {
                     InputComponent: TextInput,
                     get: () => loggingConfig().max_size,

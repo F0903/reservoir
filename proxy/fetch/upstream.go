@@ -3,6 +3,7 @@ package fetch
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"reservoir/cache"
@@ -71,18 +72,36 @@ func (f *Fetcher) handleUpstream200(req *http.Request, resp *http.Response, base
 		lastModified = t
 	}
 
-	etag := resp.Header.Get("ETag")
-
-	var bytesRead int
-	reader := countingreader.New(resp.Body, &bytesRead)
-	cacheReader := cache.WithSizeHint(reader, resp.ContentLength)
-
-	cached, err = f.cache.Cache(storeKey, cacheReader, decision.Expires, CacheMetadata{
-		ETag:         etag,
+	metadata := CacheMetadata{
+		ETag:         resp.Header.Get("ETag"),
 		LastModified: lastModified,
 		Header:       resp.Header,
 		Vary:         decision.Vary,
-	})
+	}
+
+	var bytesRead int
+	var body io.Reader = countingreader.New(resp.Body, &bytesRead)
+
+	// Requests waiting on this flight read the body from a live copy while the cache
+	// is still downloading it, so they are not kept waiting for the whole file.
+	if fl := flightFrom(req.Context()); fl != nil {
+		now := time.Now()
+		live := &liveSource{
+			src:   body,
+			start: fl.startBody,
+			body: newLiveBody(storeKey, cache.EntryMetadata[CacheMetadata]{
+				TimeWritten: now,
+				LastAccess:  now,
+				Expires:     decision.Expires,
+				Size:        resp.ContentLength,
+				Object:      metadata,
+			}, f.liveWindow),
+		}
+		body = live
+		defer func() { live.settle(err == nil && cached != nil) }()
+	}
+
+	cached, err = f.cache.Cache(storeKey, cache.WithSizeHint(body, resp.ContentLength), decision.Expires, metadata)
 	f.metrics.Requests.BytesFetched.Add(int64(bytesRead))
 	if err != nil {
 		// The cache can't hold this response, but the client can still get it directly.
